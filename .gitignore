@@ -1,7 +1,6 @@
 .DS_Store
 
 .env
-*.sql
 *.key
 *.token
 node_modules
