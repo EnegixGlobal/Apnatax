@@ -1,0 +1,272 @@
+
+.main-sidebar{
+    z-index: 10;
+}
+/* Folder Grid Layout */
+.folder-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 20px;
+  padding: 0 0 20px 20px;
+}
+
+/* Folder Styling */
+.folder {
+  width: 180px;
+  height: 180px;
+padding: 12px;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #dee2e6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  color: #495057;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  position: relative;
+}
+
+.folder:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+  z-index: 10;
+}
+
+/* Folder Icons */
+.folder-icon {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  margin-bottom: 8px;
+}
+
+.folder-icon i {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 80px;
+  transition: opacity 0.2s ease;
+}
+
+.folder-icon .closed {
+  opacity: 1;
+  color: #ffc107;
+}
+
+.folder-icon .open {
+  opacity: 0;
+  color: #ffc107;
+}
+
+.folder:hover .closed {
+  opacity: 0;
+}
+
+.folder:hover .open {
+  opacity: 1;
+}
+
+/* Folder Text */
+.folder-name {
+  font-weight: 600;
+  font-size: 14px;
+  text-align: center;
+  word-break: break-word;
+  max-width: 100%;
+  padding: 0 4px;
+  margin: 0;
+  margin-top: 10px;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  line-clamp: 1;
+  -webkit-line-clamp: 1;
+  overflow: hidden;
+}
+
+.folder-count {
+  font-size: 12px;
+  color: #6c757d;
+  margin-top: 4px;
+}
+
+/* Popup Details */
+.folder-popup {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 200px;
+  background: white;
+  border-radius: 6px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+  padding: 12px;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s ease;
+  z-index: 20;
+  border: 1px solid #dee2e6;
+}
+
+.folder-popup.top {
+    bottom: calc(100% + 10px);
+}
+
+.folder-popup.bottom {
+  top: calc(100% + 10px);
+}
+
+.folder:hover .folder-popup {
+  opacity: 1;
+  visibility: visible;
+}
+
+.popup-title {
+  font-weight: bold;
+  margin-bottom: 8px;
+  color: #343a40;
+}
+
+.popup-details {
+  font-size: 12px;
+  color: #6c757d;
+  line-height: 1.4;
+}
+
+.popup-details div {
+  margin-bottom: 4px;
+}
+
+/* Arrow for popup */
+.folder-popup::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 8px;
+  border-style: solid;
+  border-color: white transparent transparent transparent;
+}
+
+/* Arrow for popup */
+.folder-popup.bottom::after {
+  content: '';
+  position: absolute;
+  top: -16px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 8px;
+  border-style: solid;
+  border-color: transparent transparent white transparent;
+}
+
+/* Dark Mode Support */
+.dark-mode .folder {
+  background: #343a40;
+  border-color: #454d55;
+  color: #f8f9fa;
+}
+
+.dark-mode .folder-popup {
+  background: #343a40;
+  border-color: #454d55;
+  color: #f8f9fa;
+}
+
+.dark-mode .folder-popup::after {
+  border-color: #343a40 transparent transparent transparent;
+}
+
+.dark-mode .popup-title {
+  color: #f8f9fa;
+}
+/* 08-05-2025 changes */
+.folder-doc{
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.folder-edit{
+    position: absolute;
+    z-index: 20;
+    top: 0;
+}
+@media(max-width:1440px){
+  .folder {
+    width: 190px;
+    height: 190px;
+}
+}
+@media (max-width: 1300px) {
+  .folder {
+      width: 180px;
+      height: 180px;
+  }
+}
+@media (max-width: 1280px) {
+  .folder {
+    width: 210px;
+    height: 210px;
+}
+
+}
+@media(max-width:1200px){
+  .folder {
+    width: 180px;
+    height: 180px;
+}
+}
+@media(max-width:1080px){
+  .folder {
+    width: 200px;
+    height: 200px;
+}
+}
+@media(max-width:992px){
+  .folder {
+    width: 190px;
+    height: 190px;
+}
+}
+@media(max-width:830px){
+  .folder {
+    width: 220px;
+    height: 220px;
+
+}
+}
+@media(max-width:768px){
+  .folder {
+    width: 180px;
+    height: 180px;
+
+}
+}
+@media(max-width:630px){
+  .folder {
+    width: 235px;
+    height: 235px;
+}
+
+}
+@media(max-width:575px){
+
+  .folder {
+    width: 180px;
+    height: 180px;
+}
+}
+@media(max-width:430px){
+    .folder {
+        width: 250px;
+        height: 250px;
+    }
+
+}
