@@ -25,10 +25,10 @@ date_default_timezone_set('Asia/Kolkata');
 |
 */
 if(isset($_SERVER['HTTP_HOST']) && $_SERVER['HTTP_HOST']=='localhost'){
-    $config['base_url'] = 'http://localhost/projects/taxefi';
+    $config['base_url'] = 'http://localhost/soratax/';
 }
 else{
-    $config['base_url'] = "https://$_SERVER[HTTP_HOST]";
+    $config['base_url'] = "https://$_SERVER[HTTP_HOST]/";
 }
 
 /*
@@ -231,7 +231,7 @@ $config['allow_get_array'] = TRUE;
 | your log files will fill up very fast.
 |
 */
-$config['log_threshold'] = 0;
+$config['log_threshold'] = 1;
 
 /*
 |--------------------------------------------------------------------------
