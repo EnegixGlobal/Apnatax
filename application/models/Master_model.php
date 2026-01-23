@@ -53,7 +53,58 @@ class Master_model extends CI_Model{
     }
     
     public function getpackages($where=array(),$type="all"){
+        // Handle special case for turnover-based package selection
+        if(isset($where['turnover>']) && !empty($where['turnover>'])){
+            $client_turnover = $where['turnover>'];
+            $package_name = isset($where['name']) ? $where['name'] : '';
+            
+            // Remove turnover> from where clause for base query
+            unset($where['turnover>']);
+            
+            // Get all packages with matching name
+            $this->db->where($where);
+            $this->db->order_by('turnover', 'ASC');
+            $this->db->order_by('id', 'ASC');
+            $query = $this->db->get("packages");
+            $all_packages = $query->result_array();
+            
+            if(empty($all_packages)){
+                return $type == 'all' ? array() : null;
+            }
+            
+            // If client turnover > 10000000, use ">100 Lac Per 100 Lac" package
+            if($client_turnover > 10000000){
+                foreach($all_packages as $package){
+                    if(strpos($package['remarks'], '>100 Lac Per 100 Lac') !== false){
+                        return $type == 'all' ? array($package) : $package;
+                    }
+                }
+            }
+            
+            // For turnover <= 10000000, find the highest package with turnover <= client turnover
+            // Exclude ">100 Lac Per 100 Lac" packages
+            $matching_packages = array();
+            foreach($all_packages as $package){
+                if(strpos($package['remarks'], '>100 Lac Per 100 Lac') === false){
+                    if($package['turnover'] <= $client_turnover){
+                        $matching_packages[] = $package;
+                    }
+                }
+            }
+            
+            if(!empty($matching_packages)){
+                // Return the package with highest turnover
+                $selected = end($matching_packages);
+                return $type == 'all' ? array($selected) : $selected;
+            }
+            
+            // Fallback: return first package if no match found
+            return $type == 'all' ? array($all_packages[0]) : $all_packages[0];
+        }
+        
+        // Standard query for other cases
         $this->db->where($where);
+        $this->db->order_by('id', 'ASC');
         $query=$this->db->get("packages");
         $result=array();
         if($type=='all'){
@@ -63,6 +114,41 @@ class Master_model extends CI_Model{
             $array=$query->unbuffered_row('array');
         }
         return $array;
+    }
+    
+    public function addpackage($data){
+        if($this->db->insert("packages",$data)){
+            $package_id=$this->db->insert_id();
+            return array("status"=>true,"message"=>"Package Added Successfully!",'package_id'=>$package_id);
+        }
+        else{
+            $error=$this->db->error();
+            return array("status"=>false,"message"=>$error['message']);
+        }
+    }
+    
+    public function updatepackage($data){
+        $id=$data['id'];
+        unset($data['id']);
+        $where=array("id"=>$id);
+        if($this->db->update("packages",$data,$where)){
+            return array("status"=>true,"message"=>"Package Updated Successfully!");
+        }
+        else{
+            $error=$this->db->error();
+            return array("status"=>false,"message"=>$error['message']);
+        }
+    }
+    
+    public function deletepackage($id){
+        $where=array("id"=>$id);
+        if($this->db->delete("packages",$where)){
+            return array("status"=>true,"message"=>"Package Deleted Successfully!");
+        }
+        else{
+            $error=$this->db->error();
+            return array("status"=>false,"message"=>$error['message']);
+        }
     }
     
     public function getdocuments($where=array(),$type="all"){

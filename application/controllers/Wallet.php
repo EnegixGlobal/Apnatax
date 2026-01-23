@@ -50,6 +50,31 @@ class Wallet extends CI_Controller {
         $where2=array('t1.user_id'=>$user['id']);
         $order_by="added_on desc";
         $data['transactions']=$this->wallet->gettransactions($where1,$where2,$order_by);
+        
+        // Calculate wallet balances
+        $total_balance=0;
+        $this->db->select_sum('amount');
+        $this->db->where(['user_id'=>$user['id'],'status'=>1]);
+        $wallet=$this->db->get("wallet")->unbuffered_row()->amount;
+        $wallet=!empty($wallet)?$wallet:0;
+        $total_balance+=$wallet;
+        
+        $this->db->select_sum('amount');
+        $this->db->where(['user_id'=>$user['id']]);
+        $purchases=$this->db->get("purchases")->unbuffered_row()->amount;
+        $purchases=!empty($purchases)?$purchases:0;
+        $total_balance-=$purchases;
+        
+        $this->db->select_sum('amount');
+        $this->db->where(['user_id'=>$user['id']]);
+        $acc_payment=$this->db->get("acc_payment")->unbuffered_row()->amount;
+        $acc_payment=!empty($acc_payment)?$acc_payment:0;
+        $total_balance-=$acc_payment;
+        
+        $data['total_balance']=$total_balance;
+        $data['security_deposit']=$this->wallet->getsecuritydeposit($user['id']);
+        $data['available_balance']=getwalletbalance();
+        
 		$this->template->load('wallet','wallet',$data);
 	}
     

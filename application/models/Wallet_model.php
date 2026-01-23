@@ -72,7 +72,73 @@ class Wallet_model extends CI_Model{
         $acc_payment=$this->db->get("acc_payment")->unbuffered_row()->amount;
         $acc_payment=!empty($acc_payment)?$acc_payment:0;
         $balance-=$acc_payment;
+        
+        // Subtract security deposit
+        $security_deposit=$this->getsecuritydeposit($user_id);
+        $balance-=$security_deposit;
+        
         return $balance;
+    }
+    
+    public function getsecuritydeposit($user_id){
+        $this->db->select_sum('amount');
+        $this->db->where(['user_id'=>$user_id]);
+        $security=$this->db->get("security_deposit")->unbuffered_row()->amount;
+        return !empty($security)?$security:0;
+    }
+    
+    public function addsecuritydeposit($data){
+        $datetime=date('Y-m-d H:i:s');
+        $data['added_on']=$data['updated_on']=$datetime;
+        if($this->db->insert("security_deposit",$data)){
+            return array("status"=>true,"message"=>"Security Deposit Added Successfully!");
+        }
+        else{
+            $error=$this->db->error();
+            return array("status"=>false,"message"=>$error['message']);
+        }
+    }
+    
+    public function updatesecuritydeposit($data){
+        $datetime=date('Y-m-d H:i:s');
+        $data['updated_on']=$datetime;
+        $id=$data['id'];
+        unset($data['id']);
+        $where=array("id"=>$id);
+        if($this->db->update("security_deposit",$data,$where)){
+            return array("status"=>true,"message"=>"Security Deposit Updated Successfully!");
+        }
+        else{
+            $error=$this->db->error();
+            return array("status"=>false,"message"=>$error['message']);
+        }
+    }
+    
+    public function getsecuritydeposits($where=array(),$type="all"){
+        $columns="t1.*,t2.name as customer_name,t2.mobile";
+        $this->db->select($columns);
+        $this->db->where($where);
+        $this->db->from('security_deposit t1');
+        $this->db->join('customers t2','t1.user_id=t2.user_id','left');
+        $this->db->order_by('t1.added_on','desc');
+        $query=$this->db->get();
+        if($type=='all'){
+            $array=$query->result_array();
+        }
+        else{
+            $array=$query->unbuffered_row('array');
+        }
+        return $array;
+    }
+    
+    public function deletesecuritydeposit($id){
+        if($this->db->delete("security_deposit",array("id"=>$id))){
+            return array("status"=>true,"message"=>"Security Deposit Deleted Successfully!");
+        }
+        else{
+            $error=$this->db->error();
+            return array("status"=>false,"message"=>$error['message']);
+        }
     }
     
     public function gettransactions($where1=array(),$where2=array(),$order_by="date"){

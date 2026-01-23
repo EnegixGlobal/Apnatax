@@ -29,7 +29,9 @@
                                     <li><a href="<?= base_url('masterkey/'); ?>" class="slide-item <?= activate_menu('masterkey'); ?>"> Services</a></li>
                                     <li><a href="<?= base_url('masterkey/documents/'); ?>" class="slide-item <?= activate_menu('masterkey/documents'); ?>"> Documents Required</a></li>
                                     <li><a href="<?= base_url('masterkey/documentlist/'); ?>" class="slide-item <?= activate_menu('masterkey/documentlist'); ?>"> Documents Required List</a></li>
+                                    <li><a href="<?= base_url('masterkey/packages/'); ?>" class="slide-item <?= activate_menu('masterkey/packages'); ?>"> Packages</a></li>
                                     <li><a href="<?= base_url('masterkey/salarypercent/'); ?>" class="slide-item <?= activate_menu('masterkey/salarypercent'); ?>"> Employee Salary Percent</a></li>
+                                    <li><a href="<?= base_url('masterkey/securityamount/'); ?>" class="slide-item <?= activate_menu('masterkey/securityamount'); ?>"> Security Amount</a></li>
                                 </ul>
                             </li>
                             <li class="slide <?= activate_dropdown('customers') ?>">
