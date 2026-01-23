@@ -74,23 +74,28 @@ $active_group = 'default';
 $query_builder = TRUE;
 
 $db['default'] = array(
-	'dsn'	=> '',
-	'hostname' => DB_HOST,
-	'username' => DB_USER,
-	'password' => DB_PASS,
-	'database' => DB_NAME,
-	'dbdriver' => 'mysqli',
-	'dbprefix' => TP,
-	'pconnect' => FALSE,
-	'db_debug' => (ENVIRONMENT !== 'production'),
-	'cache_on' => FALSE,
-	'cachedir' => '',
-	'char_set' => 'utf8',
-	'dbcollat' => 'utf8_general_ci',
-	'swap_pre' => '',
-	'encrypt' => FALSE,
-	'compress' => FALSE,
-	'stricton' => FALSE,
-	'failover' => array(),
-	'save_queries' => TRUE
+    'dsn'       => '',
+    'hostname'  => 'localhost',
+    'username'  => 'root',
+    'password'  => '',
+    'database'  => 'db_taxefi',
+    'dbdriver'  => 'mysqli',
+    'dbprefix'  => 'tf_',
+    'pconnect'  => FALSE,
+    'db_debug'  => (ENVIRONMENT !== 'production'),
+    'cache_on'  => FALSE,
+    'cachedir'  => '',
+    'char_set'  => 'utf8',
+    'dbcollat'  => 'utf8_general_ci',
+    'swap_pre'  => '',
+    'encrypt'   => FALSE,
+    'compress'  => FALSE,
+    'stricton'  => FALSE,
+    'failover'  => array(),
+    'save_queries' => TRUE
 );
+
+
+
+
+?>
