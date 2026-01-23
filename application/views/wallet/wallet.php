@@ -6,8 +6,38 @@
                             <div class="card-body">
                                 <div class="d-flex">
                                     <div class="text-white">
-                                        <h2 class="mb-0 number-font"><?= $this->amount->toDecimal(getwalletbalance()); ?></h2>
-                                        <p class="text-white mb-0">Wallet Balance </p>
+                                        <h2 class="mb-0 number-font"><?= $this->amount->toDecimal($available_balance); ?></h2>
+                                        <p class="text-white mb-0">Available Wallet Balance </p>
+                                    </div>
+                                    <div class="ms-auto card-icon">
+                                        <img src="<?= file_url('assets/images/money.svg'); ?>" alt="" style="filter:grayscale(1)">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card bg-warning img-card box-primary-shadow">
+                            <div class="card-body">
+                                <div class="d-flex">
+                                    <div class="text-white">
+                                        <h2 class="mb-0 number-font"><?= $this->amount->toDecimal($security_deposit); ?></h2>
+                                        <p class="text-white mb-0">Security Deposit </p>
+                                    </div>
+                                    <div class="ms-auto card-icon">
+                                        <img src="<?= file_url('assets/images/money.svg'); ?>" alt="" style="filter:grayscale(1)">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card bg-info img-card box-primary-shadow">
+                            <div class="card-body">
+                                <div class="d-flex">
+                                    <div class="text-white">
+                                        <h2 class="mb-0 number-font"><?= $this->amount->toDecimal($total_balance); ?></h2>
+                                        <p class="text-white mb-0">Total Wallet Balance </p>
                                     </div>
                                     <div class="ms-auto card-icon">
                                         <img src="<?= file_url('assets/images/money.svg'); ?>" alt="" style="filter:grayscale(1)">

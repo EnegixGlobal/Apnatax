@@ -98,6 +98,16 @@ class Masterkey extends CI_Controller {
 		$this->template->load('masterkey','salarypercent',$data);
 	}
     
+	public function packages(){
+        $data['title']="Packages";
+        //$data['subtitle']="Sample Subtitle";
+        $data['breadcrumb']=array();
+        $data['datatable']=true;
+        $where=array();
+        $data['packages']=$this->master->getpackages($where);
+		$this->template->load('masterkey','packages',$data);
+	}
+    
     public function getservicedocuments(){
         $service_id=$this->input->post('service_id');
         $documents=$this->master->getservicedocuments(['t1.service_id'=>$service_id]);
@@ -291,6 +301,130 @@ class Masterkey extends CI_Controller {
         $id=$this->input->post('id');
         $salarypercent=$this->master->getsalarypercents(array("id"=>$id),"single");
         echo json_encode($salarypercent);
+    }
+    
+    public function addpackage(){
+        if($this->input->post('addpackage')!==NULL){
+            $data=$this->input->post();
+            unset($data['addpackage']);
+            $data['status']=!empty($data['status'])?1:0;
+			$result=$this->master->addpackage($data);
+			if($result['status']===true){
+				$this->session->set_flashdata("msg",$result['message']);
+			}
+            else{
+                $this->session->set_flashdata("err_msg",$result['message']);
+            }
+        }
+        if($this->input->post('updatepackage')!==NULL){
+            $data=$this->input->post();
+            unset($data['updatepackage']);
+            $data['status']=!empty($data['status'])?1:0;
+			$result=$this->master->updatepackage($data);
+			if($result['status']===true){
+				$this->session->set_flashdata("msg",$result['message']);
+			}
+            else{
+                $this->session->set_flashdata("err_msg",$result['message']);
+            }
+        }
+        if(!empty($data) && !isset($data['id'])){
+            unset($_SESSION["msg"],$_SESSION["err_msg"]);
+            echo json_encode($result);
+            exit;
+        }
+        redirect($_SERVER['HTTP_REFERER']);
+    }
+    
+    public function getpackage(){
+        $id=$this->input->post('id');
+        $package=$this->master->getpackages(array("id"=>$id),"single");
+        echo json_encode($package);
+    }
+    
+    public function deletepackage($id=NULL){
+        if($id!==NULL){
+            $result=$this->master->deletepackage($id);
+            if($result['status']===true){
+                $this->session->set_flashdata("msg",$result['message']);
+            }
+            else{
+                $this->session->set_flashdata("err_msg",$result['message']);
+            }
+        }
+        redirect('masterkey/packages/');
+    }
+    
+    public function securityamount(){
+        $data['title']="Security Amount";
+        $data['breadcrumb']=array();
+        $data['datatable']=true;
+        $where=array();
+        $data['security_deposits']=$this->wallet->getsecuritydeposits($where);
+        
+        // Get customers for dropdown
+        $customers=$this->customer->getcustomers($where);
+        $options=array(''=>'Select Customer');
+        if(!empty($customers)){
+            foreach($customers as $customer){
+                $options[$customer['user_id']]=$customer['name'].' - '.$customer['mobile'];
+            }
+        }
+        $data['customers']=$options;
+        $data['form']='add';
+        $this->template->load('masterkey','securityamount',$data);
+    }
+    
+    public function addsecuritydeposit(){
+        if($this->input->post('addsecuritydeposit')!==NULL){
+            $data=$this->input->post();
+            unset($data['addsecuritydeposit']);
+            $user=getuser();
+            $data['added_by']=$user['id'];
+            $result=$this->wallet->addsecuritydeposit($data);
+            if($result['status']===true){
+                $this->session->set_flashdata("msg",$result['message']);
+            }
+            else{
+                $this->session->set_flashdata("err_msg",$result['message']);
+            }
+        }
+        if($this->input->post('updatesecuritydeposit')!==NULL){
+            $data=$this->input->post();
+            unset($data['updatesecuritydeposit']);
+            $result=$this->wallet->updatesecuritydeposit($data);
+            if($result['status']===true){
+                $this->session->set_flashdata("msg",$result['message']);
+            }
+            else{
+                $this->session->set_flashdata("err_msg",$result['message']);
+            }
+        }
+        if(!empty($data) && !isset($data['id'])){
+            unset($_SESSION["msg"],$_SESSION["err_msg"]);
+            echo json_encode($result);
+            exit;
+        }
+        redirect('masterkey/securityamount/');
+    }
+    
+    public function getsecuritydeposit(){
+        $id=$this->input->post('id');
+        $security_deposit=$this->wallet->getsecuritydeposits(array("t1.id"=>$id),"single");
+        echo json_encode($security_deposit);
+    }
+    
+    public function deletesecuritydeposit($id=NULL){
+        if($id!==NULL){
+            $result=$this->wallet->deletesecuritydeposit($id);
+            if($result['status']===true){
+                $this->session->set_flashdata("msg",$result['message']);
+            }
+            else{
+                $this->session->set_flashdata("err_msg",$result['message']);
+            }
+        }
+        redirect('masterkey/securityamount/');
     }
     
 }
