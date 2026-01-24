@@ -145,7 +145,7 @@ elseif($order['status']==4){
                                                 <a href="<?= base_url('orders/acceptorder/'.md5($order['id'])); ?>" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#myModal" onClick="$('.modal-title').text('Upload Assessment Report');$('#assign-form').hide();$('#assessment-form').show();">Upload Assessment Report</a>
                                                 <?php
                                                     }
-                                                    if($order['status']==4){
+                                                    if($order['status']==4 && !empty($assessment) && !empty($assessment['file'])){
                                                         $extension=substr($assessment['file'], -4);
                                                         $extension=trim($extension,'.');
                                                         if($extension=='png' || $extension=='jpg'|| $extension=='jpeg'){
@@ -158,7 +158,7 @@ elseif($order['status']==4){
                                                             $filetype='excel';
                                                         }
                                                     ?>
-                                                    <a href="<?= $assessment['file'] ?>" target="_blank" download class="btn btn-sm btn-info"><i class="fa fa-download"></i> Download Assessment File</a>
+                                                    <a href="<?= file_url($assessment['file']) ?>" target="_blank" download class="btn btn-sm btn-info"><i class="fa fa-download"></i> Download Assessment File</a>
                                                 <?php
                                                     }
                                                 ?>

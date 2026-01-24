@@ -30,6 +30,39 @@ class Home extends CI_Controller {
         $this->template->load('pages','home',$data);
     }
     
+    public function workreports(){
+        checklogin();
+        if($this->session->role!='customer'){
+            redirect('home/');
+        }
+        $user=getuser();
+        $year=$this->session->year;
+        $firm_id=$this->session->firm;
+        
+        $data=['title'=>'Work Reports'];
+        $data['breadcrumb']=array("active"=>"Work Reports");
+        $data['datatable']=true;
+        $data['user']=$user;
+        
+        // Get completed assessments (purchases with status=4 - Assessment Report Uploaded and assessment status=1 - Completed)
+        $where="t1.user_id='$user[id]' and t1.firm_id='$firm_id' and t1.status=4";
+        if(!empty($year)){
+            $where.=" and t1.year='$year'";
+        }
+        
+        // Join with assessments table to get the assessment file (only completed assessments)
+        $this->db->select("t1.*, t2.name as service_name, t2.slug as service_slug, t3.file as assessment_file, t3.date as assessment_date, t3.remarks as assessment_remarks");
+        $this->db->from('purchases t1');
+        $this->db->join('services t2', 't1.service_id=t2.id', 'left');
+        $this->db->join('assessments t3', 't1.id=t3.order_id and t3.status=1', 'left');
+        $this->db->where($where);
+        $this->db->order_by('t3.date', 'DESC');
+        $query = $this->db->get();
+        $data['workreports'] = $query->result_array();
+        
+        $this->template->load('pages','workreports',$data);
+    }
+    
     public function updatenotification(){
         $id=$this->input->post('id');
         $notification=$this->common->getnotifications(["md5(concat('notify-',t1.id))"=>$id],'single');

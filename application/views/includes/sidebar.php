@@ -103,6 +103,9 @@
                                 ?>
                                 <a class="side-menu__item <?= activate_menu($active); ?>" data-bs-toggle="slide" href="<?= base_url('services/purchasedservices/'); ?>"><i class="side-menu__icon fa fa-list"></i><span class="side-menu__label">Purchased Services</span></a>
                             </li>
+                            <li class="slide">
+                                <a class="side-menu__item <?= activate_menu('home/workreports'); ?>" data-bs-toggle="slide" href="<?= base_url('home/workreports/'); ?>"><i class="side-menu__icon fa fa-file-text"></i><span class="side-menu__label">Work Reports</span></a>
+                            </li>
                             <?php /*?><li class="slide <?= activate_dropdown('firms') ?>">
                                 <a class="side-menu__item <?= activate_dropdown('firms') ?>" data-bs-toggle="slide" href="javascript:void(0)"><i class="side-menu__icon  fa fa-users"></i><span class="side-menu__label">Firms</span><i class="angle fe fe-chevron-right"></i></a>
                                 <ul class="slide-menu">

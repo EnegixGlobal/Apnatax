@@ -95,9 +95,23 @@
             $year=$CI->session->year;
             $firm_id=$CI->session->firm;
             $data['user']=$user;
-            $where="t1.user_id='$user[id]' and t1.firm_id='$firm_id' and t1.year='$year' and t1.status='0'";
-            $CI->db->group_by('t1.service_id');
-            $services=$CI->service->getpurchasedservices($where);
+            
+            // Get service package for this user/firm/year to get package service IDs
+            $service_package = $CI->customer->getservicepackage(['t1.user_id' => $user['id'], 't1.firm_id' => $firm_id, 't1.year' => $year], 'single');
+            
+            $services = array();
+            if (!empty($service_package) && !empty($service_package['service_ids'])) {
+                // Get service IDs from the package
+                $package_service_ids = explode(',', $service_package['service_ids']);
+                if (!empty($package_service_ids)) {
+                    // Filter to only count pending services that are part of the package
+                    $service_ids_str = implode(',', array_map('intval', $package_service_ids));
+                    $where = "t1.user_id='$user[id]' and t1.firm_id='$firm_id' and t1.year='$year' and t1.status='0' and t1.service_id IN ($service_ids_str)";
+                    $CI->db->group_by('t1.service_id');
+                    $services = $CI->service->getpurchasedservices($where);
+                }
+            }
+            
             return !empty($services)?count($services):0;
 		}  
 	}
@@ -118,6 +132,30 @@
             $user=$user===NULL?getuser():$user;
             $balance=$CI->wallet->getwalletbalance($user['id']);
             return $balance;
+		}  
+	}
+
+	if(!function_exists('countworkreports')) {
+  		function countworkreports() {
+    		$CI = get_instance();
+            $user=getuser();
+            $year=$CI->session->year;
+            $firm_id=$CI->session->firm;
+            
+            // Count completed assessments (purchases with status=4 and assessment status=1)
+            $where="t1.user_id='$user[id]' and t1.firm_id='$firm_id' and t1.status=4";
+            if(!empty($year)){
+                $where.=" and t1.year='$year'";
+            }
+            
+            $CI->db->select("COUNT(DISTINCT t1.id) as count");
+            $CI->db->from('purchases t1');
+            $CI->db->join('assessments t3', 't1.id=t3.order_id and t3.status=1', 'left');
+            $CI->db->where($where);
+            $CI->db->where('t3.id IS NOT NULL');
+            $query = $CI->db->get();
+            $result = $query->row_array();
+            return !empty($result['count']) ? $result['count'] : 0;
 		}  
 	}
 

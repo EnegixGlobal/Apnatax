@@ -258,8 +258,9 @@ class Wallet extends CI_Controller {
                 $upload=upload_file('file',$upload_path,$allowed_types,$filename);
                 if($upload['status']===true){
                     $data['file']=$upload['path'];
-                
+                    $data['firm_id']=$this->db->get_where('formdata',['order_id'=>$data['order_id']])->unbuffered_row()->firm_id;
                     $data['date']=date("Y-m-d");
+                    $data['status']=1; // Mark assessment as completed
                     $data['added_on']=$data['updated_on']=date('Y-m-d H:i:s');
                     if($this->db->insert('assessments',$data)){
                         $this->db->update('purchases',['status'=>4],['id'=>$data['order_id']]);
