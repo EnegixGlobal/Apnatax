@@ -187,6 +187,22 @@
                                             </div>
                                         </a>
                                     </div>
+                                    <div class="col-md-3">
+                                        <a href="<?= base_url('home/workreports/'); ?>">
+                                            <div class="card bg-info img-card box-primary-shadow">
+                                                <div class="card-body">
+                                                    <div class="d-flex">
+                                                        <div class="text-white">
+                                                            <h2><?= countworkreports(); ?></h2>
+                                                            <p class="text-white mb-0">Work Reports </p>
+                                                        </div>
+                                                        <div class="ms-auto card-icon">
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </a>
+                                    </div>
                                 </div>
                                 <?php
                                     }

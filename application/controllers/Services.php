@@ -56,12 +56,26 @@ class Services extends CI_Controller {
         $firm_id=$this->session->firm;
         $user=getuser();
         $data['user']=$user;
-        $where="t1.user_id='$user[id]' and t1.firm_id='$firm_id' and t1.year='$year' and t1.status='0'";
-        $this->db->group_by('t1.service_id');
-        $services=$this->service->getpurchasedservices($where);
-        $data['services']=$services;
+        
+        // Get service package for this user/firm/year to get package service IDs
+        $service_package = $this->customer->getservicepackage(['t1.user_id' => $user['id'], 't1.firm_id' => $firm_id, 't1.year' => $year], 'single');
+        
+        $services = array();
+        if (!empty($service_package) && !empty($service_package['service_ids'])) {
+            // Get service IDs from the package
+            $package_service_ids = explode(',', $service_package['service_ids']);
+            if (!empty($package_service_ids)) {
+                // Filter to only show pending services that are part of the package
+                $service_ids_str = implode(',', array_map('intval', $package_service_ids));
+                $where = "t1.user_id='$user[id]' and t1.firm_id='$firm_id' and t1.year='$year' and t1.status='0' and t1.service_id IN ($service_ids_str)";
+                $this->db->group_by('t1.service_id');
+                $services = $this->service->getpurchasedservices($where);
+            }
+        }
+        
+        $data['services'] = $services;
         //print_pre($data,true);
-        $data['datatable']=true;
+        $data['datatable'] = true;
         //$data['folders']=$folders;
         $this->template->load('services','pendingservices',$data);
     }

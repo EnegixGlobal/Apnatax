@@ -85,10 +85,17 @@ class Orders extends CI_Controller {
         }
         $data['assigned']=$assigned;
         
-        $getassessment=$this->db->get_where('assessments',['order_id'=>$order['id'],'status'=>0]);
+        // Get assessment - check for status=1 (completed) first, then status=0 (pending) as fallback
+        $getassessment=$this->db->get_where('assessments',['order_id'=>$order['id'],'status'=>1]);
         $assessment=array();
         if($getassessment->num_rows()>0){
             $assessment=$getassessment->unbuffered_row('array');
+        } else {
+            // Fallback to status=0 for backward compatibility
+            $getassessment=$this->db->get_where('assessments',['order_id'=>$order['id'],'status'=>0]);
+            if($getassessment->num_rows()>0){
+                $assessment=$getassessment->unbuffered_row('array');
+            }
         }
         $data['assessment']=$assessment;
         
@@ -207,6 +214,7 @@ class Orders extends CI_Controller {
                     $data['file']=$upload['path'];
                     $data['firm_id']=$this->db->get_where('formdata',['order_id'=>$data['order_id']])->unbuffered_row()->firm_id;
                     $data['date']=date("Y-m-d");
+                    $data['status']=1; // Mark assessment as completed
                     $data['added_on']=$data['updated_on']=date('Y-m-d H:i:s');
                     if($this->db->insert('assessments',$data)){
                         $this->db->update('purchases',['status'=>4],['id'=>$data['order_id']]);

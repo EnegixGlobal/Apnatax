@@ -19,9 +19,9 @@
                                 <div class="folder-doc">
                                     <?php /*?><a href="#" class="btn btn-sm p-0 folder-edit"><i class="fa fa-edit"></i></a><?php */?>
                                     <a href="<?= base_url($folder['link']); ?>" class="folder">
-                                        <div class="folder-icon">
+                                        <!-- <div class="folder-icon">
                                             <?= $icon; ?>
-                                        </div>
+                                        </div> -->
                                         <div class="folder-name"><?= $folder['name']; ?></div>
                                         <?php
                                             if(empty($folder['type'])){

@@ -16,7 +16,7 @@
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-4">
+                    <!-- <div class="col-md-4">
                         <div class="card bg-warning img-card box-primary-shadow">
                             <div class="card-body">
                                 <div class="d-flex">
@@ -45,7 +45,7 @@
                                 </div>
                             </div>
                         </div>
-                    </div>
+                    </div> -->
                 </div><hr>
                 <div class="row <?= $this->session->flashdata('remaining')===NULL?'':'bg-danger py-2'; ?>">
                     <div class="col-md-12">
@@ -98,6 +98,11 @@
                                             }
                                             elseif($single['type']=='acc_payment'){
                                                 $type='Accountancy Payment';
+                                                $color='text-danger';
+                                                $trans_type='Debit';
+                                            }
+                                            elseif($single['type']=='security_deposit'){
+                                                $type='Security Deposit';
                                                 $color='text-danger';
                                                 $trans_type='Debit';
                                             }

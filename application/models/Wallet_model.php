@@ -157,15 +157,22 @@ class Wallet_model extends CI_Model{
         $this->db->join('services t2','t1.service_id=t2.id');
         $sql2=$this->db->get_compiled_select();
         
-        $columns2="concat('acc_payment-',md5(concat('acc_payment',t1.id))) as id,t1.date,t1.amount,
+        $columns3="concat('acc_payment-',md5(concat('acc_payment',t1.id))) as id,t1.date,t1.amount,
                     md5(concat('acc_payment',t1.id)) as transaction_id,concat('Accountancy Payment of ',MONTHNAME(t2.date),'-',YEAR(t2.date)) as remarks,t1.added_on,'debit' as trans_type,'acc_payment' as type";
-        $this->db->select($columns2);
+        $this->db->select($columns3);
         $this->db->where($where2);
         $this->db->from('acc_payment t1');
         $this->db->join('accountancy t2','t1.acc_date=t2.date and t1.firm_id=t2.firm_id');
         $sql3=$this->db->get_compiled_select();
         
-        $query = $this->db->query($sql1 . ' UNION ' . $sql2.' UNION ' . $sql3.' ORDER BY '.$order_by);
+        $columns4="concat('security_deposit-',md5(concat('security_deposit',t1.id))) as id,t1.date,t1.amount,
+                    md5(concat('security_deposit',t1.id)) as transaction_id,COALESCE(t1.remarks,'Security Deposit') as remarks,t1.added_on,'debit' as trans_type,'security_deposit' as type";
+        $this->db->select($columns4);
+        $this->db->where($where2);
+        $this->db->from('security_deposit t1');
+        $sql4=$this->db->get_compiled_select();
+        
+        $query = $this->db->query($sql1 . ' UNION ' . $sql2.' UNION ' . $sql3.' UNION ' . $sql4.' ORDER BY '.$order_by);
 
         // Get the result
         $result = $query->result_array();
