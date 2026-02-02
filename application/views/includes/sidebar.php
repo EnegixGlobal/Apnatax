@@ -75,6 +75,14 @@
                                     <li><a href="<?= base_url('users/roles/'); ?>" class="slide-item <?= activate_menu('users/roles'); ?>"> User Roles</a></li>
                                 </ul>
                             </li>
+                            <li class="slide <?= activate_dropdown('reports/adminincome') ?>">
+                                <a class="side-menu__item <?= activate_dropdown('reports/adminincome') ?>" data-bs-toggle="slide" href="javascript:void(0)"><i class="side-menu__icon  fa fa-line-chart"></i><span class="side-menu__label">Income Reports</span><i class="angle fe fe-chevron-right"></i></a>
+                                <ul class="slide-menu">
+                                    <li class="side-menu-label1"><a href="javascript:void(0)">Income Reports</a></li>
+                                    <li><a href="<?= base_url('reports/adminincome/'); ?>" class="slide-item <?= activate_menu('reports/adminincome'); ?>"> Income by Service</a></li>
+                                    <li><a href="<?= base_url('reports/servicecustomers/'); ?>" class="slide-item <?= activate_menu('reports/servicecustomers'); ?>"> Service Customers</a></li>
+                                </ul>
+                            </li>
                             <li class="slide">
                                 <a class="side-menu__item <?= activate_menu('chat'); ?>" data-bs-toggle="slide" href="<?= base_url('chat/'); ?>"><i class="side-menu__icon fa fa-comments"></i><span class="side-menu__label">Chat</span></a>
                             </li>
