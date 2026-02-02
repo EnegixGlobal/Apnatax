@@ -8,7 +8,9 @@
                                                         <th>Mobile</th>
                                                         <th>Email</th>
                                                         <th>Service Purchased</th>
-                                                        <th>Amount</th>
+                                                        <th>Subtotal</th>
+                                                        <th>GST (18%)</th>
+                                                        <th>Total Amount</th>
                                                         <th>Status</th>
                                                         <th>Action</th>
                                                     </tr>
@@ -28,6 +30,12 @@
                                                                 $status='<span class="text-success">Assessment Done and Report Uploaded!</span>';
                                                             }
                                                             
+                                                            // Get GST information
+                                                            $subtotal = !empty($single['subtotal']) ? $single['subtotal'] : $single['amount'];
+                                                            $gst_amount = !empty($single['gst_amount']) ? $single['gst_amount'] : 0;
+                                                            $gst_enabled = !empty($single['gst_enabled']) && $single['gst_enabled'] == 1;
+                                                            $total_amount = !empty($single['amount']) ? $single['amount'] : $subtotal;
+                                                            
                                                     ?>
                                                     <tr>
                                                         <td><?= ++$i; ?></td>
@@ -35,7 +43,9 @@
                                                         <td><?= $single['mobile']; ?></td>
                                                         <td><?= $single['email']; ?></td>
                                                         <td><?= $single['service_name']; ?></td>
-                                                        <td><?= $single['amount']; ?></td>
+                                                        <td><?= number_format($subtotal, 2); ?></td>
+                                                        <td><?= $gst_enabled ? number_format($gst_amount, 2) : '-'; ?></td>
+                                                        <td><strong><?= number_format($total_amount, 2); ?></strong></td>
                                                         <td><?= $status; ?></td>
                                                         <td>
                                                             <?php

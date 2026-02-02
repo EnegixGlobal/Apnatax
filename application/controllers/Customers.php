@@ -295,6 +295,8 @@ class Customers extends CI_Controller
             unset($data['savecustomer']);
             $user = getuser();
             $data['added_by'] = $user['id'];
+            // Handle GST enabled checkbox
+            $data['gst_enabled'] = !empty($data['gst_enabled']) && $data['gst_enabled'] == 1 ? 1 : 0;
             $result = $this->customer->savecustomer($data);
             if ($result['status'] === true) {
                 $this->session->set_flashdata("msg", $result['message']);
@@ -307,6 +309,8 @@ class Customers extends CI_Controller
             $data = $this->input->post();
             unset($data['updatecustomer']);
             $user = getuser();
+            // Handle GST enabled checkbox
+            $data['gst_enabled'] = !empty($data['gst_enabled']) && $data['gst_enabled'] == 1 ? 1 : 0;
             //print_pre($data,true);
             $result = $this->customer->updatecustomer($data);
             if ($result['status'] === true) {

@@ -469,5 +469,118 @@ class Service_model extends CI_Model{
         }
         return $array;
     }
+    
+    public function getincomebyservice($where="1",$period='monthly',$service_id=NULL){
+        // Build date filter based on period
+        $date_filter = "";
+        if($period == 'monthly'){
+            $date_filter = "DATE_FORMAT(t1.date, '%Y-%m') = DATE_FORMAT(CURDATE(), '%Y-%m')";
+        }
+        elseif($period == 'quarterly'){
+            $quarter = ceil(date('n') / 3);
+            $date_filter = "QUARTER(t1.date) = $quarter AND YEAR(t1.date) = YEAR(CURDATE())";
+        }
+        elseif($period == 'yearly'){
+            $date_filter = "YEAR(t1.date) = YEAR(CURDATE())";
+        }
+        
+        // Use amount field (which includes GST if applicable)
+        $columns = "t2.id as service_id, t2.name as service_name, 
+                    COALESCE(SUM(t1.amount), 0) as total_amount,
+                    COUNT(DISTINCT t1.id) as total_orders,
+                    COUNT(DISTINCT t1.user_id) as total_customers";
+        
+        $this->db->select($columns);
+        $this->db->where($where);
+        if(!empty($date_filter)){
+            $this->db->where($date_filter, NULL, FALSE);
+        }
+        if(!empty($service_id)){
+            $this->db->where('t1.service_id', $service_id);
+        }
+        $this->db->from('purchases t1');
+        $this->db->join('services t2', 't1.service_id = t2.id', 'left');
+        $this->db->group_by('t2.id, t2.name');
+        $this->db->order_by('total_amount', 'DESC');
+        $query = $this->db->get();
+        
+        return $query->result_array();
+    }
+    
+    public function getincomebyperiod($where=array(),$period='monthly',$service_id=NULL,$start_date=NULL,$end_date=NULL){
+        // Build date filter based on period
+        $date_filter = "";
+        if(!empty($start_date) && !empty($end_date)){
+            $date_filter = "t1.date >= '$start_date' AND t1.date <= '$end_date'";
+        }
+        elseif($period == 'monthly'){
+            $date_filter = "DATE_FORMAT(t1.date, '%Y-%m') = DATE_FORMAT(CURDATE(), '%Y-%m')";
+        }
+        elseif($period == 'quarterly'){
+            $quarter = ceil(date('n') / 3);
+            $date_filter = "QUARTER(t1.date) = $quarter AND YEAR(t1.date) = YEAR(CURDATE())";
+        }
+        elseif($period == 'yearly'){
+            $date_filter = "YEAR(t1.date) = YEAR(CURDATE())";
+        }
+        // If period is empty or 'all', don't apply date filter
+        
+        // Use amount field (which includes GST if applicable)
+        $columns = "t2.id as service_id, t2.name as service_name, 
+                    COALESCE(SUM(t1.amount), 0) as total_amount,
+                    COUNT(DISTINCT t1.id) as total_orders,
+                    COUNT(DISTINCT t1.user_id) as total_customers";
+        
+        $this->db->select($columns);
+        // Handle where clause
+        if(!empty($where) && is_array($where)){
+            $this->db->where($where);
+        } elseif(!empty($where) && is_string($where) && $where != "1"){
+            $this->db->where($where, NULL, FALSE);
+        }
+        if(!empty($date_filter)){
+            $this->db->where($date_filter, NULL, FALSE);
+        }
+        if(!empty($service_id)){
+            $this->db->where('t1.service_id', $service_id);
+        }
+        $this->db->from('purchases t1');
+        $this->db->join('services t2', 't1.service_id = t2.id', 'left');
+        $this->db->group_by('t2.id, t2.name');
+        $this->db->order_by('total_amount', 'DESC');
+        $query = $this->db->get();
+        
+        return $query->result_array();
+    }
+    
+    public function getcustomersbyservice($where=array(),$service_id=NULL,$start_date=NULL,$end_date=NULL){
+        // Select all columns from purchases, then add specific ones
+        // This handles cases where GST columns may or may not exist
+        $columns = "t1.*, 
+                    t2.id as customer_id, t2.name as customer_name, t2.mobile, t2.email,
+                    t3.id as service_id, t3.name as service_name";
+        
+        $this->db->select($columns);
+        // Handle where clause
+        if(!empty($where) && is_array($where)){
+            $this->db->where($where);
+        } elseif(!empty($where) && is_string($where) && $where != "1"){
+            $this->db->where($where, NULL, FALSE);
+        }
+        if(!empty($service_id)){
+            $this->db->where('t1.service_id', $service_id);
+        }
+        if(!empty($start_date) && !empty($end_date)){
+            $this->db->where("t1.date >= '$start_date' AND t1.date <= '$end_date'", NULL, FALSE);
+        }
+        $this->db->from('purchases t1');
+        $this->db->join('users t2', 't1.user_id = t2.id', 'left');
+        $this->db->join('services t3', 't1.service_id = t3.id', 'left');
+        $this->db->order_by('t1.date', 'DESC');
+        $this->db->order_by('t1.amount', 'DESC');
+        $query = $this->db->get();
+        
+        return $query->result_array();
+    }
 
 }

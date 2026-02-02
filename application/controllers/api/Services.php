@@ -83,35 +83,49 @@ class Services extends RestController{
                         }
                         if($status){
                             $service['rate']=$service_id==1?$amount:$service['rate'];
-                            $total=$service['rate'];
+                            $subtotal=$service['rate'];
                             if(!empty($types) && count($types)>1){
                                 if($type=='Monthly'){
-                                    $total=$service['rate'];
+                                    $subtotal=$service['rate'];
                                 }
                                 elseif($type=='Quarterly'){
                                     if(in_array("Monthly",$types)){
-                                        $total=$service['rate']*3;
+                                        $subtotal=$service['rate']*3;
                                     }
                                     else{
-                                        $total=$service['rate'];
+                                        $subtotal=$service['rate'];
                                     }
                                 }
                                 elseif($type=='Yearly'){
                                     if(in_array("Monthly",$types) && !in_array("Quarterly",$types)){
-                                        $total=$service['rate']*12;
+                                        $subtotal=$service['rate']*12;
                                     }
                                     elseif(!in_array("Monthly",$types) && in_array("Quarterly",$types)){
-                                        $total=$service['rate']*4;
+                                        $subtotal=$service['rate']*4;
                                     }
                                     else{
-                                        $total=$service['rate'];
+                                        $subtotal=$service['rate'];
                                     }
                                 }
                             }
+                            
+                            // Check if GST is enabled for this customer
+                            $customer=$this->customer->getcustomers(['t1.user_id'=>$user['id']],'single');
+                            $gst_enabled=!empty($customer) && !empty($customer['gst_enabled']) && $customer['gst_enabled']==1;
+                            $gst_amount=0;
+                            $total=$subtotal;
+                            
+                            if($gst_enabled){
+                                // Calculate 18% GST
+                                $gst_amount=round(($subtotal*18)/100, 2);
+                                $total=$subtotal+$gst_amount;
+                            }
+                            
                             $where=array('user_id'=>$user['id'],'status'=>1);
                             $single=array('date'=>date('Y-m-d'),'year'=>$year,'type'=>$type,'user_id'=>$user['id'],
                                           'service_id'=>$service['id'],'firm_id'=>$firm['id'],'service'=>$service['name'],
-                                          'rate'=>$service['rate'],'amount'=>$total);
+                                          'rate'=>$service['rate'],'subtotal'=>$subtotal,'gst_amount'=>$gst_amount,
+                                          'gst_enabled'=>$gst_enabled?1:0,'amount'=>$total);
                             $balance=$this->wallet->getwalletbalance($user['id']);
 
                             if($balance>=$total){
@@ -824,3 +838,4 @@ class Services extends RestController{
     
     
 }
+

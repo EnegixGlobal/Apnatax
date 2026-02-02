@@ -73,6 +73,32 @@
                                             </div>
                                         </div>
                                         <div class="row mb-4">
+                                            <div class="col-md-4">
+                                                <div class="form-group">
+                                                    <?php
+                                                        $pincode=!empty($customer['pincode'])?$customer['pincode']:'';
+                                                        $attributes=array("id"=>"pincode","Placeholder"=>"Pincode","autocomplete"=>"off","maxlength"=>"6");
+                                                        echo create_form_input("text","pincode","Pincode",true,$pincode,$attributes); 
+                                                    ?>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="form-group">
+                                                    <label class="form-label">GST (18%) <span class="text-danger">*</span></label>
+                                                    <div class="form-check form-switch">
+                                                        <?php
+                                                            $gst_enabled=!empty($customer['gst_enabled']) && $customer['gst_enabled']==1;
+                                                        ?>
+                                                        <input class="form-check-input" type="checkbox" name="gst_enabled" id="gst_enabled" value="1" <?= $gst_enabled?'checked':''; ?>>
+                                                        <label class="form-check-label" for="gst_enabled">
+                                                            Enable 18% GST for this customer
+                                                        </label>
+                                                    </div>
+                                                    <small class="text-muted">When enabled, 18% GST will be added to all service purchases</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="row mb-4">
                                             <div class="col-md-12">
                                                 <?php
                                                     $id=!empty($customer['id'])?$customer['id']:'';
