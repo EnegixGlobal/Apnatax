@@ -75,6 +75,7 @@
                                 <thead>
                                     <tr>
                                         <th>Sl.No.</th>
+                                        <th>Service Name</th>
                                         <th>Type</th>
                                         <th>Transaction Type</th>
                                         <th>Date</th>
@@ -111,6 +112,7 @@
                                     ?>
                                     <tr>
                                         <td><?= ++$i; ?></td>
+                                        <td><?= !empty($single['service_name'])?$single['service_name']:'-'; ?></td>
                                         <td><?= $type; ?></td>
                                         <td class="<?= $color ?>"><?= $trans_type; ?></td>
                                         <td><?= date('d-m-Y',strtotime($single['date'])); ?></td>

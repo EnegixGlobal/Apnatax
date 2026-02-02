@@ -3,7 +3,6 @@ $button='';
 ?>
                             <div class="card">
                                 <div class="card-body">
-                                    <?= form_open_multipart('customers/savecustomer/'); ?>
                                         <div class="row mb-4">
                                             <div class="col-md-4">
                                                 <div class="form-group">
@@ -68,22 +67,121 @@ $button='';
                                         </div>
                                         <?php 
                                             }
-                                            else{
                                         ?>
+                                        <div class="row mb-4">
+                                            <div class="col-md-12">
+                                                <h4>Certificates</h4>
+                                            </div>
+                                        </div>
+                                        <?= form_open_multipart('customers/uploadcertificates/'.md5($customer['id'])); ?>
+                                        <div class="row mb-4">
+                                            <div class="col-md-6">
+                                                <div class="form-group">
+                                                    <label>TDS Certificate</label>
+                                                    <?php if(!empty($kyc) && !empty($kyc['tds_certificate'])){ ?>
+                                                        <div class="mb-2">
+                                                            <a href="<?= $kyc['tds_certificate'] ?>" target="_blank" class="btn btn-sm btn-info">
+                                                                <i class="fa fa-eye"></i> View TDS Certificate
+                                                            </a>
+                                                            <a href="<?= base_url('customers/delete_certificate/'.md5($customer['id']).'/tds_certificate') ?>" 
+                                                               class="btn btn-sm btn-danger" 
+                                                               onclick="return confirm('Are you sure you want to delete this certificate?');">
+                                                                <i class="fa fa-trash"></i> Delete TDS Certificate
+                                                            </a>
+                                                        </div>
+                                                    <?php } ?>
+                                                    <?php 
+                                                        $attributes=array("id"=>"tds_certificate","accept"=>"image/*|application/pdf");
+                                                        echo create_form_input("file","tds_certificate","Upload TDS Certificate",false,'',$attributes); 
+                                                    ?>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="form-group">
+                                                    <label>GST Certificate</label>
+                                                    <?php if(!empty($kyc) && !empty($kyc['gst_certificate'])){ ?>
+                                                        <div class="mb-2">
+                                                            <a href="<?= $kyc['gst_certificate'] ?>" target="_blank" class="btn btn-sm btn-info">
+                                                                <i class="fa fa-eye"></i> View GST Certificate
+                                                            </a>
+                                                            <a href="<?= base_url('customers/delete_certificate/'.md5($customer['id']).'/gst_certificate') ?>" 
+                                                               class="btn btn-sm btn-danger" 
+                                                               onclick="return confirm('Are you sure you want to delete this certificate?');">
+                                                                <i class="fa fa-trash"></i> Delete GST Certificate
+                                                            </a>
+                                                        </div>
+                                                    <?php } ?>
+                                                    <?php 
+                                                        $attributes=array("id"=>"gst_certificate","accept"=>"image/*|application/pdf");
+                                                        echo create_form_input("file","gst_certificate","Upload GST Certificate",false,'',$attributes); 
+                                                    ?>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="row mb-4">
+                                            <div class="col-md-6">
+                                                <div class="form-group">
+                                                    <label>Audit Report</label>
+                                                    <?php if(!empty($kyc) && !empty($kyc['audit_report'])){ ?>
+                                                        <div class="mb-2">
+                                                            <a href="<?= $kyc['audit_report'] ?>" target="_blank" class="btn btn-sm btn-info">
+                                                                <i class="fa fa-eye"></i> View Audit Report
+                                                            </a>
+                                                            <a href="<?= base_url('customers/delete_certificate/'.md5($customer['id']).'/audit_report') ?>" 
+                                                               class="btn btn-sm btn-danger" 
+                                                               onclick="return confirm('Are you sure you want to delete this certificate?');">
+                                                                <i class="fa fa-trash"></i> Delete Audit Report
+                                                            </a>
+                                                        </div>
+                                                    <?php } ?>
+                                                    <?php 
+                                                        $attributes=array("id"=>"audit_report","accept"=>"image/*|application/pdf");
+                                                        echo create_form_input("file","audit_report","Upload Audit Report",false,'',$attributes); 
+                                                    ?>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="form-group">
+                                                    <label>Income Tax Certificate</label>
+                                                    <?php if(!empty($kyc) && !empty($kyc['income_tax_certificate'])){ ?>
+                                                        <div class="mb-2">
+                                                            <a href="<?= $kyc['income_tax_certificate'] ?>" target="_blank" class="btn btn-sm btn-info">
+                                                                <i class="fa fa-eye"></i> View Income Tax Certificate
+                                                            </a>
+                                                            <a href="<?= base_url('customers/delete_certificate/'.md5($customer['id']).'/income_tax_certificate') ?>" 
+                                                               class="btn btn-sm btn-danger" 
+                                                               onclick="return confirm('Are you sure you want to delete this certificate?');">
+                                                                <i class="fa fa-trash"></i> Delete Income Tax Certificate
+                                                            </a>
+                                                        </div>
+                                                    <?php } ?>
+                                                    <?php 
+                                                        $attributes=array("id"=>"income_tax_certificate","accept"=>"image/*|application/pdf");
+                                                        echo create_form_input("file","income_tax_certificate","Upload Income Tax Certificate",false,'',$attributes); 
+                                                    ?>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="row mb-4">
+                                            <div class="col-md-12">
+                                                <button type="submit" class="btn btn-sm btn-success" name="uploadcertificates">
+                                                    <i class="fa fa-upload"></i> Upload Certificates
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <?= form_close(); ?>
+                                        <?php if(empty($kyc)){ ?>
                                         <div class="row">
                                             <div class="col-12">
                                                 <h3 class="text-danger">KYC Details Not Uploaded!</h3>
                                             </div>
                                         </div>
-                                        <?php
-                                            }
-                                        ?>
+                                        <?php } ?>
                                         <div class="row">
                                             <div class="col-12">
                                                 <a href="<?= base_url('customers/'); ?>" class="btn btn-sm btn-danger">Close</a>
                                             </div>
                                         </div>
-                                    <?= form_close(); ?>
                                 </div>
 
                     </div>

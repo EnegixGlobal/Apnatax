@@ -429,7 +429,11 @@ class Account_model extends CI_Model{
     public function getkyc($where){
         $columns="t1.pan,case when t1.pan_image='' then '' else concat('".file_url()."',t1.pan_image) end as pan_image,";
         $columns.="t1.aadhar,case when t1.aadhar_image='' then '' else concat('".file_url()."',t1.aadhar_image) end as aadhar_image,";
-        $columns.="case when t1.aadhar_back='' then '' else concat('".file_url()."',t1.aadhar_back) end as aadhar_back,t1.status";
+        $columns.="case when t1.aadhar_back='' then '' else concat('".file_url()."',t1.aadhar_back) end as aadhar_back,";
+        $columns.="case when t1.tds_certificate='' then '' else concat('".file_url()."',t1.tds_certificate) end as tds_certificate,";
+        $columns.="case when t1.gst_certificate='' then '' else concat('".file_url()."',t1.gst_certificate) end as gst_certificate,";
+        $columns.="case when t1.audit_report='' then '' else concat('".file_url()."',t1.audit_report) end as audit_report,";
+        $columns.="case when t1.income_tax_certificate='' then '' else concat('".file_url()."',t1.income_tax_certificate) end as income_tax_certificate,t1.status";
         $this->db->select($columns);
         $this->db->where($where);
         $this->db->from('kyc t1');

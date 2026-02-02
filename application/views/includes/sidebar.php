@@ -87,6 +87,7 @@
                                     <li class="side-menu-label1"><a href="javascript:void(0)">Profile</a></li>
                                     <li><a href="<?= base_url('profile/'); ?>" class="slide-item <?= activate_menu('profile'); ?>"> Profile</a></li>
                                     <li><a href="<?= base_url('profile/kyc/'); ?>" class="slide-item <?= activate_menu('profile/kyc'); ?>"> KYC</a></li>
+                                    <li><a href="<?= base_url('profile/certificates/'); ?>" class="slide-item <?= activate_menu('profile/certificates'); ?>"> Certificates</a></li>
                                     <li><a href="<?= base_url('editpassword/'); ?>" class="slide-item <?= activate_menu('home/editpassword'); ?>"> Edit Password</a></li>
                                 </ul>
                             </li>
@@ -105,6 +106,9 @@
                             </li>
                             <li class="slide">
                                 <a class="side-menu__item <?= activate_menu('home/workreports'); ?>" data-bs-toggle="slide" href="<?= base_url('home/workreports/'); ?>"><i class="side-menu__icon fa fa-file-text"></i><span class="side-menu__label">Work Reports</span></a>
+                            </li>
+                            <li class="slide">
+                                <a class="side-menu__item <?= activate_menu('profile/olddata'); ?>" data-bs-toggle="slide" href="<?= base_url('profile/olddata/'); ?>"><i class="side-menu__icon fa fa-archive"></i><span class="side-menu__label">Old Data</span></a>
                             </li>
                             <?php /*?><li class="slide <?= activate_dropdown('firms') ?>">
                                 <a class="side-menu__item <?= activate_dropdown('firms') ?>" data-bs-toggle="slide" href="javascript:void(0)"><i class="side-menu__icon  fa fa-users"></i><span class="side-menu__label">Firms</span><i class="angle fe fe-chevron-right"></i></a>
