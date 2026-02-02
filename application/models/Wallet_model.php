@@ -143,14 +143,14 @@ class Wallet_model extends CI_Model{
     
     public function gettransactions($where1=array(),$where2=array(),$order_by="date"){
         $columns1="concat('transaction-',md5(concat('transaction',id))) as id,date,amount,
-                    merchant_transaction_id as transaction_id,'' as remarks,updated_on as added_on,'credit' as trans_type,'topup' as type";
+                    merchant_transaction_id as transaction_id,'' as remarks,updated_on as added_on,'credit' as trans_type,'topup' as type,'' as service_name";
         $this->db->select($columns1);
         $this->db->where($where1);
         $this->db->from('wallet');
         $sql1=$this->db->get_compiled_select();
         
         $columns2="concat('purchase-',md5(concat('purchase',t1.id))) as id,t1.date,t1.amount,
-                    md5(concat('purchase',t1.id)) as transaction_id,concat('Purchased ',t2.name) as remarks,t1.added_on,'debit' as trans_type,'service_purchase' as type";
+                    md5(concat('purchase',t1.id)) as transaction_id,concat('Purchased ',t2.name) as remarks,t1.added_on,'debit' as trans_type,'service_purchase' as type,t2.name as service_name";
         $this->db->select($columns2);
         $this->db->where($where2);
         $this->db->from('purchases t1');
@@ -158,21 +158,22 @@ class Wallet_model extends CI_Model{
         $sql2=$this->db->get_compiled_select();
         
         $columns3="concat('acc_payment-',md5(concat('acc_payment',t1.id))) as id,t1.date,t1.amount,
-                    md5(concat('acc_payment',t1.id)) as transaction_id,concat('Accountancy Payment of ',MONTHNAME(t2.date),'-',YEAR(t2.date)) as remarks,t1.added_on,'debit' as trans_type,'acc_payment' as type";
+                    md5(concat('acc_payment',t1.id)) as transaction_id,concat('Accountancy Payment of ',MONTHNAME(t2.date),'-',YEAR(t2.date)) as remarks,t1.added_on,'debit' as trans_type,'acc_payment' as type,'' as service_name";
         $this->db->select($columns3);
         $this->db->where($where2);
         $this->db->from('acc_payment t1');
         $this->db->join('accountancy t2','t1.acc_date=t2.date and t1.firm_id=t2.firm_id');
         $sql3=$this->db->get_compiled_select();
         
-        $columns4="concat('security_deposit-',md5(concat('security_deposit',t1.id))) as id,t1.date,t1.amount,
-                    md5(concat('security_deposit',t1.id)) as transaction_id,COALESCE(t1.remarks,'Security Deposit') as remarks,t1.added_on,'debit' as trans_type,'security_deposit' as type";
-        $this->db->select($columns4);
-        $this->db->where($where2);
-        $this->db->from('security_deposit t1');
-        $sql4=$this->db->get_compiled_select();
+        // Security Deposit transactions excluded from wallet view
+        // $columns4="concat('security_deposit-',md5(concat('security_deposit',t1.id))) as id,t1.date,t1.amount,
+        //             md5(concat('security_deposit',t1.id)) as transaction_id,COALESCE(t1.remarks,'Security Deposit') as remarks,t1.added_on,'debit' as trans_type,'security_deposit' as type";
+        // $this->db->select($columns4);
+        // $this->db->where($where2);
+        // $this->db->from('security_deposit t1');
+        // $sql4=$this->db->get_compiled_select();
         
-        $query = $this->db->query($sql1 . ' UNION ' . $sql2.' UNION ' . $sql3.' UNION ' . $sql4.' ORDER BY '.$order_by);
+        $query = $this->db->query($sql1 . ' UNION ' . $sql2.' UNION ' . $sql3.' ORDER BY '.$order_by);
 
         // Get the result
         $result = $query->result_array();

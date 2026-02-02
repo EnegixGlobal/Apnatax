@@ -40,6 +40,48 @@ class Profile extends CI_Controller {
         $this->template->load('profile','kyc',$data);
     }
     
+	public function certificates(){
+        $data['title']="Certificates";
+        $user=getuser();
+        $customer=$this->customer->getcustomers(['t1.user_id'=>$user['id']],'single');
+        $data['kyc']=$this->account->getkyc(['t1.user_id'=>$user['id']],'single');
+        $this->template->load('profile','certificates',$data);
+    }
+    
+    public function download_certificate($type = ''){
+        $user = getuser();
+        $allowed_types = array('tds_certificate', 'gst_certificate', 'audit_report', 'income_tax_certificate');
+        
+        if(empty($type) || !in_array($type, $allowed_types)){
+            $this->session->set_flashdata("err_msg", "Invalid certificate type!");
+            redirect('profile/certificates');
+        }
+        
+        // Get KYC data with raw file path (without file_url conversion)
+        $kyc = $this->db->select($type)->where('user_id', $user['id'])->get('kyc')->row_array();
+        
+        if(empty($kyc) || empty($kyc[$type])){
+            $this->session->set_flashdata("err_msg", "Certificate not found!");
+            redirect('profile/certificates');
+        }
+        
+        $file_path = $kyc[$type];
+        $full_path = FCPATH . $file_path;
+        
+        // Check if file exists
+        if(!file_exists($full_path)){
+            $this->session->set_flashdata("err_msg", "Certificate file not found!");
+            redirect('profile/certificates');
+        }
+        
+        // Get filename from path
+        $filename = basename($file_path);
+        
+        // Load download helper and force download
+        $this->load->helper('download');
+        force_download($full_path, NULL);
+    }
+    
 	public function bankstatement(){
         $data['title']="Monthly Bank Statement";
         $user=getuser();
@@ -215,10 +257,48 @@ class Profile extends CI_Controller {
                 }
 			}
             else{
-                $this->session->set_flashdata("err_msg",$result['message']);
+                $this->session->set_flashdata("err_msg","Firm not found!");
             }
         }
         redirect($_SERVER['HTTP_REFERER']);
+    }
+    
+    public function olddata(){
+        $data['title']="Old Data";
+        $user=getuser();
+        $data['breadcrumb']=array("active"=>"Old Data");
+        $data['datatable']=true;
+        
+        // Get old data for this customer
+        $where=array('t1.user_id'=>$user['id'],'t1.status'=>1);
+        $data['old_data']=$this->customer->getoldclientdata($where);
+        
+        $this->template->load('profile','olddata',$data);
+    }
+    
+    public function downloadolddata($id=NULL){
+        if($id===NULL){
+            redirect('profile/olddata');
+        }
+        $user=getuser();
+        $old_data=$this->customer->getoldclientdata(['md5(t1.id)'=>$id,'t1.user_id'=>$user['id']],'single');
+        if(empty($old_data)){
+            $this->session->set_flashdata("err_msg","Data not found!");
+            redirect('profile/olddata');
+        }
+        
+        $file_path=FCPATH.$old_data['file_path'];
+        if(file_exists($file_path)){
+            header('Content-Type: application/octet-stream');
+            header('Content-Disposition: attachment; filename="'.$old_data['file_name'].'"');
+            header('Content-Length: '.filesize($file_path));
+            readfile($file_path);
+            exit;
+        }
+        else{
+            $this->session->set_flashdata("err_msg","File not found!");
+            redirect('profile/olddata');
+        }
     }
     
     

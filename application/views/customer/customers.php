@@ -35,6 +35,7 @@
                                             <td>
                                                 <a href="<?= base_url('customers/editcustomer/'.md5($single['id'])); ?>" class="btn btn-sm btn-primary"><i class="fa fa-edit"></i></a>
                                                 <a href="<?= base_url('customers/kycdetails/'.md5($single['id'])); ?>" class="btn btn-sm btn-info"><i class="fa fa-eye"></i> View KYC</a>
+                                                <a href="<?= base_url('customers/uploadolddata/'.md5($single['id'])); ?>" class="btn btn-sm btn-success"><i class="fa fa-upload"></i> Upload Old Data</a>
                                             </td>
                                         </tr>
                                         <?php

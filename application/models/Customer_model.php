@@ -249,4 +249,70 @@ class Customer_model extends CI_Model{
         return $array;
     }
     
+    public function saveoldclientdata($data){
+        $datetime=date('Y-m-d H:i:s');
+        $data['added_on']=$data['updated_on']=$datetime;
+        if($this->db->insert("old_client_data",$data)){
+            $id=$this->db->insert_id();
+            return array("status"=>true,"message"=>"Old Data Uploaded Successfully!",'id'=>$id);
+        }
+        else{
+            $error=$this->db->error();
+            return array("status"=>false,"message"=>$error['message']);
+        }
+    }
+    
+    public function getoldclientdata($where=array(),$type="all"){
+        $columns="t1.*,t2.name as service_name,t2.slug as service_slug,t3.name as customer_name,t3.mobile as customer_mobile,t4.name as uploaded_by_name";
+        $this->db->select($columns);
+        $this->db->where($where);
+        $this->db->from('old_client_data t1');
+        $this->db->join('services t2','t1.service_id=t2.id','left');
+        $this->db->join('customers t3','t1.user_id=t3.user_id','left');
+        $this->db->join('users t4','t1.uploaded_by=t4.id','left');
+        $this->db->order_by('t1.added_on','DESC');
+        $query=$this->db->get();
+        if($type=='all'){
+            $array=$query->result_array();
+        }
+        else{
+            $array=$query->unbuffered_row('array');
+        }
+        return $array;
+    }
+    
+    public function updateoldclientdata($data){
+        $id=$data['id'];
+        unset($data['id']);
+        $where=array("id"=>$id);
+        $data['updated_on']=date('Y-m-d H:i:s');
+        if($this->db->update("old_client_data",$data,$where)){
+            return array("status"=>true,"message"=>"Old Data Updated Successfully!");
+        }
+        else{
+            $error=$this->db->error();
+            return array("status"=>false,"message"=>$error['message']);
+        }
+    }
+    
+    public function deleteoldclientdata($id){
+        $where=array("id"=>$id);
+        $data=array('status'=>0,'updated_on'=>date('Y-m-d H:i:s'));
+        if($this->db->update("old_client_data",$data,$where)){
+            // Also delete the physical file
+            $old_data=$this->getoldclientdata($where,'single');
+            if(!empty($old_data) && !empty($old_data['file_path'])){
+                $file_path=FCPATH.$old_data['file_path'];
+                if(file_exists($file_path)){
+                    @unlink($file_path);
+                }
+            }
+            return array("status"=>true,"message"=>"Old Data Deleted Successfully!");
+        }
+        else{
+            $error=$this->db->error();
+            return array("status"=>false,"message"=>$error['message']);
+        }
+    }
+    
 }
