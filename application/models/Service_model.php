@@ -61,7 +61,7 @@ class Service_model extends CI_Model
         return $array;
     }
 
-    public function getpurchasedservices($where = array(), $type = 'all')
+    public function getpurchasedservices($where = array(), $type = 'all', $group_by_service = false)
     {
         $columns = "t1.*,t2.name as service_name,t2.slug as service_slug,t2.type,t1.type as purchased_type";
         $columns .= ",  case when t1.status=0 then 'Pending' 
@@ -83,11 +83,27 @@ class Service_model extends CI_Model
         $this->db->join('services t2', 't1.service_id=t2.id', 'left');
         $this->db->join('assessments t3', 't1.id=t3.order_id', 'left');
         $this->db->join('formdata t4', "t1.id=t4.order_id and field like '%-month'", 'left');
+
+        // Add group_by if requested
+        if ($group_by_service) {
+            $this->db->group_by('t1.service_id');
+        }
+
         $query = $this->db->get();
+
         // Check if query succeeded before calling result methods
         if ($query === FALSE) {
+            $error = $this->db->error();
+            log_message('error', 'getpurchasedservices query failed: ' . $error['message']);
+            log_message('error', 'WHERE clause: ' . (is_string($where) ? $where : json_encode($where)));
             return ($type == 'all') ? array() : array();
         }
+
+        // Log for debugging (only in development)
+        if (ENVIRONMENT !== 'production') {
+            log_message('debug', 'getpurchasedservices query executed successfully. Rows: ' . $query->num_rows());
+        }
+
         if ($type == 'all') {
             $array = $query->result_array();
         } else {
