@@ -306,6 +306,9 @@ class Reports extends CI_Controller
         $service_id = $this->input->get('service_id') ? $this->input->get('service_id') : NULL;
         $start_date = $this->input->get('start_date') ? $this->input->get('start_date') : NULL;
         $end_date = $this->input->get('end_date') ? $this->input->get('end_date') : NULL;
+        $selected_month = $this->input->get('month') ? $this->input->get('month') : NULL;
+        $selected_quarter = $this->input->get('quarter') ? $this->input->get('quarter') : NULL;
+        $selected_year = $this->input->get('year') ? $this->input->get('year') : NULL;
 
         // If custom date range is selected but period is not set to custom, set it
         if (!empty($start_date) && !empty($end_date) && $period != 'custom') {
@@ -324,15 +327,65 @@ class Reports extends CI_Controller
                 $service_options[$service['id']] = $service['name'];
             }
         }
+
+        // Generate month dropdown options (last 12 months)
+        $month_options = array('' => 'Select Month');
+        $current_year = date('Y');
+        $current_month = date('m');
+        for ($i = 11; $i >= 0; $i--) {
+            $date = date('Y-m', strtotime("-$i months"));
+            $month_value = $date; // Format: YYYY-MM
+            $month_label = date('F Y', strtotime($date . '-01'));
+            $month_options[$month_value] = $month_label;
+        }
+
+        // Generate quarter dropdown options (last 8 quarters)
+        $quarter_options = array('' => 'Select Quarter');
+        $current_year = date('Y');
+        $current_month = date('n');
+        $current_quarter = ceil($current_month / 3);
+
+        // Generate quarters: start from current quarter and go back 8 quarters
+        $added_quarters = array();
+        for ($i = 0; $i < 24; $i++) { // Go back 24 months to cover 8 quarters
+            $months_back = $i;
+            $date = date('Y-m', strtotime("-$months_back months"));
+            $year = date('Y', strtotime($date . '-01'));
+            $month = date('n', strtotime($date . '-01'));
+            $quarter = ceil($month / 3);
+            $quarter_value = $year . '-Q' . $quarter; // Format: YYYY-Q1, YYYY-Q2, etc.
+
+            // Only add if not already added and we haven't reached 8 quarters yet
+            if (!isset($added_quarters[$quarter_value]) && count($added_quarters) < 8) {
+                $quarter_label = 'Q' . $quarter . ' ' . $year;
+                $quarter_options[$quarter_value] = $quarter_label;
+                $added_quarters[$quarter_value] = true;
+            }
+        }
+
+        // Generate year dropdown options (last 5 years)
+        $year_options = array('' => 'Select Year');
+        $current_year = date('Y');
+        for ($i = 0; $i < 5; $i++) {
+            $year = $current_year - $i;
+            $year_options[$year] = $year;
+        }
+
         $data['services'] = $service_options;
+        $data['month_options'] = $month_options;
+        $data['quarter_options'] = $quarter_options;
+        $data['year_options'] = $year_options;
         $data['selected_service'] = $service_id;
         $data['selected_period'] = $period;
+        $data['selected_month'] = $selected_month;
+        $data['selected_quarter'] = $selected_quarter;
+        $data['selected_year'] = $selected_year;
         $data['start_date'] = $start_date;
         $data['end_date'] = $end_date;
 
         // Get income data - use empty array instead of "1" string
         $where = array();
-        $income_data = $this->service->getincomebyperiod($where, $period, $service_id, $start_date, $end_date);
+        $income_data = $this->service->getincomebyperiod($where, $period, $service_id, $start_date, $end_date, $selected_month, $selected_quarter, $selected_year);
         $data['income_data'] = $income_data;
 
         // Calculate totals

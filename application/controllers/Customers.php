@@ -24,6 +24,25 @@ class Customers extends CI_Controller
         $this->template->load('customer', 'customers', $data);
     }
 
+    public function bulkgsttoggle()
+    {
+        // Only allow admin access
+        if ($this->session->role != 'admin' && $this->session->role != 'superadmin') {
+            $this->output->set_content_type('application/json')->set_output(json_encode([
+                'status' => false,
+                'message' => 'Unauthorized access!'
+            ]));
+            return;
+        }
+
+        $enable = $this->input->post('enable');
+        $enable = ($enable == 1 || $enable === '1') ? 1 : 0;
+
+        $result = $this->customer->bulkupdategst($enable);
+
+        $this->output->set_content_type('application/json')->set_output(json_encode($result));
+    }
+
     public function addcustomer()
     {
         $data['title'] = "Add Customer";
@@ -295,8 +314,13 @@ class Customers extends CI_Controller
             unset($data['savecustomer']);
             $user = getuser();
             $data['added_by'] = $user['id'];
-            // Handle GST enabled checkbox
-            $data['gst_enabled'] = !empty($data['gst_enabled']) && $data['gst_enabled'] == 1 ? 1 : 0;
+            // GST Configuration - Now handled via bulk toggle in customers list
+            // Handle GST enabled checkbox - commented out as GST is now managed via bulk toggle
+            // $data['gst_enabled'] = !empty($data['gst_enabled']) && $data['gst_enabled'] == 1 ? 1 : 0;
+            // Set default to 0 (disabled) - can be enabled via bulk toggle
+            if (!isset($data['gst_enabled'])) {
+                $data['gst_enabled'] = 0;
+            }
             $result = $this->customer->savecustomer($data);
             if ($result['status'] === true) {
                 $this->session->set_flashdata("msg", $result['message']);
@@ -309,8 +333,11 @@ class Customers extends CI_Controller
             $data = $this->input->post();
             unset($data['updatecustomer']);
             $user = getuser();
-            // Handle GST enabled checkbox
-            $data['gst_enabled'] = !empty($data['gst_enabled']) && $data['gst_enabled'] == 1 ? 1 : 0;
+            // GST Configuration - Now handled via bulk toggle in customers list
+            // Handle GST enabled checkbox - commented out as GST is now managed via bulk toggle
+            // $data['gst_enabled'] = !empty($data['gst_enabled']) && $data['gst_enabled'] == 1 ? 1 : 0;
+            // Don't update gst_enabled from form - keep existing value (managed via bulk toggle)
+            unset($data['gst_enabled']);
             //print_pre($data,true);
             $result = $this->customer->updatecustomer($data);
             if ($result['status'] === true) {
