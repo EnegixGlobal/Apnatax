@@ -37,26 +37,39 @@ class Services extends CI_Controller
         $data['user'] = $user;
 
         // Validate required session data
-        if (empty($year) || empty($firm_id)) {
+        if (empty($year) || empty($firm_id) || empty($user['id'])) {
             $this->session->set_flashdata('err_msg', 'Please select Year and Firm!');
             redirect($_SERVER['HTTP_REFERER'] ?? 'home/');
             return;
         }
 
-        // Use proper escaping for SQL query
-        $user_id_escaped = $this->db->escape($user['id']);
-        $firm_id_escaped = $this->db->escape($firm_id);
-        $year_escaped = $this->db->escape($year);
-        $where = "t1.user_id={$user_id_escaped} AND t1.firm_id={$firm_id_escaped} AND t1.year={$year_escaped}";
+        // Use array format for WHERE clause (more reliable than string)
+        $where = array(
+            't1.user_id' => $user['id'],
+            't1.firm_id' => $firm_id,
+            't1.year' => $year
+        );
 
         // Pass group_by as a parameter or handle it in the model
         $services = $this->service->getpurchasedservices($where, 'all', true); // Pass flag for group_by
+
+        // Log for debugging
+        if (ENVIRONMENT !== 'production') {
+            log_message('debug', 'purchasedservices - User ID: ' . $user['id'] . ', Firm ID: ' . $firm_id . ', Year: ' . $year);
+            log_message('debug', 'purchasedservices - Services found: ' . count($services));
+            // Also log the WHERE clause for debugging
+            log_message('debug', 'purchasedservices - WHERE: ' . json_encode($where));
+        }
+
         if (!empty($services)) {
             foreach ($services as $key => $service) {
                 $services[$key]['name'] = $service['service_name'];
                 $services[$key]['count'] = '';
                 $services[$key]['link'] = ('services/monthlyservices/' . $service['service_slug']);
             }
+        } else {
+            // Log when no services found for debugging
+            log_message('info', 'purchasedservices - No services found for User ID: ' . $user['id'] . ', Firm ID: ' . $firm_id . ', Year: ' . $year);
         }
         $data['services'] = $services;
         //print_pre($data,true);

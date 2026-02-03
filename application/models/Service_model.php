@@ -63,45 +63,99 @@ class Service_model extends CI_Model
 
     public function getpurchasedservices($where = array(), $type = 'all', $group_by_service = false)
     {
-        $columns = "t1.*,t2.name as service_name,t2.slug as service_slug,t2.type,t1.type as purchased_type";
-        $columns .= ",  case when t1.status=0 then 'Pending' 
-                            when t1.status=1 then 'Complete' 
-                            when t1.status=2 then 'Documents Uploaded' 
-                            when t1.status=3 then 'Form Assessment in Progress' 
-                            when t1.status=4 then 'Assessment Report Uploaded' 
-                            else '' end as order_status";
-        $columns .= ",  case when t1.status=4 then concat('" . base_url() . "',t3.file) 
-                            else '' end as report,ifnull(t4.value,'') as month";
-        $this->db->select($columns);
-        // Handle both array and string where conditions
-        if (is_array($where)) {
-            $this->db->where($where);
-        } elseif (!empty($where) && is_string($where)) {
-            $this->db->where($where, NULL, FALSE);
-        }
-        $this->db->from('purchases t1');
-        $this->db->join('services t2', 't1.service_id=t2.id', 'left');
-        $this->db->join('assessments t3', 't1.id=t3.order_id', 'left');
-        $this->db->join('formdata t4', "t1.id=t4.order_id and field like '%-month'", 'left');
+        // Reset query builder to avoid conflicts
+        $this->db->reset_query();
 
-        // Add group_by if requested
         if ($group_by_service) {
-            $this->db->group_by('t1.service_id');
-        }
+            // When grouping by service_id, we need to handle MySQL's ONLY_FULL_GROUP_BY mode
+            // Use a subquery to get the latest purchase for each service_id
+            $prefix = $this->db->dbprefix;
+            $purchases_table = $prefix . 'purchases';
+            $services_table = $prefix . 'services';
+            $assessments_table = $prefix . 'assessments';
+            $formdata_table = $prefix . 'formdata';
 
-        $query = $this->db->get();
+            // Build WHERE clause for subquery
+            $where_clause = "1=1";
+            if (is_array($where)) {
+                foreach ($where as $key => $value) {
+                    $field = str_replace('t1.', '', $key);
+                    $escaped_value = $this->db->escape($value);
+                    $where_clause .= " AND t1.{$field} = {$escaped_value}";
+                }
+            } elseif (is_string($where) && !empty($where)) {
+                // For string WHERE, use it as-is but ensure table prefix is correct
+                $where_clause = $where;
+            }
+
+            // Subquery to get the latest purchase ID for each service_id
+            $subquery = "(SELECT MAX(t1.id) as id 
+                         FROM {$purchases_table} t1 
+                         WHERE {$where_clause}
+                         GROUP BY t1.service_id) as latest";
+
+            // Main query with proper column selection
+            $columns = "t1.*,t2.name as service_name,t2.slug as service_slug,t2.type,t1.type as purchased_type";
+            $columns .= ",  case when t1.status=0 then 'Pending' 
+                                when t1.status=1 then 'Complete' 
+                                when t1.status=2 then 'Documents Uploaded' 
+                                when t1.status=3 then 'Form Assessment in Progress' 
+                                when t1.status=4 then 'Assessment Report Uploaded' 
+                                else '' end as order_status";
+            $columns .= ",  case when t1.status=4 then concat('" . base_url() . "',t3.file) 
+                                else '' end as report,ifnull(t4.value,'') as month";
+
+            $sql = "SELECT {$columns}
+                    FROM {$purchases_table} t1
+                    INNER JOIN {$subquery} ON t1.id = latest.id
+                    LEFT JOIN {$services_table} t2 ON t1.service_id=t2.id
+                    LEFT JOIN {$assessments_table} t3 ON t1.id=t3.order_id
+                    LEFT JOIN {$formdata_table} t4 ON t1.id=t4.order_id AND t4.field LIKE '%-month'
+                    ORDER BY t1.id DESC";
+
+            $query = $this->db->query($sql);
+        } else {
+            // Standard query without grouping
+            $columns = "t1.*,t2.name as service_name,t2.slug as service_slug,t2.type,t1.type as purchased_type";
+            $columns .= ",  case when t1.status=0 then 'Pending' 
+                                when t1.status=1 then 'Complete' 
+                                when t1.status=2 then 'Documents Uploaded' 
+                                when t1.status=3 then 'Form Assessment in Progress' 
+                                when t1.status=4 then 'Assessment Report Uploaded' 
+                                else '' end as order_status";
+            $columns .= ",  case when t1.status=4 then concat('" . base_url() . "',t3.file) 
+                                else '' end as report,ifnull(t4.value,'') as month";
+            $this->db->select($columns);
+
+            // Handle both array and string where conditions
+            if (is_array($where)) {
+                $this->db->where($where);
+            } elseif (!empty($where) && is_string($where)) {
+                $this->db->where($where, NULL, FALSE);
+            }
+
+            $this->db->from('purchases t1');
+            $this->db->join('services t2', 't1.service_id=t2.id', 'left');
+            $this->db->join('assessments t3', 't1.id=t3.order_id', 'left');
+            $this->db->join('formdata t4', "t1.id=t4.order_id and t4.field like '%-month'", 'left');
+            $this->db->order_by('t1.id', 'DESC');
+
+            $query = $this->db->get();
+        }
 
         // Check if query succeeded before calling result methods
         if ($query === FALSE) {
             $error = $this->db->error();
             log_message('error', 'getpurchasedservices query failed: ' . $error['message']);
             log_message('error', 'WHERE clause: ' . (is_string($where) ? $where : json_encode($where)));
+            log_message('error', 'SQL: ' . $this->db->last_query());
             return ($type == 'all') ? array() : array();
         }
 
         // Log for debugging (only in development)
         if (ENVIRONMENT !== 'production') {
             log_message('debug', 'getpurchasedservices query executed successfully. Rows: ' . $query->num_rows());
+            log_message('debug', 'SQL: ' . $this->db->last_query());
         }
 
         if ($type == 'all') {
