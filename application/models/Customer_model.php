@@ -315,4 +315,32 @@ class Customer_model extends CI_Model{
         }
     }
     
+    public function bulkupdategst($enable = 1){
+        $datetime = date('Y-m-d H:i:s');
+        $data = array(
+            'gst_enabled' => $enable,
+            'updated_on' => $datetime
+        );
+        
+        // Update all customers
+        if($this->db->update("customers", $data)){
+            $affected_rows = $this->db->affected_rows();
+            $message = $enable == 1 
+                ? "GST (18%) enabled successfully for all customers!" 
+                : "GST (18%) disabled successfully for all customers!";
+            return array(
+                "status" => true, 
+                "message" => $message,
+                "affected_rows" => $affected_rows
+            );
+        }
+        else{
+            $error = $this->db->error();
+            return array(
+                "status" => false, 
+                "message" => $error['message'] ?: "Failed to update GST settings"
+            );
+        }
+    }
+    
 }

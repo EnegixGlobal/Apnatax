@@ -41,6 +41,24 @@
                     <?= form_dropdown('service_id', $services, $selected_service, 'class="form-control"'); ?>
                 </div>
             </div>
+            <div class="col-md-2" id="month_div" style="display:<?= $selected_period == 'monthly' ? 'block' : 'none'; ?>;">
+                <div class="form-group">
+                    <label>Month</label>
+                    <?= form_dropdown('month', $month_options, $selected_month, 'class="form-control" id="month_select"'); ?>
+                </div>
+            </div>
+            <div class="col-md-2" id="quarter_div" style="display:<?= $selected_period == 'quarterly' ? 'block' : 'none'; ?>;">
+                <div class="form-group">
+                    <label>Quarter</label>
+                    <?= form_dropdown('quarter', $quarter_options, $selected_quarter, 'class="form-control" id="quarter_select"'); ?>
+                </div>
+            </div>
+            <div class="col-md-2" id="year_div" style="display:<?= $selected_period == 'yearly' ? 'block' : 'none'; ?>;">
+                <div class="form-group">
+                    <label>Year</label>
+                    <?= form_dropdown('year', $year_options, $selected_year, 'class="form-control" id="year_select"'); ?>
+                </div>
+            </div>
             <div class="col-md-2" id="start_date_div" style="display:<?= $selected_period == 'custom' ? 'block' : 'none'; ?>;">
                 <div class="form-group">
                     <label>Start Date</label>
@@ -159,22 +177,46 @@
 <script>
     $(document).ready(function() {
         $('#period').change(function() {
-            if ($(this).val() == 'custom') {
+            var period = $(this).val();
+            // Hide all period-specific fields first
+            $('#month_div').hide();
+            $('#quarter_div').hide();
+            $('#year_div').hide();
+            $('#start_date_div').hide();
+            $('#end_date_div').hide();
+
+            // Show relevant fields based on period
+            if (period == 'custom') {
                 $('#start_date_div').show();
                 $('#end_date_div').show();
-            } else {
-                $('#start_date_div').hide();
-                $('#end_date_div').hide();
+            } else if (period == 'monthly') {
+                $('#month_div').show();
+            } else if (period == 'quarterly') {
+                $('#quarter_div').show();
+            } else if (period == 'yearly') {
+                $('#year_div').show();
             }
         });
 
-        // Show/hide date fields on page load
-        if ($('#period').val() == 'custom') {
+        // Show/hide fields on page load
+        var period = $('#period').val();
+        // Hide all period-specific fields first
+        $('#month_div').hide();
+        $('#quarter_div').hide();
+        $('#year_div').hide();
+        $('#start_date_div').hide();
+        $('#end_date_div').hide();
+
+        // Show relevant fields based on period
+        if (period == 'custom') {
             $('#start_date_div').show();
             $('#end_date_div').show();
-        } else {
-            $('#start_date_div').hide();
-            $('#end_date_div').hide();
+        } else if (period == 'monthly') {
+            $('#month_div').show();
+        } else if (period == 'quarterly') {
+            $('#quarter_div').show();
+        } else if (period == 'yearly') {
+            $('#year_div').show();
         }
 
         <?php if ($datatable) { ?>

@@ -584,19 +584,41 @@ class Service_model extends CI_Model
         return $query->result_array();
     }
 
-    public function getincomebyperiod($where = array(), $period = 'monthly', $service_id = NULL, $start_date = NULL, $end_date = NULL)
+    public function getincomebyperiod($where = array(), $period = 'monthly', $service_id = NULL, $start_date = NULL, $end_date = NULL, $selected_month = NULL, $selected_quarter = NULL, $selected_year = NULL)
     {
         // Build date filter based on period
         $date_filter = "";
         if (!empty($start_date) && !empty($end_date)) {
             $date_filter = "t1.date >= '$start_date' AND t1.date <= '$end_date'";
         } elseif ($period == 'monthly') {
-            $date_filter = "DATE_FORMAT(t1.date, '%Y-%m') = DATE_FORMAT(CURDATE(), '%Y-%m')";
+            // If a specific month is selected, use it; otherwise use current month
+            if (!empty($selected_month)) {
+                // selected_month format: YYYY-MM
+                $date_filter = "DATE_FORMAT(t1.date, '%Y-%m') = '$selected_month'";
+            } else {
+                $date_filter = "DATE_FORMAT(t1.date, '%Y-%m') = DATE_FORMAT(CURDATE(), '%Y-%m')";
+            }
         } elseif ($period == 'quarterly') {
-            $quarter = ceil(date('n') / 3);
-            $date_filter = "QUARTER(t1.date) = $quarter AND YEAR(t1.date) = YEAR(CURDATE())";
+            // If a specific quarter is selected, use it; otherwise use current quarter
+            if (!empty($selected_quarter)) {
+                // selected_quarter format: YYYY-Q1, YYYY-Q2, etc.
+                list($year, $quarter) = explode('-Q', $selected_quarter);
+                $quarter = (int)$quarter;
+                // Calculate month range for the quarter
+                $start_month = ($quarter - 1) * 3 + 1;
+                $end_month = $quarter * 3;
+                $date_filter = "YEAR(t1.date) = $year AND MONTH(t1.date) >= $start_month AND MONTH(t1.date) <= $end_month";
+            } else {
+                $quarter = ceil(date('n') / 3);
+                $date_filter = "QUARTER(t1.date) = $quarter AND YEAR(t1.date) = YEAR(CURDATE())";
+            }
         } elseif ($period == 'yearly') {
-            $date_filter = "YEAR(t1.date) = YEAR(CURDATE())";
+            // If a specific year is selected, use it; otherwise use current year
+            if (!empty($selected_year)) {
+                $date_filter = "YEAR(t1.date) = '$selected_year'";
+            } else {
+                $date_filter = "YEAR(t1.date) = YEAR(CURDATE())";
+            }
         }
         // If period is empty or 'all', don't apply date filter
 
