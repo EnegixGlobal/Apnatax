@@ -393,6 +393,14 @@ class Service_model extends CI_Model
                 month;";
 
         $query = $this->db->query($sql);
+
+        // Check if query succeeded before calling result methods
+        if ($query === FALSE) {
+            $error = $this->db->error();
+            log_message('error', 'getturnoverswithpayment query failed: ' . $error['message'] . ' SQL: ' . $sql);
+            return ($type == 'all') ? array() : array();
+        }
+
         if ($type == 'all') {
             $array = $query->result_array();
             if (!empty($array)) {
