@@ -25,6 +25,14 @@ class Reports extends CI_Controller
         $year = $this->session->year;
         $firm_id = $this->session->firm;
         $user_id = $user['id'];
+
+        // Validate required session data
+        if (empty($year) || empty($firm_id)) {
+            $this->session->set_flashdata('err_msg', 'Please select Year and Firm!');
+            redirect($_SERVER['HTTP_REFERER'] ?? 'home/');
+            return;
+        }
+
         $yearval = getyearmonthvalues($year);
         $year1 = $yearval['year1'];
         $year2 = $yearval['year2'];
@@ -33,8 +41,21 @@ class Reports extends CI_Controller
         $where = array('user_id' => $user_id, 'status' => 1);
         $query = $this->db->get_where('customer_packages', $where);
         if ($query->num_rows() > 0) {
-            $where2 = "t1.user_id='$user_id' and t1.firm_id='$firm_id' and t1.date>='$from' and t1.date<='$to'";
+            // Use proper escaping for SQL query
+            $user_id_escaped = $this->db->escape($user_id);
+            $firm_id_escaped = $this->db->escape($firm_id);
+            $from_escaped = $this->db->escape($from);
+            $to_escaped = $this->db->escape($to);
+            $where2 = "t1.user_id={$user_id_escaped} AND t1.firm_id={$firm_id_escaped} AND t1.date>={$from_escaped} AND t1.date<={$to_escaped}";
             $accountancy = $this->service->getturnoverswithpayment($where2);
+
+            // Log for debugging (only in development)
+            if (ENVIRONMENT !== 'production') {
+                log_message('debug', 'Reports index - User ID: ' . $user_id . ', Firm ID: ' . $firm_id . ', Year: ' . $year);
+                log_message('debug', 'Reports index - Date range: ' . $from . ' to ' . $to);
+                log_message('debug', 'Reports index - Accountancy records found: ' . count($accountancy));
+            }
+
             $turnovers = !empty($accountancy) ? array_column($accountancy, 'turnover') : array(0);
             $turnover = array_sum($turnovers);
             $total_turnover = $turnover;
@@ -64,7 +85,7 @@ class Reports extends CI_Controller
                     } else {
                         $acc_fees = 0;
                     }
-                    $other_fee = $single['other_fee'];
+                    $other_fee = $single['other_fee'] ?? 0;
                     $total_other += $other_fee;
                     $balance = $outstanding + $acc_fees + $other_fee;
                     if ($single['due_date'] < $date && $paid < $balance) {

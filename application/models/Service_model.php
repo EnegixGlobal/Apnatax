@@ -357,40 +357,26 @@ class Service_model extends CI_Model
         $this->db->from('accountancy t1');
         $this->db->join('acc_payment t2','t1.date=t2.acc_date','left');
         $query=$this->db->get();*/
-        $sql = "SELECT
-                t1.*,
-                COALESCE(SUM(t2.amount),0) AS paid
-            FROM
-                tf_accountancy t1
-            LEFT JOIN
-                tf_acc_payment t2
-            ON
-                t1.user_id=t2.user_id
-                AND t2.date <= t1.due_date
-                AND t2.date >= COALESCE((
-                    SELECT MAX(t3.due_date)
-                    FROM tf_accountancy t3
-                    WHERE t3.date < t1.date
-                ), '1900-01-01')
-            where $where
-            GROUP BY
-                t1.id
-            ORDER BY
-                t1.id;";
+
+        // Use dynamic table prefix from database config
+        $prefix = $this->db->dbprefix;
+        $accountancy_table = $prefix . 'accountancy';
+        $payment_table = $prefix . 'acc_payment';
+
         $sql = "SELECT
                 DATE_FORMAT(t1.date, '%Y-%m') AS month,
                 t1.*,
-                SUM(t2.amount) AS paid
+                COALESCE(SUM(t2.amount), 0) AS paid
             FROM
-                tf_accountancy t1
+                {$accountancy_table} t1
             LEFT JOIN
-                tf_acc_payment t2 ON t1.user_id = t2.user_id AND t1.date = t2.acc_date and t1.firm_id=t2.firm_id
+                {$payment_table} t2 ON t1.user_id = t2.user_id AND t1.date = t2.acc_date AND t1.firm_id = t2.firm_id
             WHERE
                 $where
             GROUP BY
-                DATE_FORMAT(t1.date, '%Y-%m')
+                DATE_FORMAT(t1.date, '%Y-%m'), t1.id
             ORDER BY
-                month;";
+                month, t1.id;";
 
         $query = $this->db->query($sql);
 
@@ -398,7 +384,14 @@ class Service_model extends CI_Model
         if ($query === FALSE) {
             $error = $this->db->error();
             log_message('error', 'getturnoverswithpayment query failed: ' . $error['message'] . ' SQL: ' . $sql);
+            log_message('error', 'Table prefix used: ' . $prefix);
+            log_message('error', 'WHERE clause: ' . $where);
             return ($type == 'all') ? array() : array();
+        }
+
+        // Log successful query for debugging (only in development)
+        if (ENVIRONMENT !== 'production') {
+            log_message('debug', 'getturnoverswithpayment query executed successfully. Rows: ' . $query->num_rows());
         }
 
         if ($type == 'all') {
