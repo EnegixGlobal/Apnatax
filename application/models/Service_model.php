@@ -16,11 +16,26 @@ class Service_model extends CI_Model
         $name = !empty($data['name']) ? $data['name'] : '';
         unset($data['name']);
         foreach ($data as $single) {
-            $service = $single['service'];
-            unset($single['service']);
+            $service_name = !empty($single['service']) ? $single['service'] : '';
+            // Keep service name in database (don't unset it)
+            // Ensure all required fields have default values
+            if (!isset($single['rate']) || $single['rate'] === null) {
+                $single['rate'] = !empty($single['amount']) ? $single['amount'] : 0;
+            }
+            if (!isset($single['subtotal']) || $single['subtotal'] === null) {
+                $single['subtotal'] = !empty($single['amount']) ? $single['amount'] : 0;
+            }
+            if (!isset($single['gst_amount']) || $single['gst_amount'] === null) {
+                $single['gst_amount'] = 0;
+            }
+            if (!isset($single['gst_enabled']) || $single['gst_enabled'] === null) {
+                $single['gst_enabled'] = 0;
+            }
+
             $single['parent_id'] = $parent_id;
             $single['added_on'] = $datetime;
             $single['updated_on'] = $datetime;
+
             if ($this->db->insert("purchases", $single)) {
                 $order_id = $this->db->insert_id();
                 $parent_id = $parent_id === NULL ? $order_id : $parent_id;
@@ -29,7 +44,7 @@ class Service_model extends CI_Model
                     "type" => "New",
                     "user_id" => $single['user_id'],
                     'order_id' => $order_id,
-                    'message' => $name . ' has Purchased ' . $service . ' Service',
+                    'message' => $name . ' has Purchased ' . $service_name . ' Service',
                     'added_on' => $datetime,
                     'updated_on' => $datetime
                 );
@@ -37,7 +52,10 @@ class Service_model extends CI_Model
             } else {
                 $error = $this->db->error();
                 $result['status'] = false;
-                $result['message'] = $error['message'];
+                $result['message'] = !empty($error['message']) ? $error['message'] : 'Failed to save purchase. Please check database columns.';
+                // Log the error for debugging
+                log_message('error', 'Purchase failed: ' . json_encode($error) . ' | Data: ' . json_encode($single));
+                break; // Stop processing if one fails
             }
             $result['order_id'] = $parent_id;
         }
@@ -46,6 +64,7 @@ class Service_model extends CI_Model
 
     public function getpurchases($where = array(), $type = 'all')
     {
+        // Include all purchase columns including service_option and service_option_display
         $columns = "t1.*,t2.name,t2.mobile,t2.email,t3.name as service_name";
         $this->db->select($columns);
         $this->db->where($where);
@@ -521,7 +540,8 @@ class Service_model extends CI_Model
         if ($this->db->get_where('bank_statements', array('user_id' => $data['user_id'], 'firm_id' => $data['firm_id'], 'year' => $data['year'], 'month' => $data['month']))->num_rows() == 0) {
             $data['added_on'] = $data['updated_on'] = date('Y-m-d H:i:s');
             if ($this->db->insert("bank_statements", $data)) {
-                return array("status" => true, "message" => "Bank Statement Added Successfully!");
+                $bank_statement_id = $this->db->insert_id();
+                return array("status" => true, "message" => "Bank Statement Added Successfully!", "bank_statement_id" => $bank_statement_id);
             } else {
                 $error = $this->db->error();
                 return array("status" => false, "message" => $error['message']);

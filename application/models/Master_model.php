@@ -272,5 +272,85 @@ class Master_model extends CI_Model{
         return $array;
     }
     
+    /**
+     * Get service options (for dynamic pricing like Income Tax Return)
+     */
+    public function getserviceoptions($where=array(),$type="all"){
+        $this->db->where($where);
+        $this->db->order_by('id', 'ASC');
+        $query=$this->db->get("service_options");
+        if($type=='all'){
+            $array=$query->result_array();
+        }
+        else{
+            $array=$query->unbuffered_row('array');
+        }
+        return $array;
+    }
+    
+    /**
+     * Get service options as key-value array (option_key => rate)
+     */
+    public function getserviceoptionspricing($service_id){
+        $options = $this->getserviceoptions(array('service_id' => $service_id, 'status' => 1), 'all');
+        $pricing = array();
+        $display_names = array();
+        if(!empty($options)){
+            foreach($options as $option){
+                $pricing[$option['option_key']] = $option['rate'];
+                $display_names[$option['option_key']] = $option['display_name'];
+            }
+        }
+        return array('pricing' => $pricing, 'display_names' => $display_names);
+    }
+    
+    /**
+     * Add service option
+     */
+    public function addserviceoption($data){
+        $datetime = date('Y-m-d H:i:s');
+        $data['added_on'] = $datetime;
+        $data['updated_on'] = $datetime;
+        if($this->db->insert("service_options",$data)){
+            $option_id=$this->db->insert_id();
+            return array("status"=>true,"message"=>"Service Option Added Successfully!",'option_id'=>$option_id);
+        }
+        else{
+            $error=$this->db->error();
+            return array("status"=>false,"message"=>$error['message']);
+        }
+    }
+    
+    /**
+     * Update service option
+     */
+    public function updateserviceoption($data){
+        $id=$data['id'];
+        unset($data['id']);
+        $data['updated_on'] = date('Y-m-d H:i:s');
+        $where=array("id"=>$id);
+        if($this->db->update("service_options",$data,$where)){
+            return array("status"=>true,"message"=>"Service Option Updated Successfully!");
+        }
+        else{
+            $error=$this->db->error();
+            return array("status"=>false,"message"=>$error['message']);
+        }
+    }
+    
+    /**
+     * Delete service option
+     */
+    public function deleteserviceoption($id){
+        $where=array("id"=>$id);
+        if($this->db->delete("service_options",$where)){
+            return array("status"=>true,"message"=>"Service Option Deleted Successfully!");
+        }
+        else{
+            $error=$this->db->error();
+            return array("status"=>false,"message"=>$error['message']);
+        }
+    }
+    
     
 }
