@@ -292,8 +292,22 @@
                             var id = $('#id').val();
                             var amount = serviceOptionsPricing[selectedOption];
 
-                            var year = '<?= $this->session->year; ?>';
+                            var sessionYear = '<?= !empty($this->session->year) ? $this->session->year : date("Y"); ?>';
                             var periodValue = '';
+
+                            // Extract year safely from session (handles formats like "2023-2024", "20232024", or "2023")
+                            var startYear = sessionYear;
+                            if (sessionYear.indexOf('-') !== -1) {
+                                // Format: "2023-2024"
+                                startYear = parseInt(sessionYear.split('-')[0]);
+                            } else if (sessionYear.length === 8) {
+                                // Format: "20232024"
+                                startYear = parseInt(sessionYear.substring(0, 4));
+                            } else {
+                                // Format: "2023"
+                                startYear = parseInt(sessionYear) || new Date().getFullYear();
+                            }
+
                             // For Yearly type, get the year period value
                             $.ajax({
                                 type: "post",
@@ -301,17 +315,22 @@
                                 dataType: "json",
                                 async: false,
                                 success: function(response) {
-                                    if (response.status && response.years && response.years.length > 0) {
-                                        // Use the first year as default or match with current session year
+                                    if (response.status && response.years && Array.isArray(response.years) && response.years.length > 0) {
+                                        // Use the first year as default
                                         periodValue = response.years[0].id;
-                                        // Try to match with current year
-                                        var currentYearId = year + (parseInt(year) + 1);
+
+                                        // Try to match with current session year (format: "20232024" for AY 2023-24)
+                                        var currentYearId = startYear + '' + (startYear + 1);
                                         response.years.forEach(function(y) {
                                             if (y.id == currentYearId) {
                                                 periodValue = y.id;
                                             }
                                         });
                                     }
+                                },
+                                error: function() {
+                                    // If API fails, use default
+                                    periodValue = startYear + '' + (startYear + 1);
                                 }
                             });
 
@@ -342,7 +361,20 @@
                         // Handle type change to show/hide period dropdown
                         $('body').on('change', '#type', function() {
                             var selectedType = $(this).val();
-                            var year = '<?= $this->session->year; ?>';
+                            var sessionYear = '<?= !empty($this->session->year) ? $this->session->year : date("Y"); ?>';
+
+                            // Extract year safely from session (handles formats like "2023-2024", "20232024", or "2023")
+                            var year = sessionYear;
+                            if (sessionYear.indexOf('-') !== -1) {
+                                // Format: "2023-2024"
+                                year = sessionYear.split('-')[0];
+                            } else if (sessionYear.length === 8) {
+                                // Format: "20232024"
+                                year = sessionYear.substring(0, 4);
+                            } else if (sessionYear.length !== 4 || isNaN(sessionYear)) {
+                                // Invalid format, use current year
+                                year = new Date().getFullYear().toString();
+                            }
 
                             if (selectedType == 'Monthly' || selectedType == 'Quarterly' || selectedType == 'Yearly') {
                                 $('#period-selection-row').show();
