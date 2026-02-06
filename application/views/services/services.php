@@ -29,7 +29,7 @@
                                                         <?php
                                                         if ($single['buy_status'] === true) {
                                                         ?>
-                                                            <button type="button" class="btn btn-sm btn-success buy-btn" value="<?= $single['id'] ?>" data-types="<?= $single['type']; ?>" data-service-name="<?= htmlspecialchars($single['name'], ENT_QUOTES); ?>"><i class="fa fa-shopping-cart"></i> Purchase</button>
+                                                            <button type="button" class="btn btn-sm btn-success buy-btn" value="<?= $single['id'] ?>" data-types="<?= htmlspecialchars($single['type'], ENT_QUOTES); ?>" data-service-name="<?= htmlspecialchars($single['name'], ENT_QUOTES); ?>"><i class="fa fa-shopping-cart"></i> Purchase</button>
                                                         <?php
                                                         } elseif ($single['buy_status'] === false) {
                                                             echo '<span class="text-danger">' . $single['message'] . '</span>';
