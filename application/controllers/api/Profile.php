@@ -643,6 +643,7 @@ class Profile extends RestController{
                             $statements[$key]['year_value']=$year['value'];
                             $statements[$key]['month_value']=$month['value'];
                             $statements[$key]['statement']=file_url($single['statement']);
+                            $statements[$key]['creditors_statement']=file_url($single['creditors_statement']);
                         }
                         $this->response([
                             'status' => true,'statements'=>$statements], RestController::HTTP_OK);

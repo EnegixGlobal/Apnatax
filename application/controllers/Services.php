@@ -21,10 +21,55 @@ class Services extends CI_Controller
         $user = getuser();
         $data['user'] = $user;
         $where = array();
-        $data['services'] = $this->master->getservices($where);
+        $services = $this->master->getservices($where);
+
+        // Load service options for services that have dynamic options
+        if (!empty($services)) {
+            foreach ($services as $key => $service) {
+                $service_options = $this->master->getserviceoptions(array('service_id' => $service['id'], 'status' => 1), 'all');
+                if (!empty($service_options)) {
+                    $services[$key]['has_options'] = true;
+                    $services[$key]['options'] = $service_options;
+                } else {
+                    $services[$key]['has_options'] = false;
+                }
+            }
+        }
+
+        $data['services'] = $services;
         //print_pre($data,true);
         $data['datatable'] = true;
         $this->template->load('services', 'services', $data);
+    }
+
+    /**
+     * AJAX endpoint to get service options
+     */
+    public function getserviceoptions()
+    {
+        $service_id = $this->input->post('service_id');
+        if (empty($service_id)) {
+            echo json_encode(array('status' => false, 'message' => 'Service ID required'));
+            return;
+        }
+
+        $options = $this->master->getserviceoptions(array('service_id' => $service_id, 'status' => 1), 'all');
+        $pricing = array();
+        $display_names = array();
+
+        if (!empty($options)) {
+            foreach ($options as $option) {
+                $pricing[$option['option_key']] = $option['rate'];
+                $display_names[$option['option_key']] = $option['display_name'];
+            }
+        }
+
+        echo json_encode(array(
+            'status' => true,
+            'pricing' => $pricing,
+            'display_names' => $display_names,
+            'options' => $options
+        ));
     }
 
     public function purchasedservices()
@@ -66,6 +111,8 @@ class Services extends CI_Controller
                 $services[$key]['name'] = $service['service_name'];
                 $services[$key]['count'] = '';
                 $services[$key]['link'] = ('services/monthlyservices/' . $service['service_slug']);
+                // Keep option display for showing in view (will be shown in separate column)
+                $services[$key]['service_option_display'] = !empty($service['service_option_display']) ? $service['service_option_display'] : '';
             }
         } else {
             // Log when no services found for debugging
@@ -565,6 +612,8 @@ class Services extends CI_Controller
         $package_id = $this->input->post('package_id');
         $type = $this->input->post('type');
         $amount = $this->input->post('amount');
+        $service_option = $this->input->post('service_option'); // Generic parameter for all services with options
+        $period_value = $this->input->post('period_value'); // Period value for Monthly/Quarterly/Yearly
         $where = array('t1.id' => $firm_id, "t1.user_id" => $user['id']);
         $firm = $this->customer->getfirms($where, 'single');
         if (!empty($firm)) {
@@ -576,6 +625,40 @@ class Services extends CI_Controller
                 $types = explode(',', $service['type']);
                 $status = true;
                 $message = "";
+
+                // Check if this service has dynamic options (generic for all services)
+                $has_service_options = false;
+                $service_options_pricing = array();
+                $service_options_display_names = array();
+                $selected_option_display = '';
+
+                // Check if this service has dynamic options
+                $service_options = $this->master->getserviceoptionspricing($service_id);
+                if (!empty($service_options['pricing']) && !empty($service_option)) {
+                    $service_options_pricing = $service_options['pricing'];
+                    $service_options_display_names = $service_options['display_names'];
+
+                    // Validate selected option exists
+                    if (in_array($service_option, array_keys($service_options_pricing))) {
+                        $has_service_options = true;
+                        // Get pricing for selected option
+                        $amount = $service_options_pricing[$service_option];
+                        // Get display name for selected option
+                        $selected_option_display = isset($service_options_display_names[$service_option]) ?
+                            $service_options_display_names[$service_option] :
+                            ucfirst(str_replace('-', ' ', $service_option));
+                        // Update service name to include the option
+                        $service['name'] = trim($service['name']) . ' - ' . $selected_option_display;
+                        // For services with options, default to Yearly type if not specified
+                        if (empty($type) || !in_array($type, $types)) {
+                            $type = in_array('Yearly', $types) ? 'Yearly' : (count($types) > 0 ? $types[0] : 'Yearly');
+                        }
+                    } else {
+                        $status = false;
+                        $message = "Invalid option selected for " . $service['name'];
+                    }
+                }
+
                 if ($service_id == 1) {
                     //                    $status=false;
                     //                    $message="Select Package to Activate ".$service['name'];
@@ -629,9 +712,55 @@ class Services extends CI_Controller
                         $this->session->set_flashdata("err_msg", $message);
                     }
                     return false;
-                } elseif (!in_array($type, $types)) {
+                } elseif (!$has_service_options && !in_array($type, $types)) {
                     $status = false;
                     $message = $type . " option not available for " . $service['name'];
+                } elseif ($has_service_options && !empty($service_option)) {
+                    // Handle services with dynamic options - check for duplicate purchase of same option
+                    $where2 = "t1.user_id='$user[id]' and t1.service_id='$service_id' and t1.year='$year'";
+                    if ($service_for == 'Firm') {
+                        $where2 .= " and t1.firm_id='$firm_id'";
+                    }
+                    // If period_value is provided, also check for it
+                    if (!empty($period_value)) {
+                        $where2 .= " and t1.period_value='$period_value'";
+                    }
+                    $purchases = $this->service->getpurchases($where2);
+                    if (!empty($purchases)) {
+                        // Check if this specific option was already purchased
+                        foreach ($purchases as $purchase) {
+                            // First check service_option column (most reliable)
+                            if (!empty($purchase['service_option']) && $purchase['service_option'] == $service_option) {
+                                $status = false;
+                                $years = getyearmonthvalues($year);
+                                $period_msg = '';
+                                if (!empty($period_value)) {
+                                    $period_info = getyearmonthvalues($period_value);
+                                    $period_msg = ' for ' . $period_info['value'];
+                                } else {
+                                    $period_msg = ' for ' . $years['value'];
+                                }
+                                $message = "You have already Purchased " . $service['name'] . " (" . $selected_option_display . ")" . $period_msg . "!";
+                                break;
+                            }
+                            // Fallback: check service name for the option
+                            $search_keyword = strtolower($selected_option_display);
+                            $purchase_service_name = strtolower(!empty($purchase['service']) ? $purchase['service'] : (!empty($purchase['service_name']) ? $purchase['service_name'] : ''));
+                            if (strpos($purchase_service_name, $search_keyword) !== false) {
+                                $status = false;
+                                $years = getyearmonthvalues($year);
+                                $period_msg = '';
+                                if (!empty($period_value)) {
+                                    $period_info = getyearmonthvalues($period_value);
+                                    $period_msg = ' for ' . $period_info['value'];
+                                } else {
+                                    $period_msg = ' for ' . $years['value'];
+                                }
+                                $message = "You have already Purchased " . $service['name'] . " (" . $selected_option_display . ")" . $period_msg . "!";
+                                break;
+                            }
+                        }
+                    }
                 } elseif ($service['type'] == 'Once') {
                     $where2 = "t1.user_id='$user[id]' and t1.service_id='$service_id'";
                     if ($service_for == 'Firm') {
@@ -647,11 +776,23 @@ class Services extends CI_Controller
                     if ($service_for == 'Firm') {
                         $where2 .= " and t1.firm_id='$firm_id'";
                     }
-                    $purchases = $this->service->getpurchases($where2);
-                    if (!empty($purchases)) {
-                        $status = false;
-                        $years = getyearmonthvalues($year);
-                        $message = "You have already Purchased " . $service['name'] . " for " . $years['value'] . "!";
+                    // If period_value is provided, also check for it
+                    if (!empty($period_value)) {
+                        $where2 .= " and t1.period_value='$period_value'";
+                    }
+                    // For services with options, duplicate check already handled above
+                    if (!$has_service_options) {
+                        $purchases = $this->service->getpurchases($where2);
+                        if (!empty($purchases)) {
+                            $status = false;
+                            if (!empty($period_value)) {
+                                $period_info = getyearmonthvalues($period_value);
+                                $message = "You have already Purchased " . $service['name'] . " for " . $period_info['value'] . "!";
+                            } else {
+                                $years = getyearmonthvalues($year);
+                                $message = "You have already Purchased " . $service['name'] . " for " . $years['value'] . "!";
+                            }
+                        }
                     }
                 } elseif ($types[0] == 'Yearly' && count($types) > 1) {
                     /*$where2="t1.user_id='$user[id]' and t1.service_id='$service_id' and t1.year='$year'";
@@ -664,32 +805,83 @@ class Services extends CI_Controller
                         $message="You have already Purchased this Service!";
                     }*/
                 } elseif ($type == 'Monthly') {
-                    $where2 = "t1.user_id='$user[id]' and t1.service_id='$service_id' and t1.year='$year'";
-                    if ($service_for == 'Firm') {
-                        $where2 .= " and t1.firm_id='$firm_id'";
-                    }
-                    $purchases = $this->service->getpurchases($where2);
-                    if (!empty($purchases) && count($purchases) >= 12) {
-                        $status = false;
-                        $years = getyearmonthvalues($year);
-                        $message = "You have already Purchased " . $service['name'] . " for all Months of " . $years['value'] . "!";
+                    // Check for duplicate purchase of same month
+                    if (!empty($period_value)) {
+                        $where2 = "t1.user_id='$user[id]' and t1.service_id='$service_id' and t1.year='$year' and t1.type='Monthly' and t1.period_value='$period_value'";
+                        if ($service_for == 'Firm') {
+                            $where2 .= " and t1.firm_id='$firm_id'";
+                        }
+                        $purchases = $this->service->getpurchases($where2);
+                        if (!empty($purchases)) {
+                            $status = false;
+                            $period_info = getyearmonthvalues($period_value);
+                            $message = "You have already Purchased " . $service['name'] . " for " . $period_info['value'] . "!";
+                        }
+                    } else {
+                        // Fallback: check if all 12 months purchased
+                        $where2 = "t1.user_id='$user[id]' and t1.service_id='$service_id' and t1.year='$year' and t1.type='Monthly'";
+                        if ($service_for == 'Firm') {
+                            $where2 .= " and t1.firm_id='$firm_id'";
+                        }
+                        $purchases = $this->service->getpurchases($where2);
+                        if (!empty($purchases) && count($purchases) >= 12) {
+                            $status = false;
+                            $years = getyearmonthvalues($year);
+                            $message = "You have already Purchased " . $service['name'] . " for all Months of " . $years['value'] . "!";
+                        }
                     }
                 } elseif ($type == 'Quarterly') {
-                    $where2 = "t1.user_id='$user[id]' and t1.service_id='$service_id' and t1.year='$year'";
-                    if ($service_for == 'Firm') {
-                        $where2 .= " and t1.firm_id='$firm_id'";
+                    // Check for duplicate purchase of same quarter
+                    if (!empty($period_value)) {
+                        $where2 = "t1.user_id='$user[id]' and t1.service_id='$service_id' and t1.year='$year' and t1.type='Quarterly' and t1.period_value='$period_value'";
+                        if ($service_for == 'Firm') {
+                            $where2 .= " and t1.firm_id='$firm_id'";
+                        }
+                        $purchases = $this->service->getpurchases($where2);
+                        if (!empty($purchases)) {
+                            $status = false;
+                            $period_info = getyearmonthvalues($period_value);
+                            $message = "You have already Purchased " . $service['name'] . " for " . $period_info['value'] . "!";
+                        }
+                    } else {
+                        // Fallback: check if all 4 quarters purchased
+                        $where2 = "t1.user_id='$user[id]' and t1.service_id='$service_id' and t1.year='$year' and t1.type='Quarterly'";
+                        if ($service_for == 'Firm') {
+                            $where2 .= " and t1.firm_id='$firm_id'";
+                        }
+                        $purchases = $this->service->getpurchases($where2);
+                        if (!empty($purchases) && count($purchases) >= 4) {
+                            $status = false;
+                            $years = getyearmonthvalues($year);
+                            $message = "You have already Purchased " . $service['name'] . " for all Quarters of " . $years['value'] . "!";
+                        }
                     }
-                    $purchases = $this->service->getpurchases($where2);
-                    if (!empty($purchases) && count($purchases) >= 4) {
-                        $status = false;
-                        $years = getyearmonthvalues($year);
-                        $message = "You have already Purchased " . $service['name'] . " for all Quarters of " . $years['value'] . "!";
+                } elseif ($type == 'Yearly') {
+                    // Check for duplicate purchase of same year
+                    if (!empty($period_value)) {
+                        $where2 = "t1.user_id='$user[id]' and t1.service_id='$service_id' and t1.year='$year' and t1.type='Yearly' and t1.period_value='$period_value'";
+                        if ($service_for == 'Firm') {
+                            $where2 .= " and t1.firm_id='$firm_id'";
+                        }
+                        $purchases = $this->service->getpurchases($where2);
+                        if (!empty($purchases)) {
+                            $status = false;
+                            $period_info = getyearmonthvalues($period_value);
+                            $message = "You have already Purchased " . $service['name'] . " for " . $period_info['value'] . "!";
+                        }
                     }
                 }
                 if ($status) {
-                    $service['rate'] = $service['rate'];
-                    $subtotal = $service['rate'];
-                    if (!empty($types) && count($types) > 1) {
+                    // Use custom amount for services with options, otherwise use service rate
+                    if ($has_service_options && !empty($amount)) {
+                        $subtotal = floatval($amount);
+                        $service['rate'] = $subtotal; // Update rate for display
+                    } else {
+                        $service['rate'] = $service['rate'];
+                        $subtotal = $service['rate'];
+                    }
+
+                    if (!$has_service_options && !empty($types) && count($types) > 1) {
                         if ($type == 'Monthly') {
                             $subtotal = $service['rate'];
                         } elseif ($type == 'Quarterly') {
@@ -736,6 +928,17 @@ class Services extends CI_Controller
                         'gst_enabled' => $gst_enabled ? 1 : 0,
                         'amount' => $total
                     );
+
+                    // Store period value for Monthly/Quarterly/Yearly purchases
+                    if (!empty($period_value) && ($type == 'Monthly' || $type == 'Quarterly' || $type == 'Yearly')) {
+                        $single['period_value'] = $period_value;
+                    }
+
+                    // Store service option if applicable (generic for all services with options)
+                    if ($has_service_options && !empty($service_option)) {
+                        $single['service_option'] = $service_option;
+                        $single['service_option_display'] = $selected_option_display;
+                    }
                     $balance = $this->wallet->getwalletbalance($user['id']);
 
                     if ($balance >= $total) {

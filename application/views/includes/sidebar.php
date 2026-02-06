@@ -28,6 +28,7 @@
                         <ul class="slide-menu">
                             <li class="side-menu-label1"><a href="javascript:void(0)">Masterkey</a></li>
                             <li><a href="<?= base_url('masterkey/'); ?>" class="slide-item <?= activate_menu('masterkey'); ?>"> Services</a></li>
+                            <li><a href="<?= base_url('masterkey/serviceoptions/'); ?>" class="slide-item <?= activate_menu('masterkey/serviceoptions'); ?>"> Service Options</a></li>
                             <li><a href="<?= base_url('masterkey/documents/'); ?>" class="slide-item <?= activate_menu('masterkey/documents'); ?>"> Documents Required</a></li>
                             <li><a href="<?= base_url('masterkey/documentlist/'); ?>" class="slide-item <?= activate_menu('masterkey/documentlist'); ?>"> Documents Required List</a></li>
                             <li><a href="<?= base_url('masterkey/packages/'); ?>" class="slide-item <?= activate_menu('masterkey/packages'); ?>"> Packages</a></li>
