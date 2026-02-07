@@ -116,5 +116,9 @@
 
 
         <div class="notifications d-none">
-            <button class="<?= $notify ?>" data-type="<?= $nDataType ?>" onClick="notifyMsg(<?= json_encode($msg); ?>,<?= json_encode($nDataType); ?>)"><?= htmlspecialchars($msg, ENT_QUOTES, 'UTF-8'); ?></button>
+            <?php if (!empty($msg)): ?>
+                <button class="<?= $notify ?>" data-type="<?= htmlspecialchars($nDataType, ENT_QUOTES, 'UTF-8'); ?>" onClick='notifyMsg(<?= json_encode($msg); ?>,<?= json_encode($nDataType); ?>)'><?= htmlspecialchars($msg, ENT_QUOTES, 'UTF-8'); ?></button>
+            <?php else: ?>
+                <button class="<?= $notify ?>" data-type="<?= htmlspecialchars($nDataType, ENT_QUOTES, 'UTF-8'); ?>"></button>
+            <?php endif; ?>
         </div>
