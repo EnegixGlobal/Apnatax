@@ -240,7 +240,7 @@
                                 $('#purchase').text('Purchase');
                             }
                             // $('#package_id').val(''); // Commented out: Package selection reset
-                            $('.modal-dialog').removeClass('modal-md').addClass('modal-sm')
+                            $('.modal-dialog').removeClass('modal-md').addClass('modal-sm');
                             $('#id').val($(this).val());
                             $('#type-form').removeClass('d-none');
                             $('#package-form').addClass('d-none');
@@ -249,7 +249,8 @@
                             if (type == '') {
 
                             } else if (type.search(',') == -1) {
-                                $('#type').html('<option value="">Select Type</option><option value="' + type + '">' + type + '</option>');
+                                var escapedType = $('<div>').text(type).html();
+                                $('#type').html('<option value="">Select Type</option><option value="' + escapedType + '">' + escapedType + '</option>');
                                 $('#type').val(type);
                                 myModal.show();
                                 $('#type').trigger('change');
@@ -259,7 +260,8 @@
                                 var types = type.split(',');
                                 var options = '<option value="">Select Type</option>';
                                 for (let i = 0; i < types.length; i++) {
-                                    options += '<option value="' + types[i] + '">' + types[i] + '</option>';
+                                    var escapedType = $('<div>').text(types[i].trim()).html();
+                                    options += '<option value="' + escapedType + '">' + escapedType + '</option>';
                                 }
                                 $('#type').html(options);
 
