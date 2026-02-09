@@ -145,7 +145,7 @@ if (!function_exists('getquarterly')) {
         $array[] = array('id' => $index, 'value' => $value, 'start' => $year . '-10-01', 'end' => $year . '-12-31');
         $index = ($year + 1) . 'Q4';
         $value = 'Q4 (Jan-' . ($shortyear + 1) . ' to Mar-' . ($shortyear + 1) . ')';
-        $array[] = array('id' => $index, 'value' => $value, 'start' => $year . '-01-01', 'end' => ($year + 1) . '--31');
+        $array[] = array('id' => $index, 'value' => $value, 'start' => ($year + 1) . '-01-01', 'end' => ($year + 1) . '-03-31');
         return $array;
     }
 }
@@ -185,15 +185,23 @@ if (!function_exists('getyearmonthvalues')) {
                 $months = getmonths($year);
                 $name = 'Month';
             } else {
+                // For quarters, Q4 belongs to the previous financial year
+                // e.g., 2026Q4 should use getquarterly(2025) which creates 2026Q4
+                $quarter_num = substr($value, -1);
+                if ($quarter_num == '4') {
+                    $year--; // Q4 is part of previous year's financial year
+                }
                 $months = getquarterly($year);
                 $name = 'Quarter';
             }
             $ids = array_column($months, 'id');
             $key = array_search($index, $ids);
-            $value = $months[$key]['value'];
-            $start = $months[$key]['start'];
-            $end = $months[$key]['end'];
-            $result = array('id' => $index, 'name' => $name, 'value' => $value, 'start' => $start, 'end' => $end);
+            if ($key !== false && isset($months[$key])) {
+                $value = $months[$key]['value'];
+                $start = $months[$key]['start'];
+                $end = $months[$key]['end'];
+                $result = array('id' => $index, 'name' => $name, 'value' => $value, 'start' => $start, 'end' => $end);
+            }
         }
         return $result;
     }
@@ -480,16 +488,17 @@ if (!function_exists('checkservicepurchase')) {
                 $message = "You have already Purchased " . $service['name'] . "!";
             }
         } elseif ($types[0] == 'Yearly') {
-            $where = "t1.user_id='$user[id]' and t1.service_id='$service[id]' and t1.year='$year'";
+            $where = "t1.user_id='$user[id]' and t1.service_id='$service[id]' and t1.year='$year' and t1.type='Yearly'";
             // Always check firm_id if provided (purchases always have firm_id)
             if (!empty($firm_id)) {
                 $where .= " and t1.firm_id='$firm_id'";
             }
             $purchases = $CI->service->getpurchases($where);
-            if (!empty($purchases)) {
+            // Check annual limit: Maximum 1 yearly purchase per year
+            if (!empty($purchases) && count($purchases) >= 1) {
                 $status = false;
                 $years = getyearmonthvalues($year);
-                $message = "You have already Purchased " . $service['name'] . " for " . $years['value'] . "!";
+                $message = "Annual limit reached! You can purchase yearly services maximum 1 time per year for " . $years['value'] . "!";
             }
         } else {
             //print_pre($service);
@@ -501,10 +510,11 @@ if (!function_exists('checkservicepurchase')) {
                     $where .= " and t1.firm_id='$firm_id'";
                 }
                 $purchases = $CI->service->getpurchases($where);
+                // Check annual limit: Maximum 4 quarterly purchases per year
                 if (!empty($purchases) && count($purchases) >= 4) {
                     $status = false;
                     $years = getyearmonthvalues($year);
-                    $message = "You have already Purchased " . $service['name'] . " for all Quarters of " . $years['value'] . "!";
+                    $message = "Annual limit reached! You can purchase quarterly services maximum 4 times per year for " . $years['value'] . "!";
                 }
             } elseif ($types[0] == 'Monthly') {
                 $where = "t1.user_id='$user[id]' and t1.service_id='$service[id]' and t1.year='$year' 
@@ -515,10 +525,11 @@ if (!function_exists('checkservicepurchase')) {
                 }
                 $purchases = $CI->service->getpurchases($where);
                 //print_pre($purchases);
+                // Check annual limit: Maximum 12 monthly purchases per year
                 if (!empty($purchases) && count($purchases) >= 12) {
                     $status = false;
                     $years = getyearmonthvalues($year);
-                    $message = "You have already Purchased " . $service['name'] . " for " . $years['value'] . "!";
+                    $message = "Annual limit reached! You can purchase monthly services maximum 12 times per year for " . $years['value'] . "!";
                 }
             }
         }
