@@ -198,35 +198,41 @@ class Services extends CI_Controller
                     $slug = date('Y', strtotime($service['date']));
                     redirect($link);
                 } elseif ($service['purchased_type'] == 'Monthly') {
-                    /*if($service['month']!=''){
-                        $month=getyearmonthvalues($service['month']);
-                        $slug=$month['value'];
+                    // First check period_value from purchase record
+                    if (!empty($service['period_value'])) {
+                        $period_info = getyearmonthvalues($service['period_value']);
+                        if (!empty($period_info['value'])) {
+                            $name = $period_info['value'];
+                        }
                     }
-                    else{
-                        $slug=date('F-Y',strtotime($service['date']));
-                    }*/
-                    $documents = $this->service->getuploadeddocuments(['a.order_id' => $service['id']]);
-                    $doc_names = !empty($documents) ? array_column($documents, 'display_name') : array();
-                    if (!empty($doc_names)) {
-                        $index = array_search('Month', $doc_names);
-                        if ($index !== false) {
-                            $name = $documents[$index]['formvalue'];
+                    // Fall back to formdata if period_value not available
+                    if ($name == "<span class=\"text-danger\">Pending</span>") {
+                        $documents = $this->service->getuploadeddocuments(['a.order_id' => $service['id']]);
+                        $doc_names = !empty($documents) ? array_column($documents, 'display_name') : array();
+                        if (!empty($doc_names)) {
+                            $index = array_search('Month', $doc_names);
+                            if ($index !== false) {
+                                $name = $documents[$index]['formvalue'];
+                            }
                         }
                     }
                 } elseif ($service['purchased_type'] == 'Quarterly') {
-                    /*if($service['month']!=''){
-                        $month=getyearmonthvalues($service['month']);
-                        $slug=$month['value'];
+                    // First check period_value from purchase record
+                    if (!empty($service['period_value'])) {
+                        $period_info = getyearmonthvalues($service['period_value']);
+                        if (!empty($period_info['value'])) {
+                            $name = $period_info['value'];
+                        }
                     }
-                    else{
-                        $slug=date('F-Y',strtotime($service['date']));
-                    }*/
-                    $documents = $this->service->getuploadeddocuments(['a.order_id' => $service['id']]);
-                    $doc_names = !empty($documents) ? array_column($documents, 'display_name') : array();
-                    if (!empty($doc_names)) {
-                        $index = array_search('Quarter', $doc_names);
-                        if ($index !== false) {
-                            $name = $documents[$index]['formvalue'];
+                    // Fall back to formdata if period_value not available
+                    if ($name == "<span class=\"text-danger\">Pending</span>") {
+                        $documents = $this->service->getuploadeddocuments(['a.order_id' => $service['id']]);
+                        $doc_names = !empty($documents) ? array_column($documents, 'display_name') : array();
+                        if (!empty($doc_names)) {
+                            $index = array_search('Quarter', $doc_names);
+                            if ($index !== false) {
+                                $name = $documents[$index]['formvalue'];
+                            }
                         }
                     }
                 } else {
@@ -298,6 +304,13 @@ class Services extends CI_Controller
                     $data['finaldocuments'] = $finaldocuments;
                     $where = "t1.user_id='$user[id]' and t1.id='$order_id' and t1.firm_id='$firm_id'";
                     $data['order'] = $this->service->getpurchasedservices($where, 'single');
+
+                    // Get period_value (quarter/month) for pre-selecting dropdown
+                    $data['selected_period'] = '';
+                    if (!empty($data['order']['period_value'])) {
+                        $data['selected_period'] = $data['order']['period_value'];
+                    }
+
                     $data['firm'] = $this->customer->getfirms(array("t1.id" => $firm_id), "single");
                     $data['kyc'] = $kyc;
                     $this->template->load('services', 'serviceform', $data);
@@ -808,71 +821,72 @@ class Services extends CI_Controller
                         $message="You have already Purchased this Service!";
                     }*/
                 } elseif ($type == 'Monthly') {
-                    // Check for duplicate purchase of same month
-                    if (!empty($period_value)) {
-                        $where2 = "t1.user_id='$user[id]' and t1.service_id='$service_id' and t1.year='$year' and t1.type='Monthly' and t1.period_value='$period_value'";
-                        // Always check firm_id if provided (purchases always have firm_id)
-                        if (!empty($firm_id)) {
-                            $where2 .= " and t1.firm_id='$firm_id'";
-                        }
-                        $purchases = $this->service->getpurchases($where2);
-                        if (!empty($purchases)) {
+                    // Check annual limit: Maximum 12 monthly purchases per year
+                    $where2 = "t1.user_id='$user[id]' and t1.service_id='$service_id' and t1.year='$year' and t1.type='Monthly'";
+                    // Always check firm_id if provided (purchases always have firm_id)
+                    if (!empty($firm_id)) {
+                        $where2 .= " and t1.firm_id='$firm_id'";
+                    }
+                    $purchases = $this->service->getpurchases($where2);
+
+                    // Check if annual limit (12 months) is reached
+                    if (!empty($purchases) && count($purchases) >= 12) {
+                        $status = false;
+                        $years = getyearmonthvalues($year);
+                        $message = "You have reached the annual limit! You can purchase monthly services maximum 12 times per year for " . $years['value'] . "!";
+                    } elseif (!empty($period_value)) {
+                        // Check for duplicate purchase of specific month
+                        $where3 = $where2 . " and t1.period_value='$period_value'";
+                        $existing = $this->service->getpurchases($where3);
+                        if (!empty($existing)) {
                             $status = false;
                             $period_info = getyearmonthvalues($period_value);
                             $message = "You have already Purchased " . $service['name'] . " for " . $period_info['value'] . "!";
-                        }
-                    } else {
-                        // Fallback: check if all 12 months purchased
-                        $where2 = "t1.user_id='$user[id]' and t1.service_id='$service_id' and t1.year='$year' and t1.type='Monthly'";
-                        // Always check firm_id if provided (purchases always have firm_id)
-                        if (!empty($firm_id)) {
-                            $where2 .= " and t1.firm_id='$firm_id'";
-                        }
-                        $purchases = $this->service->getpurchases($where2);
-                        if (!empty($purchases) && count($purchases) >= 12) {
-                            $status = false;
-                            $years = getyearmonthvalues($year);
-                            $message = "You have already Purchased " . $service['name'] . " for all Months of " . $years['value'] . "!";
                         }
                     }
                 } elseif ($type == 'Quarterly') {
-                    // Check for duplicate purchase of same quarter
-                    if (!empty($period_value)) {
-                        $where2 = "t1.user_id='$user[id]' and t1.service_id='$service_id' and t1.year='$year' and t1.type='Quarterly' and t1.period_value='$period_value'";
-                        // Always check firm_id if provided (purchases always have firm_id)
-                        if (!empty($firm_id)) {
-                            $where2 .= " and t1.firm_id='$firm_id'";
-                        }
-                        $purchases = $this->service->getpurchases($where2);
-                        if (!empty($purchases)) {
+                    // Check annual limit: Maximum 4 quarterly purchases per year
+                    $where2 = "t1.user_id='$user[id]' and t1.service_id='$service_id' and t1.year='$year' and t1.type='Quarterly'";
+                    // Always check firm_id if provided (purchases always have firm_id)
+                    if (!empty($firm_id)) {
+                        $where2 .= " and t1.firm_id='$firm_id'";
+                    }
+                    $purchases = $this->service->getpurchases($where2);
+
+                    // Check if annual limit (4 quarters) is reached
+                    if (!empty($purchases) && count($purchases) >= 4) {
+                        $status = false;
+                        $years = getyearmonthvalues($year);
+                        $message = "You have reached the annual limit! You can purchase quarterly services maximum 4 times per year for " . $years['value'] . "!";
+                    } elseif (!empty($period_value)) {
+                        // Check for duplicate purchase of specific quarter
+                        $where3 = $where2 . " and t1.period_value='$period_value'";
+                        $existing = $this->service->getpurchases($where3);
+                        if (!empty($existing)) {
                             $status = false;
                             $period_info = getyearmonthvalues($period_value);
                             $message = "You have already Purchased " . $service['name'] . " for " . $period_info['value'] . "!";
                         }
-                    } else {
-                        // Fallback: check if all 4 quarters purchased
-                        $where2 = "t1.user_id='$user[id]' and t1.service_id='$service_id' and t1.year='$year' and t1.type='Quarterly'";
-                        // Always check firm_id if provided (purchases always have firm_id)
-                        if (!empty($firm_id)) {
-                            $where2 .= " and t1.firm_id='$firm_id'";
-                        }
-                        $purchases = $this->service->getpurchases($where2);
-                        if (!empty($purchases) && count($purchases) >= 4) {
-                            $status = false;
-                            $years = getyearmonthvalues($year);
-                            $message = "You have already Purchased " . $service['name'] . " for all Quarters of " . $years['value'] . "!";
-                        }
                     }
                 } elseif ($type == 'Yearly') {
-                    // Check for duplicate purchase of same year
-                    if (!empty($period_value)) {
-                        $where2 = "t1.user_id='$user[id]' and t1.service_id='$service_id' and t1.year='$year' and t1.type='Yearly' and t1.period_value='$period_value'";
-                        // Always check firm_id if provided (purchases always have firm_id)
-                        if (!empty($firm_id)) {
-                            $where2 .= " and t1.firm_id='$firm_id'";
-                        }
-                        $purchases = $this->service->getpurchases($where2);
-                        if (!empty($purchases)) {
+                    // Check annual limit: Maximum 1 yearly purchase per year
+                    $where2 = "t1.user_id='$user[id]' and t1.service_id='$service_id' and t1.year='$year' and t1.type='Yearly'";
+                    // Always check firm_id if provided (purchases always have firm_id)
+                    if (!empty($firm_id)) {
+                        $where2 .= " and t1.firm_id='$firm_id'";
+                    }
+                    $purchases = $this->service->getpurchases($where2);
+
+                    // Check if annual limit (1 yearly) is reached
+                    if (!empty($purchases) && count($purchases) >= 1) {
+                        $status = false;
+                        $years = getyearmonthvalues($year);
+                        $message = "You have reached the annual limit! You can purchase yearly services maximum 1 time per year for " . $years['value'] . "!";
+                    } elseif (!empty($period_value)) {
+                        // Check for duplicate purchase of specific year period
+                        $where3 = $where2 . " and t1.period_value='$period_value'";
+                        $existing = $this->service->getpurchases($where3);
+                        if (!empty($existing)) {
                             $status = false;
                             $period_info = getyearmonthvalues($period_value);
                             $message = "You have already Purchased " . $service['name'] . " for " . $period_info['value'] . "!";

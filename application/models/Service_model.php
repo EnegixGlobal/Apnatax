@@ -114,6 +114,7 @@ class Service_model extends CI_Model
                          GROUP BY t1.service_id) as latest";
 
             // Main query with proper column selection
+            // Use subqueries to get month and report values to avoid duplicates from multiple records
             $columns = "t1.*,t2.name as service_name,t2.slug as service_slug,t2.type,t1.type as purchased_type";
             $columns .= ",  case when t1.status=0 then 'Pending' 
                                 when t1.status=1 then 'Complete' 
@@ -121,20 +122,25 @@ class Service_model extends CI_Model
                                 when t1.status=3 then 'Form Assessment in Progress' 
                                 when t1.status=4 then 'Assessment Report Uploaded' 
                                 else '' end as order_status";
-            $columns .= ",  case when t1.status=4 then concat('" . base_url() . "',t3.file) 
-                                else '' end as report,ifnull(t4.value,'') as month";
+            $columns .= ",  case when t1.status=4 then concat('" . base_url() . "',(SELECT t3.file FROM {$assessments_table} t3 WHERE t3.order_id = t1.id AND t3.status = 1 ORDER BY t3.id DESC LIMIT 1))
+                                else '' end as report";
+            $columns .= ", (SELECT MAX(t4.value) FROM {$formdata_table} t4 WHERE t4.order_id = t1.id AND t4.field LIKE '%-month' LIMIT 1) as month";
 
             $sql = "SELECT {$columns}
                     FROM {$purchases_table} t1
                     INNER JOIN {$subquery} ON t1.id = latest.id
                     LEFT JOIN {$services_table} t2 ON t1.service_id=t2.id
-                    LEFT JOIN {$assessments_table} t3 ON t1.id=t3.order_id
-                    LEFT JOIN {$formdata_table} t4 ON t1.id=t4.order_id AND t4.field LIKE '%-month'
+                    GROUP BY t1.id
                     ORDER BY t1.id DESC";
 
             $query = $this->db->query($sql);
         } else {
             // Standard query without grouping
+            // Use subqueries in SELECT to get month and report values to avoid duplicates
+            $prefix = $this->db->dbprefix;
+            $formdata_table = $prefix . 'formdata';
+            $assessments_table = $prefix . 'assessments';
+
             $columns = "t1.*,t2.name as service_name,t2.slug as service_slug,t2.type,t1.type as purchased_type";
             $columns .= ",  case when t1.status=0 then 'Pending' 
                                 when t1.status=1 then 'Complete' 
@@ -142,9 +148,10 @@ class Service_model extends CI_Model
                                 when t1.status=3 then 'Form Assessment in Progress' 
                                 when t1.status=4 then 'Assessment Report Uploaded' 
                                 else '' end as order_status";
-            $columns .= ",  case when t1.status=4 then concat('" . base_url() . "',t3.file) 
-                                else '' end as report,ifnull(t4.value,'') as month";
-            $this->db->select($columns);
+            $columns .= ",  case when t1.status=4 then concat('" . base_url() . "',(SELECT t3.file FROM {$assessments_table} t3 WHERE t3.order_id = t1.id AND t3.status = 1 ORDER BY t3.id DESC LIMIT 1))
+                                else '' end as report";
+            $columns .= ", (SELECT MAX(t4.value) FROM {$formdata_table} t4 WHERE t4.order_id = t1.id AND t4.field LIKE '%-month' LIMIT 1) as month";
+            $this->db->select($columns, FALSE);
 
             // Handle both array and string where conditions
             if (is_array($where)) {
@@ -155,8 +162,7 @@ class Service_model extends CI_Model
 
             $this->db->from('purchases t1');
             $this->db->join('services t2', 't1.service_id=t2.id', 'left');
-            $this->db->join('assessments t3', 't1.id=t3.order_id', 'left');
-            $this->db->join('formdata t4', "t1.id=t4.order_id and t4.field like '%-month'", 'left');
+            $this->db->group_by('t1.id');
             $this->db->order_by('t1.id', 'DESC');
 
             $query = $this->db->get();
