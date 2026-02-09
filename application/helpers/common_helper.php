@@ -470,7 +470,8 @@ if (!function_exists('checkservicepurchase')) {
             }
         } elseif ($service['type'] == 'Once') {
             $where = "t1.user_id='$user[id]' and t1.service_id='$service[id]'";
-            if ($service_for == 'Firm') {
+            // Always check firm_id if provided (purchases always have firm_id)
+            if (!empty($firm_id)) {
                 $where .= " and t1.firm_id='$firm_id'";
             }
             $purchases = $CI->service->getpurchases($where);
@@ -480,7 +481,8 @@ if (!function_exists('checkservicepurchase')) {
             }
         } elseif ($types[0] == 'Yearly') {
             $where = "t1.user_id='$user[id]' and t1.service_id='$service[id]' and t1.year='$year'";
-            if ($service_for == 'Firm') {
+            // Always check firm_id if provided (purchases always have firm_id)
+            if (!empty($firm_id)) {
                 $where .= " and t1.firm_id='$firm_id'";
             }
             $purchases = $CI->service->getpurchases($where);
@@ -494,7 +496,8 @@ if (!function_exists('checkservicepurchase')) {
             if ($types[0] == 'Quarterly') {
                 $where = "t1.user_id='$user[id]' and t1.service_id='$service[id]' and t1.year='$year' 
                             and t1.type='Quarterly'";
-                if ($service_for == 'Firm') {
+                // Always check firm_id if provided (purchases always have firm_id)
+                if (!empty($firm_id)) {
                     $where .= " and t1.firm_id='$firm_id'";
                 }
                 $purchases = $CI->service->getpurchases($where);
@@ -506,7 +509,8 @@ if (!function_exists('checkservicepurchase')) {
             } elseif ($types[0] == 'Monthly') {
                 $where = "t1.user_id='$user[id]' and t1.service_id='$service[id]' and t1.year='$year' 
                             and t1.type='Monthly'";
-                if ($service_for == 'Firm') {
+                // Always check firm_id if provided (purchases always have firm_id)
+                if (!empty($firm_id)) {
                     $where .= " and t1.firm_id='$firm_id'";
                 }
                 $purchases = $CI->service->getpurchases($where);

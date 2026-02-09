@@ -718,7 +718,8 @@ class Services extends CI_Controller
                 } elseif ($has_service_options && !empty($service_option)) {
                     // Handle services with dynamic options - check for duplicate purchase of same option
                     $where2 = "t1.user_id='$user[id]' and t1.service_id='$service_id' and t1.year='$year'";
-                    if ($service_for == 'Firm') {
+                    // Always check firm_id if provided (purchases always have firm_id)
+                    if (!empty($firm_id)) {
                         $where2 .= " and t1.firm_id='$firm_id'";
                     }
                     // If period_value is provided, also check for it
@@ -763,7 +764,8 @@ class Services extends CI_Controller
                     }
                 } elseif ($service['type'] == 'Once') {
                     $where2 = "t1.user_id='$user[id]' and t1.service_id='$service_id'";
-                    if ($service_for == 'Firm') {
+                    // Always check firm_id if provided (purchases always have firm_id)
+                    if (!empty($firm_id)) {
                         $where2 .= " and t1.firm_id='$firm_id'";
                     }
                     $purchases = $this->service->getpurchases($where2);
@@ -773,7 +775,8 @@ class Services extends CI_Controller
                     }
                 } elseif ($types[0] == 'Yearly' && count($types) == 1) {
                     $where2 = "t1.user_id='$user[id]' and t1.service_id='$service_id' and t1.year='$year'";
-                    if ($service_for == 'Firm') {
+                    // Always check firm_id if provided (purchases always have firm_id)
+                    if (!empty($firm_id)) {
                         $where2 .= " and t1.firm_id='$firm_id'";
                     }
                     // If period_value is provided, also check for it
@@ -808,7 +811,8 @@ class Services extends CI_Controller
                     // Check for duplicate purchase of same month
                     if (!empty($period_value)) {
                         $where2 = "t1.user_id='$user[id]' and t1.service_id='$service_id' and t1.year='$year' and t1.type='Monthly' and t1.period_value='$period_value'";
-                        if ($service_for == 'Firm') {
+                        // Always check firm_id if provided (purchases always have firm_id)
+                        if (!empty($firm_id)) {
                             $where2 .= " and t1.firm_id='$firm_id'";
                         }
                         $purchases = $this->service->getpurchases($where2);
@@ -820,7 +824,8 @@ class Services extends CI_Controller
                     } else {
                         // Fallback: check if all 12 months purchased
                         $where2 = "t1.user_id='$user[id]' and t1.service_id='$service_id' and t1.year='$year' and t1.type='Monthly'";
-                        if ($service_for == 'Firm') {
+                        // Always check firm_id if provided (purchases always have firm_id)
+                        if (!empty($firm_id)) {
                             $where2 .= " and t1.firm_id='$firm_id'";
                         }
                         $purchases = $this->service->getpurchases($where2);
@@ -834,7 +839,8 @@ class Services extends CI_Controller
                     // Check for duplicate purchase of same quarter
                     if (!empty($period_value)) {
                         $where2 = "t1.user_id='$user[id]' and t1.service_id='$service_id' and t1.year='$year' and t1.type='Quarterly' and t1.period_value='$period_value'";
-                        if ($service_for == 'Firm') {
+                        // Always check firm_id if provided (purchases always have firm_id)
+                        if (!empty($firm_id)) {
                             $where2 .= " and t1.firm_id='$firm_id'";
                         }
                         $purchases = $this->service->getpurchases($where2);
@@ -846,7 +852,8 @@ class Services extends CI_Controller
                     } else {
                         // Fallback: check if all 4 quarters purchased
                         $where2 = "t1.user_id='$user[id]' and t1.service_id='$service_id' and t1.year='$year' and t1.type='Quarterly'";
-                        if ($service_for == 'Firm') {
+                        // Always check firm_id if provided (purchases always have firm_id)
+                        if (!empty($firm_id)) {
                             $where2 .= " and t1.firm_id='$firm_id'";
                         }
                         $purchases = $this->service->getpurchases($where2);
@@ -860,7 +867,8 @@ class Services extends CI_Controller
                     // Check for duplicate purchase of same year
                     if (!empty($period_value)) {
                         $where2 = "t1.user_id='$user[id]' and t1.service_id='$service_id' and t1.year='$year' and t1.type='Yearly' and t1.period_value='$period_value'";
-                        if ($service_for == 'Firm') {
+                        // Always check firm_id if provided (purchases always have firm_id)
+                        if (!empty($firm_id)) {
                             $where2 .= " and t1.firm_id='$firm_id'";
                         }
                         $purchases = $this->service->getpurchases($where2);
