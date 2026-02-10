@@ -1,26 +1,40 @@
-$('#testimonial').owlCarousel({
-    items:4,
+var testimonialCarousel = $('#testimonial').owlCarousel({
+    items:2,
     loop:true,
-    margin:10,
+    margin:30,
     autoplay:true,
-    autoplayTimeout:1000,
+    autoplayTimeout:5000,
     autoplayHoverPause:true,
+    nav:false,
+    dots:false,
     responsive:{
         0:{
-            items:1
+            items:1,
+            margin:20
         },
         600:{
-            items:2
+            items:1,
+            margin:20
         },
-        991:{
+        768:{
             items:2,
-            nav:false
+            margin:20
         },
-        1000:{
-            items:3,
+        992:{
+            items:2,
+            margin:30
         }
     }
-})
+});
+
+// Custom navigation buttons
+$('#testimonialPrev').click(function() {
+    testimonialCarousel.trigger('prev.owl.carousel');
+});
+
+$('#testimonialNext').click(function() {
+    testimonialCarousel.trigger('next.owl.carousel');
+});
 let mybutton = document.getElementById("myBtn");
 window.onscroll = function() {scrollFunction()};
 

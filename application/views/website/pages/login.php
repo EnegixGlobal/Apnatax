@@ -7,83 +7,70 @@
     <title>Login | SoraTax</title>
     <link rel="icon" href="./images/logo.png">
     <?php include "./temp/inc.php" ?>
-    <style>
-        .login-btn{
-            line-height: 1.5;
-            color: #fff;
-            width: 100%;
-            height: 40px;
-            display: -webkit-box;
-            display: -webkit-flex;
-            display: -moz-box;
-            display: -ms-flexbox;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 0 25px;
-            border-radius: 5px;
-            -webkit-appearance: button;
-            color: #fff !important;
-            background: #ff5e3a !important;
-            border-color: #ff5e3a !important;
-        }
-    </style>
 </head>
 
 <body>
     <?php include "./temp/navbar.php" ?>
-    <section>
-        <div class="common-background">
+    <section class="auth-hero-section">
+        <div class="auth-hero-background">
             <div class="container">
-                <div class="about-page">
-                    <h2>Login</h2>
-                    <nav aria-label="breadcrumb">
-                        <ol class="breadcrumb">
-                            <li class="breadcrumb-item"><a href="/">Home</a></li>
-                            <li class="breadcrumb-item active" aria-current="page">Login</li>
-                        </ol>
-                    </nav>
-                </div>
-            </div>
-        </div>
-    </section>
-    <section>
-        <div class="container">
-            <div class="content-section">
-                <div class="contact-form">
-                    <div class="row">
-                        <div class="col-12 col-md-4"></div>
-                        <div class="col-12 col-md-4">
-                            <div class="title">
-                                <h2>Login</h2>
+                <div class="row align-items-center justify-content-center min-vh-100">
+                    <div class="col-12 col-md-8 col-lg-6 col-xl-5">
+                        <div class="auth-form-card">
+                            <div class="auth-form-logo">
+                                <img src="./images/logo.png" alt="Logo" class="auth-logo-img">
                             </div>
-                            <form action="login/validatelogin/" method="post" class="login100-form validate-form">
-                                <div class="form-floating mb-3">
-                                    <input type="text" name="username" id="username" placeholder="Username" class="input100 border-start-0 form-control ms-0" required />
-                                    <label for="username">Mobile No</label>
+                            <h2 class="auth-form-title">Customer Login</h2>
+                            <form action="login/validatelogin/" method="post" class="auth-form">
+                                <div class="form-group mb-3">
+                                    <label for="username">Mobile No.</label>
+                                    <input type="text" name="username" id="username" class="form-control auth-input" required />
                                 </div>
-                                <div class="form-floating mb-3">
-                                    <input type="password" name="password" id="password" placeholder="Password" class="input100 border-start-0 form-control ms-0" required/>
+                                <div class="form-group mb-3">
                                     <label for="password">Password</label>
-                                </div>
-                                <div class="text-center text-danger"><?= $this->session->flashdata('logerr'); ?></div>
-                                <div class="row">
-                                    <div class="col-12">
-                                        <input type="hidden" name="role" value="customer">
-                                        <button type="submit" name="login" class="login-btn">Login</button>
+                                    <div class="auth-password-wrapper">
+                                        <input type="password" name="password" id="password" class="form-control auth-input auth-password-input" required />
+                                        <button type="button" class="auth-password-toggle" id="togglePassword" aria-label="Show password">
+                                            <i class="zmdi zmdi-eye" id="eyeIcon"></i>
+                                        </button>
                                     </div>
-                                </div><br>
-                                <p>New Customer? <a href="register.php">Register Now</a></p>
+                                </div>
+                                <div class="text-center text-danger mb-3"><?= $this->session->flashdata('logerr'); ?></div>
+                                <input type="hidden" name="role" value="customer">
+                                <button type="submit" name="login" class="auth-submit-btn">Login</button>
+                                <p class="auth-link-text">New Customer? <a href="register.php">Register Now</a></p>
                             </form>
                         </div>
                     </div>
                 </div>
-
             </div>
         </div>
     </section>
     <?php include "./temp/footer.php" ?>
     <?php include "./temp/vendor.php" ?>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const togglePassword = document.getElementById('togglePassword');
+            const passwordInput = document.getElementById('password');
+            const eyeIcon = document.getElementById('eyeIcon');
+
+            if (togglePassword && passwordInput && eyeIcon) {
+                togglePassword.addEventListener('click', function() {
+                    const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                    passwordInput.setAttribute('type', type);
+
+                    // Toggle eye icon (using zmdi icons)
+                    if (type === 'text') {
+                        eyeIcon.classList.remove('zmdi-eye');
+                        eyeIcon.classList.add('zmdi-eye-off');
+                    } else {
+                        eyeIcon.classList.remove('zmdi-eye-off');
+                        eyeIcon.classList.add('zmdi-eye');
+                    }
+                });
+            }
+        });
+    </script>
 </body>
 
 </html>

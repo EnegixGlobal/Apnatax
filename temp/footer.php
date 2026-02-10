@@ -1,108 +1,71 @@
 <footer>
    <div class="footer-section">
       <div class="container">
-         <div class="row">
-            <div class="col-lg-6">
-               <div class="foot-address">
-                  <ul>
-                     <li>
-                        <div class="sub-title">
-                           <h2>
-                              Contact
-                           </h2>
-                        </div>
-                        <div class="row">
-                           <div class="col-1">
-                              <i class="fa-solid fa-house"></i>
-                           </div>
-                           <div class="col-11">
-                              Address: Near High school stadium Suriya District Giridih Jharkhand 825320
-                           </div>
-                        </div>
-                     </li>
-                     <li>
-                        <div class="row">
-                           <div class="col-1">
-                              <i class="fa-solid fa-phone"></i>
-                           </div>
-                           <div class="col-11">
-                              Phone: +91 70046 25048
-                           </div>
-                        </div>
-                     </li>
-                     <li>
-                        <div class="row">
-                           <div class="col-1">
-                              <i class="fa-solid fa-envelope-circle-check"></i>
-                           </div>
-                           <div class="col-11">
-                              Email: info@soratax.com
-                           </div>
-                        </div>
-                     </li>
-                  </ul>
+         <div class="row footer-main-row">
+            <!-- Logo Section Div -->
+            <div class="col-lg-3 col-md-6 col-sm-12 footer-logo-wrapper">
+               <div class="footer-logo-section">
+                  <img src="./assets/images/logo.png" alt="ApnoTax Logo" class="footer-logo">
+                  <p class="footer-description">ApnoTax helps individuals, startups, and businesses simplify taxation, compliance, and financial processes while ensuring accuracy, transparency, and long-term growth.</p>
                </div>
             </div>
-            <div class="col-lg-3">
-               <div class="footer-service">
-                  <ul>
-                     <li>
-                        <div class="sub-title">
-                           <h2>
-                              OUR SERVICES
-                           </h2>
-                        </div>
-                     </li>
-                     <li>
-                        <a href="#"> Private Limited Company</a>
-                     </li>
-                     <li>
-                        <a href="#"> Public Limited Company</a>
-                     </li>
-                     <li>
-                        <a href="#"> One Person Company</a>
-                     </li>
-                     <li><a href="#">Partnership Firm</a></li>
-                     <li><a href="#">Limited Liability Partnership</a></li>
-                     <li><a href="#">Sole Proprietorship</a></li>
-                  </ul>
+
+            <!-- Menu, Socials, Contact Section Div -->
+            <div class="col-lg-9 col-md-6 col-sm-12 footer-links-wrapper">
+               <div class="row footer-middle-section">
+                  <!-- Second Column: Menu -->
+                  <div class="col-lg-4 col-md-4 col-sm-12">
+                     <div class="footer-menu">
+                        <h3 class="footer-heading">Menu</h3>
+                        <ul class="footer-menu-list">
+                           <li><a href="index.php">Home</a></li>
+                           <li><a href="#">Services</a></li>
+                           <li><a href="about.php">About Us</a></li>
+                           <li><a href="#">Case Studies</a></li>
+                           <li><a href="#">FAQs</a></li>
+                        </ul>
+                     </div>
+                  </div>
+
+                  <!-- Third Column: Socials -->
+                  <div class="col-lg-4 col-md-4 col-sm-12">
+                     <div class="footer-socials">
+                        <h3 class="footer-heading">Socials</h3>
+                        <ul class="footer-social-list">
+                           <li><a href="#" target="_blank">Instagram</a></li>
+                           <li><a href="#" target="_blank">Facebook</a></li>
+                           <li><a href="#" target="_blank">Linkedin</a></li>
+                           <li><a href="#" target="_blank">Twitter (X)</a></li>
+                        </ul>
+                     </div>
+                  </div>
+
+                  <!-- Fourth Column: Contact -->
+                  <div class="col-lg-4 col-md-4 col-sm-12">
+                     <div class="footer-contact">
+                        <h3 class="footer-heading">Contact</h3>
+                        <ul class="footer-contact-list">
+                           <li>+91 70046 25048</li>
+                           <li>info@soratax.com</li>
+                           <li>Near High school stadium Suriya District Giridih Jharkhand 825320</li>
+                        </ul>
+                     </div>
+                  </div>
                </div>
             </div>
-            <div class="col-lg-3">
-               <div class="footer-service">
-                  <ul>
-                     <li>
-                        <div class="sub-title">
-                           <h2>
-                              REGISTRATION
-                           </h2>
-                        </div>
-                     </li>
-                     <li>
-                        <a href="#">GST Registration</a>
-                     </li>
-                     <li>
-                        <a href="#">MSME Registration</a>
-                     </li>
-                     <li>
-                        <a href="#">FSSAI Registration</a>
-                     </li>
-                     <li><a href="#">Copyright Registration</a></li>
-                     <li><a href="#">Trademark Registration</a></li>
-                  </ul>
+         </div>
+         <!-- Footer Bottom Section -->
+         <div class="row footer-bottom-section">
+            <div class="col-lg-6 col-md-6 col-sm-12">
+               <p class="footer-copyright-bottom">© 2026 made by Apnotax</p>
+            </div>
+            <div class="col-lg-6 col-md-6 col-sm-12">
+               <div class="footer-bottom-links">
+                  <a href="#">Privacy Policy</a> | <a href="#">T&C</a> | <span>Created by enegix</span>
                </div>
             </div>
          </div>
       </div>
    </div>
 </footer>
-<section>
-   <div class="copyright-wrap">
-      <div class="container">
-         <div class="copyright-content">
-            <p>Copyright © SoraTax 2023. All Rights Reserved | Developed by <a href="#">Tripledots Software Services Pvt. Ltd.</a></p>
-         </div>
-         <a onclick="topFunction()" id="myBtn" title="Go to top" class="back-to-top"><i class="fa fa-arrow-up" aria-hidden="true"></i></a>
-      </div>
-   </div>
-</section>
+<a onclick="topFunction()" id="myBtn" title="Go to top" class="back-to-top"><i class="fa fa-arrow-up" aria-hidden="true"></i></a>
