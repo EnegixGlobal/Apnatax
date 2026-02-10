@@ -91,6 +91,12 @@ select{
 .login-img::before{
     background-image: linear-gradient(#ebd5b7 0%, #ebb3a7 40%, #e36f55 80%, #ff5e3a 100%);
 }
+.login-img .employee-login-wrapper {
+    background-color: #002252 !important;
+}
+.login-img .employee-login-wrapper::before {
+    display: none;
+}
 .tasks .card{
     max-height: 440px;
 }
@@ -380,4 +386,180 @@ select{
    } 
 }
 @media(max-width:576px){
+}
+/* Employee Login Page Styles */
+.employee-login-wrapper {
+    position: relative;
+    width: 100%;
+    min-height: 100vh;
+    background-color: #002252;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+.employee-login-container {
+    width: 100%;
+    max-width: 500px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.employee-login-card {
+    background: #ffffff;
+    padding: 50px 40px;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    width: 100%;
+}
+.employee-login-logo {
+    text-align: center;
+    margin-bottom: 30px;
+}
+.employee-logo-img {
+    max-width: 200px;
+    height: auto;
+    display: inline-block;
+}
+.employee-login-title {
+    font-size: 32px;
+    font-weight: 700;
+    color: #000000;
+    text-align: center;
+    margin-bottom: 35px;
+}
+.employee-login-form {
+    width: 100%;
+}
+.employee-form-group {
+    margin-bottom: 20px;
+}
+.employee-form-group label {
+    display: block;
+    color: #000000;
+    font-size: 15px;
+    font-weight: 500;
+    margin-bottom: 8px;
+}
+.employee-form-input {
+    width: 100%;
+    padding: 12px 15px;
+    border: 1px solid rgba(0, 0, 0, 0.2);
+    border-radius: 6px;
+    font-size: 15px;
+    background: #ffffff;
+    color: #000000;
+    transition: all 0.3s ease;
+}
+.employee-form-input:focus {
+    outline: none;
+    border-color: rgba(0, 0, 0, 0.4);
+    box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.1);
+}
+.employee-password-wrapper {
+    position: relative;
+    width: 100%;
+}
+.employee-password-input {
+    padding-right: 45px;
+}
+.employee-password-toggle {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 5px;
+    color: #666666;
+    font-size: 16px;
+    transition: color 0.3s ease;
+    z-index: 10;
+}
+.employee-password-toggle:hover {
+    color: #000000;
+}
+.employee-password-toggle:focus {
+    outline: none;
+}
+.employee-error-message {
+    text-align: center;
+    color: #dc3545;
+    font-size: 14px;
+    margin-bottom: 15px;
+    min-height: 20px;
+}
+.employee-login-btn {
+    width: 100%;
+    background: #000000;
+    color: #ffffff;
+    padding: 14px 30px;
+    border: none;
+    border-radius: 6px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-top: 10px;
+}
+.employee-login-btn:hover {
+    background: #333333;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+.employee-register-text {
+    text-align: center;
+    margin-top: 25px;
+    color: #666666;
+    font-size: 15px;
+}
+.employee-register-text a {
+    color: #ff5e3a;
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.3s ease;
+}
+.employee-register-text a:hover {
+    color: #e04d2a;
+    text-decoration: underline;
+}
+@media (max-width: 768px) {
+    .employee-login-card {
+        padding: 40px 30px;
+    }
+    .employee-login-title {
+        font-size: 28px;
+        margin-bottom: 30px;
+    }
+    .employee-logo-img {
+        max-width: 180px;
+    }
+    .employee-login-logo {
+        margin-bottom: 25px;
+    }
+}
+@media (max-width: 576px) {
+    .employee-login-card {
+        padding: 35px 25px;
+        border-radius: 10px;
+    }
+    .employee-login-title {
+        font-size: 24px;
+        margin-bottom: 25px;
+    }
+    .employee-logo-img {
+        max-width: 150px;
+    }
+    .employee-login-logo {
+        margin-bottom: 20px;
+    }
+    .employee-form-input {
+        padding: 10px 12px;
+        font-size: 14px;
+    }
+    .employee-login-btn {
+        padding: 12px 25px;
+        font-size: 15px;
+    }
 }

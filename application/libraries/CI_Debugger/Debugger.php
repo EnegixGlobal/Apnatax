@@ -1,48 +1,53 @@
-<?php  
-if ( ! defined('BASEPATH')) exit('No direct script access allowed');
+<?php
+if (! defined('BASEPATH')) exit('No direct script access allowed');
 /*
 Name : Debugger
 Description : Debugger for Codeigniter 3
 Version : v0.0028
 */
-class Debugger {
+class Debugger
+{
     var $ci;
-    var $debug=FALSE;
-    var $debugbar=TRUE;
-    var $default=TRUE;
-    var $current_url='';
-    var $var_values=array();
-    
-    function __construct() {
-        $this->ci =& get_instance();
+    var $debug = FALSE;
+    var $debugbar = TRUE;
+    var $default = TRUE;
+    var $current_url = '';
+    var $var_values = array();
+
+    function __construct()
+    {
+        $this->ci = &get_instance();
         $this->ci->benchmark->mark("default_start");
         $this->getcurrenturl();
-        if(defined('CI_DEBUGGER') && CI_DEBUGGER===TRUE){
-            $this->debug=TRUE;
+        if (defined('CI_DEBUGGER') && CI_DEBUGGER === TRUE) {
+            $this->debug = TRUE;
         }
-        if($this->ci->session->debugbar===FALSE){
-            $debugbar=FALSE;
-        }
-    }
-
-
-    function getcurrenturl() {
-        if(isset($_SERVER['REQUEST_SCHEME']) && isset($_SERVER['HTTP_HOST']) && isset($_SERVER['REQUEST_URI'])){
-            $this->current_url=$_SERVER['REQUEST_SCHEME'].'://'.$_SERVER['HTTP_HOST'].$_SERVER['REQUEST_URI'];
+        if ($this->ci->session->debugbar === FALSE) {
+            $debugbar = FALSE;
         }
     }
 
 
-    function getelapsedtime($start="default_start",$end="default_end") {
-        if($end=="default_end"){
+    function getcurrenturl()
+    {
+        if (isset($_SERVER['REQUEST_SCHEME']) && isset($_SERVER['HTTP_HOST']) && isset($_SERVER['REQUEST_URI'])) {
+            $this->current_url = $_SERVER['REQUEST_SCHEME'] . '://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
+        }
+    }
+
+
+    function getelapsedtime($start = "default_start", $end = "default_end")
+    {
+        if ($end == "default_end") {
             $this->ci->benchmark->mark("default_end");
         }
-        $time=$this->ci->benchmark->elapsed_time($start, $end);
-        $time=$time<1?($time*1000).' millseconds':$time.' seconds';
+        $time = $this->ci->benchmark->elapsed_time($start, $end);
+        $time = $time < 1 ? ($time * 1000) . ' millseconds' : $time . ' seconds';
         return $time;
     }
 
-    function getmemoryusage($precision=2) {
+    function getmemoryusage($precision = 2)
+    {
         $usage = memory_get_usage(true);
         $units = array('B', 'KB', 'MB', 'GB', 'TB');
 
@@ -55,46 +60,54 @@ class Debugger {
         return round($usage, $precision) . ' ' . $units[$pow];
     }
 
-    function trackValue($name, $value) {
+    function trackValue($name, $value)
+    {
         $backtrace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 1);
         $line_number = isset($backtrace[0]['line']) ? $backtrace[0]['line'] : 'Unknown';
         $this->var_values[] = array('name' => $name, 'value' => $value, 'line' => $line_number);
     }
-    
-    function viewvariables($array=array()) {
-        $result=array();
-        if(!empty($this->var_values)){
-            if(empty($array)){
-                $result=$this->var_values;
-            }
-            elseif(is_array($array)){
-                foreach($this->var_values as $values){
-                    if(in_array($values['name'],$array)){
-                        $result[]=$values;
+
+    function viewvariables($array = array())
+    {
+        $result = array();
+        if (!empty($this->var_values)) {
+            if (empty($array)) {
+                $result = $this->var_values;
+            } elseif (is_array($array)) {
+                foreach ($this->var_values as $values) {
+                    if (in_array($values['name'], $array)) {
+                        $result[] = $values;
                     }
                 }
-            }
-            elseif(!is_array($array)){
-                foreach($this->var_values as $values){
-                    if($values['name']==$array){
-                        $result[]=$values;
+            } elseif (!is_array($array)) {
+                foreach ($this->var_values as $values) {
+                    if ($values['name'] == $array) {
+                        $result[] = $values;
                     }
                 }
             }
         }
         return $result;
     }
-    
-    function printdata($array,$die=false,$pre=true) {
-        if($pre===true){ echo "<pre>"; }
+
+    function printdata($array, $die = false, $pre = true)
+    {
+        if ($pre === true) {
+            echo "<pre>";
+        }
         print_r($array);
-        if($pre===true){ echo "</pre>"; }
-        if($die===true){ die; }
+        if ($pre === true) {
+            echo "</pre>";
+        }
+        if ($die === true) {
+            die;
+        }
     }
 
-    function getdebuggerbarstyle() {
-        $style ='<style>';
-        $style.= <<<CSS
+    function getdebuggerbarstyle()
+    {
+        $style = '<style>';
+        $style .= <<<CSS
             body{
                 padding-bottom:60px;
             }
@@ -233,9 +246,9 @@ class Debugger {
                 }
             }
 CSS;
-        $style.='</style>';
-        $style.='<style type="text/css" media="print">';
-        $style.= <<<CSS
+        $style .= '</style>';
+        $style .= '<style type="text/css" media="print">';
+        $style .= <<<CSS
             @media print{
                 #debugger-bottom-bar,
                 #debugger-toggle-button{
@@ -243,50 +256,53 @@ CSS;
                 }
             }
 CSS;
-        $style.='</style>';
-        
+        $style .= '</style>';
+
         echo $style;
     }
 
-    function getdebuggerbar() {
-        $this->getdebuggerbarstyle();
+    function getdebuggerbar()
+    {
+        // $this->getdebuggerbarstyle();
         //$variable_names = array_keys($GLOBALS);
         //print_pre($variable_names);
         //print_pre($GLOBALS,true);
-        $bottombar ='<a href="#" onClick="return toggleBottomBar()" id="debugger-toggle-button">';
-        
-        if($this->debugbar===FALSE){ $bottombar.='&#11205'; }
-        else{ $bottombar.='&#11206'; }
-        
-        $bottombar.='</a>';
-        $bottombar.='<div  id="debugger-bottom-bar" ';
-        if($this->debugbar===FALSE){
-            $bottombar.='style="display:none;"';
-        }
-        $bottombar.='>';
-        $bottombar.='<span>Memory Usage: '.$this->getmemoryusage().'</span>';
-        $bottombar.='<span>Execution Time: '.$this->getelapsedtime().'</span>';
-        $bottombar.='<span id="debugger-page-load-time"></span>';
-        $bottombar.='<span id="stay-time"></span>';
-        $bottombar.='<span><button id="debugger-view-list-btn">View Resources</button></span>';
-        $bottombar.='<a href="#" onClick="window.location.reload(); return false;">&#11119; Reload Page</a>';
-        $bottombar.='<a href="#" onClick="if (typeof reloadAjax === \'function\') { reloadAjax(); } else { console.log(\'Function does not exist.\');showPopup(\'Function does not exist.\',\'error\'); } return false;">&#11119; Reload Last Request</a>';
-        $bottombar.='<a href="'.base_url('pull.php').'" target="_blank">&#8681; Pull Files</a>';
-        $bottombar.='<a href="#" onClick="window.print(); return false;">&#9113; Print Page</a>';
-        $bottombar.='<a href="view-source:'.$this->current_url.'">&#9113; View Page Source</a>';
+        // $bottombar ='<a href="#" onClick="return toggleBottomBar()" id="debugger-toggle-button">';
+
+        // if($this->debugbar===FALSE){ $bottombar.='&#11205'; }
+        // else{ $bottombar.='&#11206'; }
+
+        // $bottombar.='</a>';
+        // $bottombar = '';
+        // $bottombar .= '<div  id="debugger-bottom-bar" ';
+        // if ($this->debugbar === FALSE) {
+        //     $bottombar .= 'style="display:none;"';
+        // }
+        // $bottombar .= '>';
+        // $bottombar .= '<span>Memory Usage: ' . $this->getmemoryusage() . '</span>';
+        // $bottombar .= '<span>Execution Time: ' . $this->getelapsedtime() . '</span>';
+        // $bottombar .= '<span id="debugger-page-load-time"></span>';
+        // $bottombar .= '<span id="stay-time"></span>';
+        // $bottombar .= '<span><button id="debugger-view-list-btn">View Resources</button></span>';
+        // $bottombar .= '<a href="#" onClick="window.location.reload(); return false;">&#11119; Reload Page</a>';
+        // $bottombar .= '<a href="#" onClick="if (typeof reloadAjax === \'function\') { reloadAjax(); } else { console.log(\'Function does not exist.\');showPopup(\'Function does not exist.\',\'error\'); } return false;">&#11119; Reload Last Request</a>';
+        // $bottombar .= '<a href="' . base_url('pull.php') . '" target="_blank">&#8681; Pull Files</a>';
+        // $bottombar .= '<a href="#" onClick="window.print(); return false;">&#9113; Print Page</a>';
+        // $bottombar .= '<a href="view-source:' . $this->current_url . '">&#9113; View Page Source</a>';
         //$bottombar.='<a href="#" onClick="clearCacheAndReload(); return false;">&#11119 Clear Cache &amp; Reload</a>';
-        $bottombar.='</div>';
-        
-        $listdiv='<div id="debugger-list-container" style="display:none;"></div>';
-        
-        echo $listdiv;
-        echo $bottombar;
-        
-        $this->getdebuggerbarscript();
+        // $bottombar .= '</div>';
+
+        // $listdiv = '<div id="debugger-list-container" style="display:none;"></div>';
+
+        // echo $listdiv;
+        // echo $bottombar;
+
+        // $this->getdebuggerbarscript();
     }
 
-    function getdebuggerbarscript() {
-        $script='<script>
+    function getdebuggerbarscript()
+    {
+        $script = '<script>
             var listContainer = document.getElementById("debugger-list-container");
             function toggleBottomBar() {
                 var bottomBar = document.getElementById("debugger-bottom-bar");
@@ -311,12 +327,12 @@ CSS;
 
                 return false;
             }';
-        if($this->ci->input->get('debug')=='debugbar' && $this->debug==TRUE){
-            $script.='var anchors=document.getElementsByTagName("a");';
-            $script.='var queryParam="debug=debugbar";';
-            $script.='for (var i = 0; i < anchors.length; i++) {
+        if ($this->ci->input->get('debug') == 'debugbar' && $this->debug == TRUE) {
+            $script .= 'var anchors=document.getElementsByTagName("a");';
+            $script .= 'var queryParam="debug=debugbar";';
+            $script .= 'for (var i = 0; i < anchors.length; i++) {
                         var href=anchors[i].href;
-                        if(href.indexOf("'.base_url().'")!=-1 && href.indexOf("#")==-1){
+                        if(href.indexOf("' . base_url() . '")!=-1 && href.indexOf("#")==-1){
                             console.log(anchors[i].innerText);
                             var separator = href.indexOf("?") === -1 ? "?" : "&";
 
@@ -325,8 +341,8 @@ CSS;
                         }
                     }';
         }
-        
-        $script.="window.addEventListener('load', function() {
+
+        $script .= "window.addEventListener('load', function() {
                         var resources = window.performance.getEntriesByType('resource');
                         var ul = document.createElement('ul');
 
@@ -345,7 +361,7 @@ CSS;
                             var plTime=(loadTime/1000)+' seconds';
                         }
                         document.getElementById('debugger-page-load-time').innerText='Page Load Time: '+plTime;";
-            $script.="
+        $script .= "
                         // Attach a function to the ajaxSend event handler
                         $(document).ajaxSend(function(event, jqXHR, ajaxOptions) {
                             var li = document.createElement('li');
@@ -372,10 +388,10 @@ CSS;
                             ul.appendChild(li);
                             countResources();
                         });";
-        
-        $script.="});";
-        
-        $script.="document.addEventListener('DOMContentLoaded', function() {
+
+        $script .= "});";
+
+        $script .= "document.addEventListener('DOMContentLoaded', function() {
         
                     var isDebugBarVisible = localStorage.getItem('debugBarVisible') === 'true';
                     var bottomBar = document.getElementById('debugger-bottom-bar');
@@ -398,13 +414,13 @@ CSS;
                       }
                     });
                 });";
-        
-        $script.="function clearCacheAndReload() {
+
+        $script .= "function clearCacheAndReload() {
                     document.cookie = 'no-cache=' + Date.now() + '; path=/';
                     location.reload();
                 }";
-        
-        $script.="let seconds = 0;
+
+        $script .= "let seconds = 0;
         
                     // Function to update the timer
                     function updateTimer() {
@@ -414,14 +430,14 @@ CSS;
 
                     // Call the updateTimer function every 1 second (1000 milliseconds)
                     setInterval(updateTimer, 1000);";
-        
-        $script.="function countResources() {
+
+        $script .= "function countResources() {
                     var ul = listContainer.querySelector('ul');
                     var liCount=ul.getElementsByTagName('li').length;
                     document.getElementById('debugger-view-list-btn').innerText='View Resources ('+liCount+')';
                 }";
-        
-        $script.="// Function to create and show the pop-up notification
+
+        $script .= "// Function to create and show the pop-up notification
                     function showPopup(message,status) {
                         // Create the pop-up element
                         var popup = document.createElement('div');
@@ -446,36 +462,39 @@ CSS;
                             popup.remove();
                         }, 3000); // 3 seconds
                     }";
-        
-        $script.='</script>';
+
+        $script .= '</script>';
         echo $script;
     }
 
-    function updateDefaultStatus($status=false) {
-        $this->default=$status;
+    function updateDefaultStatus($status = false)
+    {
+        $this->default = $status;
     }
 
-    function checkDebugStatus() {
-        $status=FALSE;
-        if($this->ci->input->is_ajax_request() || 
-           (isset($_SERVER['HTTP_API_HEADER']) && $_SERVER['HTTP_API_HEADER']=='API Tester')){
-            $status=FALSE;
-        }
-        else{
-            if(isset($_SERVER['HTTP_HOST']) && $_SERVER['HTTP_HOST']=='localhost' && $this->debug === TRUE){
-                $status=TRUE;
+    function checkDebugStatus()
+    {
+        $status = FALSE;
+        if (
+            $this->ci->input->is_ajax_request() ||
+            (isset($_SERVER['HTTP_API_HEADER']) && $_SERVER['HTTP_API_HEADER'] == 'API Tester')
+        ) {
+            $status = FALSE;
+        } else {
+            if (isset($_SERVER['HTTP_HOST']) && $_SERVER['HTTP_HOST'] == 'localhost' && $this->debug === TRUE) {
+                $status = TRUE;
             }
-            if($this->ci->input->get('debug')=='debugbar' && $this->debug===TRUE){
-                $status=TRUE;
+            if ($this->ci->input->get('debug') == 'debugbar' && $this->debug === TRUE) {
+                $status = TRUE;
             }
         }
         return $status;
     }
 
-    function __destruct() {
-        if($this->checkDebugStatus() && $this->default===TRUE){
+    function __destruct()
+    {
+        if ($this->checkDebugStatus() && $this->default === TRUE) {
             $this->getdebuggerbar();
         }
     }
-
 }

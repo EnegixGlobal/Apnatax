@@ -1,53 +1,55 @@
 
         <!-- PAGE -->
         <div class="page">
-            <div class="">
-
-                <!-- CONTAINER OPEN -->
-                <div class="col col-login mx-auto">
-                    <div class="text-center">
-                        <img src="<?= file_url('assets/images/logo-lg.png'); ?>" class="header-brand-img" alt="">
-                    </div>
-                </div>
-
-                <div class="row m-0 mt-7">
-                    <div class="col-12 col-md-4 col-lg-5"></div>
-                    <div class="col-12 col-md-4 col-lg-2">
-                        <?= form_open('login/validatelogin/','class="login100-form validate-form"'); ?>
-                            <span class="login100-form-title pb-0 text-white">
-                                Login
-                            </span>
-                            <div class="panel panel-primary">
-                                <div class="panel-body tabs-menu-body p-0 pt-2">
-                                    <div class="tab-content">
-                                        <div class="tab-pane active" id="tab5">
-                                            <div class="wrap-input100 validate-input input-group" data-bs-validate="Valid email is required: ex@abc.xyz">
-                                                <a href="javascript:void(0)" class="input-group-text bg-white text-muted">
-                                                    <i class="zmdi zmdi-email text-muted" aria-hidden="true"></i>
-                                                </a>
-                                                <input type="text" name="username" placeholder="Username" class="input100 border-start-0 form-control ms-0" required />
-                                            </div>
-                                            <div class="wrap-input100 validate-input input-group" id="Password-toggle">
-                                                <a href="javascript:void(0)" class="input-group-text bg-white text-muted">
-                                                    <i class="zmdi zmdi-eye text-muted" aria-hidden="true"></i>
-                                                </a>
-                                                <input type="password" name="password" placeholder="Password" class="input100 border-start-0 form-control ms-0" required/>
-                                            </div>
-                                            <div class="text-end pt-4 d-none">
-                                                <p class="mb-0"><a href="forgot-password.html" class="text-primary ms-1">Forgot Password?</a></p>
-                                            </div>
-                                            <div class="text-danger text-center" <?= ($this->session->flashdata('logerr')!==NULL)?'style="background-color: #f0ffff; padding: 5px;"':'' ?>><?= $this->session->flashdata('logerr'); ?></div>
-                                            <div class="container-login100-form-btn">
-                                                <button type="submit" name="login" class="login100-form-btn btn-primary">Login</button>
-                                            </div>
-                                        </div>
-                                    </div>
+            <div class="employee-login-wrapper">
+                <div class="employee-login-container">
+                    <div class="employee-login-card">
+                        <div class="employee-login-logo">
+                            <img src="<?= file_url('assets/images/logo.png'); ?>" alt="Logo" class="employee-logo-img">
+                        </div>
+                        <h2 class="employee-login-title">Login</h2>
+                        <?= form_open('login/validatelogin/','class="employee-login-form"'); ?>
+                            <div class="employee-form-group">
+                                <label for="username">Mobile No.</label>
+                                <input type="text" name="username" id="username" class="employee-form-input" required />
+                            </div>
+                            <div class="employee-form-group">
+                                <label for="password">Password</label>
+                                <div class="employee-password-wrapper">
+                                    <input type="password" name="password" id="password" class="employee-form-input employee-password-input" required/>
+                                    <button type="button" class="employee-password-toggle" id="togglePassword" aria-label="Show password">
+                                        <i class="zmdi zmdi-eye" id="eyeIcon"></i>
+                                    </button>
                                 </div>
                             </div>
+                            <div class="employee-error-message"><?= $this->session->flashdata('logerr'); ?></div>
+                            <button type="submit" name="login" class="employee-login-btn">Login</button>
                         <?= form_close(); ?>
                     </div>
                 </div>
-                <!-- CONTAINER CLOSED -->
             </div>
         </div>
         <!-- End PAGE -->
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                const togglePassword = document.getElementById('togglePassword');
+                const passwordInput = document.getElementById('password');
+                const eyeIcon = document.getElementById('eyeIcon');
+                
+                if (togglePassword && passwordInput && eyeIcon) {
+                    togglePassword.addEventListener('click', function() {
+                        const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                        passwordInput.setAttribute('type', type);
+                        
+                        // Toggle eye icon (using zmdi icons)
+                        if (type === 'text') {
+                            eyeIcon.classList.remove('zmdi-eye');
+                            eyeIcon.classList.add('zmdi-eye-off');
+                        } else {
+                            eyeIcon.classList.remove('zmdi-eye-off');
+                            eyeIcon.classList.add('zmdi-eye');
+                        }
+                    });
+                }
+            });
+        </script>

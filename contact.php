@@ -11,94 +11,146 @@
 
 <body>
     <?php include "./temp/navbar.php" ?>
-    <section>
-        <div class="common-background">
+    <section class="contact-hero-section">
+        <div class="contact-hero-background">
             <div class="container">
-                <div class="about-page">
-                    <h2>Contact</h2>
-                    <nav aria-label="breadcrumb">
-                        <ol class="breadcrumb">
-                            <li class="breadcrumb-item"><a href="#">Home</a></li>
-                            <li class="breadcrumb-item active" aria-current="page">Contact</li>
-                        </ol>
-                    </nav>
-                </div>
-            </div>
-        </div>
-    </section>
-    <section>
-        <div class="container">
-            <div class="content-section">
-                <div class="row">
-                    <div class="col-lg-4 col-md-6">
-                        <div class="contact-card">
-                            <div class="contact-icon">
+                <div class="row align-items-center min-vh-100">
+                    <div class="col-lg-6 col-md-12 contact-left-content">
+                        <h1 class="contact-hero-heading">Let's Start the Conversation</h1>
+                        <p class="contact-hero-description">Ready to take the next step? Schedule a complimentary consultation with our team and discover how we can help you achieve your goals.</p>
+                        <div class="contact-info-list">
+                            <div class="contact-info-item">
+                                <i class="fa-solid fa-phone"></i>
+                                <span>9874563210</span>
+                            </div>
+                            <div class="contact-info-item">
+                                <i class="fa-solid fa-envelope"></i>
+                                <span>info@apnotax.com</span>
+                            </div>
+                            <div class="contact-info-item">
                                 <i class="fa-solid fa-location-dot"></i>
+                                <span>Near High school stadium Suriya District Giridih Jharkhand 825320</span>
                             </div>
-                            <h4>Our Location</h4>
-                            <p>Ranchi, Jharkhand, India</p>
                         </div>
                     </div>
-                    <div class="col-lg-4 col-md-6">
-                        <div class="contact-card">
-                            <div class="contact-icon">
-                                <i class="fa-solid fa-phone-volume"></i>
-                            </div>
-                            <h4>Phone Number</h4>
-                            <p>+91-9874563210</p>
-                        </div>
-                    </div>
-                    <div class="col-lg-4 col-md-6">
-                        <div class="contact-card">
-                            <div class="contact-icon">
-                                <i class="fa-solid fa-envelope-circle-check"></i>
-                            </div>
-                            <h4>Mail us</h4>
-                            <p>Taxefi12@gmail.com</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="contact-form">
-                    <div class="row">
-                        <div class="col-lg-6">
-                            <div class="contact-img">
-                                <img src="./images/contact-img.webp" alt="contact images">
-                            </div>
-                        </div>
-                        <div class="col-lg-6">
-                            <div class="title">
-                                <h2>Get In Touch with Us</h2>
-                            </div>
-                            <form action="#">
-                                <div class="form-floating mb-3">
-                                    <input type="email" class="form-control" id="floatingInput" placeholder="name@example.com">
-                                    <label for="floatingPassword">Your Name</label>
+                    <div class="col-lg-6 col-md-12 contact-right-form">
+                        <div class="contact-form-wrapper">
+                            <form id="contactForm" action="#" method="POST">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-group mb-3">
+                                            <label for="fullName">Full Name</label>
+                                            <input type="text" class="form-control" id="fullName" name="full_name" placeholder="Jane Smith" required>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-group mb-3">
+                                            <label for="email">Email</label>
+                                            <input type="email" class="form-control" id="email" name="email" placeholder="jane@framer.com" required>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="form-floating mb-3">
-                                    <input type="password" class="form-control" id="floatingPassword" placeholder="Password">
-                                    <label for="floatingPassword">Your Phone</label>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-group mb-3">
+                                            <label for="phone">Phone</label>
+                                            <input type="tel" class="form-control" id="phone" name="phone" placeholder="+123 478 9789" required>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-group mb-3">
+                                            <label for="selectDate">Select Date</label>
+                                            <div class="date-input-wrapper">
+                                                <input type="date" class="form-control" id="selectDate" name="select_date" required>
+                                                <i class="fa-solid fa-calendar"></i>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="form-floating mb-3">
-                                    <input type="password" class="form-control" id="floatingPassword" placeholder="Password">
-                                    <label for="floatingPassword">Your Email</label>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-group mb-3">
+                                            <label for="companyName">Your Company Name</label>
+                                            <input type="text" class="form-control" id="companyName" name="company_name" placeholder="Company Name">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-group mb-3">
+                                            <label for="serviceInterest">Service You Are Interested In</label>
+                                            <div class="select-wrapper">
+                                                <select class="form-control" id="serviceInterest" name="service_interest" required>
+                                                    <option value="">Select...</option>
+                                                    <option value="gst-accountancy">GST Accountancy</option>
+                                                    <option value="it-accountancy">IT Accountancy</option>
+                                                    <option value="premium">Premium</option>
+                                                    <option value="prime">Prime</option>
+                                                    <option value="other">Other</option>
+                                                </select>
+                                                <i class="fa-solid fa-chevron-down"></i>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="form-floating mb-4">
-                                    <textarea class="form-control" placeholder="Leave a comment here" id="floatingTextarea"></textarea>
-                                    <label for="floatingTextarea">Your Message</label>
+                                <div class="form-group mb-4">
+                                    <label for="message">How Can I Help You?</label>
+                                    <textarea class="form-control" id="message" name="message" rows="4" placeholder="I need help with..."></textarea>
                                 </div>
-                                <a href="#" class="texefibtn">Submit</a>
+                                <button type="submit" class="btn btn-submit-form">
+                                    Submit Form
+                                    <i class="fa-solid fa-arrow-right"></i>
+                                </button>
                             </form>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-        <div class="map-section">
-            <iframe src="https://www.google.com/maps/embed?pb=!1m14!1m8!1m3!1d468895.11916624743!2d85.321326!3d23.343205000000005!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x39f4e0035ace6e73%3A0x41f4e59a6d674446!2sJagannath%20Mandir!5e0!3m2!1sen!2sin!4v1699519542628!5m2!1sen!2sin" width="100%" height="350" style="border:0;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
-        </div>
     </section>
     <?php include "./temp/footer.php" ?>
     <?php include "./temp/vendor.php" ?>
+    <script>
+        $(document).ready(function() {
+            $('#contactForm').on('submit', function(e) {
+                e.preventDefault();
+                
+                // Get form data
+                var formData = {
+                    full_name: $('#fullName').val(),
+                    email: $('#email').val(),
+                    phone: $('#phone').val(),
+                    select_date: $('#selectDate').val(),
+                    company_name: $('#companyName').val(),
+                    service_interest: $('#serviceInterest').val(),
+                    message: $('#message').val()
+                };
+                
+                // Basic validation
+                if (!formData.full_name || !formData.email || !formData.phone || !formData.select_date || !formData.service_interest) {
+                    alert('Please fill in all required fields.');
+                    return;
+                }
+                
+                // Here you can add AJAX call to submit the form
+                // Example:
+                // $.ajax({
+                //     url: 'api/contact',
+                //     method: 'POST',
+                //     data: formData,
+                //     success: function(response) {
+                //         alert('Thank you! Your message has been sent.');
+                //         $('#contactForm')[0].reset();
+                //     },
+                //     error: function() {
+                //         alert('Sorry, there was an error. Please try again.');
+                //     }
+                // });
+                
+                // For now, just show a success message
+                alert('Thank you! Your message has been received. We will contact you soon.');
+                $('#contactForm')[0].reset();
+            });
+        });
+    </script>
 </body>
 
 </html>
