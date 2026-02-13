@@ -19,7 +19,8 @@ class Orders extends CI_Controller
         $data['breadcrumb'] = array();
         $data['datatable'] = true;
         $where = array();
-        if ($this->session->role != 'admin') {
+        // Allow admin and employee to see all orders, restrict only customers
+        if ($this->session->role == 'customer') {
             $where['t1.status<'] = 3;
             $where['t1.status!='] = 1;
         }
@@ -34,7 +35,8 @@ class Orders extends CI_Controller
         $data['breadcrumb'] = array();
         $data['datatable'] = true;
         $where = array();
-        if ($this->session->role != 'admin') {
+        // Allow admin and employee to see all assessments, restrict only customers
+        if ($this->session->role == 'customer') {
             $where['md5(a.user_id)'] = $this->session->user;
         }
         $data['orders'] = $this->employee->myassessments($where);
@@ -108,6 +110,12 @@ class Orders extends CI_Controller
 
     public function addturnover()
     {
+        // Restrict access to admin and employee only
+        if ($this->session->role == 'customer') {
+            $this->session->set_flashdata('err_msg', 'Access Denied!');
+            redirect('home/');
+        }
+
         $data['title'] = "Add Turnover";
         //$data['subtitle']="Sample Subtitle";
         $data['breadcrumb'] = array();
@@ -122,6 +130,12 @@ class Orders extends CI_Controller
 
     public function yearlyturnover()
     {
+        // Restrict access to admin and employee only
+        if ($this->session->role == 'customer') {
+            $this->session->set_flashdata('err_msg', 'Access Denied!');
+            redirect('home/');
+        }
+
         $data['title'] = "Add Turnover";
         //$data['subtitle']="Sample Subtitle";
         $data['breadcrumb'] = array();
@@ -157,6 +171,12 @@ class Orders extends CI_Controller
 
     public function turnoversheet()
     {
+        // Restrict access to admin and employee only
+        if ($this->session->role == 'customer') {
+            $this->session->set_flashdata('err_msg', 'Access Denied!');
+            redirect('home/');
+        }
+
         $data['title'] = "Turnover Sheet";
         //$data['subtitle']="Sample Subtitle";
         $data['breadcrumb'] = array();
@@ -199,6 +219,13 @@ class Orders extends CI_Controller
 
     public function assignemployee($id = NULL)
     {
+        // Only allow admin and employee to assign orders (not customers)
+        if ($this->session->role == 'customer') {
+            $this->session->set_flashdata('err_msg', 'Access Denied!');
+            redirect('orders/');
+            return;
+        }
+
         if ($this->input->post('assignemployee') !== NULL) {
             $data = $this->input->post();
             $user = getuser();

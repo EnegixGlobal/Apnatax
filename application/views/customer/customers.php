@@ -5,6 +5,11 @@
                         <div class="col-md-12">
                             <div class="d-flex justify-content-between align-items-center">
                                 <h5 class="mb-0">Customers List</h5>
+                                <?php
+                                // Only show GST toggle for admin
+                                $CI =& get_instance();
+                                if ($CI->session->role == 'admin' || $CI->session->role == 'superadmin') {
+                                ?>
                                 <div>
                                     <label class="form-check form-switch">
                                         <input class="form-check-input" type="checkbox" id="bulk_gst_toggle"
@@ -28,6 +33,9 @@
                                         </span>
                                     </label>
                                 </div>
+                                <?php
+                                }
+                                ?>
                             </div>
                         </div>
                     </div>
@@ -97,7 +105,12 @@
                         });
                         $('#table').dataTable();
 
-                        // Bulk GST Toggle Handler
+                        // Bulk GST Toggle Handler - Only for admin
+                        <?php
+                        // Only load GST toggle handler for admin
+                        $CI =& get_instance();
+                        if ($CI->session->role == 'admin' || $CI->session->role == 'superadmin') {
+                        ?>
                         $('#bulk_gst_toggle').change(function() {
                             var isEnabled = $(this).is(':checked');
                             var action = isEnabled ? 'enable' : 'disable';
@@ -134,6 +147,9 @@
                                 $(this).prop('checked', !isEnabled);
                             }
                         });
+                        <?php
+                        }
+                        ?>
                     });
 
                     function getPhoto(input) {

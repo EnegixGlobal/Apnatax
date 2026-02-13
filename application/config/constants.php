@@ -90,7 +90,7 @@ $curyear = date('Y');
 if($startyear<$curyear){
     $curyear=$startyear.'-'.$curyear;
 }
-defined('PROJECT_NAME')        OR define('PROJECT_NAME','SoraTax'); 
+defined('PROJECT_NAME')        OR define('PROJECT_NAME','ApnoTax'); 
 defined('OUR_BRAND')       	   OR define('OUR_BRAND','<b>Developed & Managed </b> by <span class="text-danger"> Tripledots Software Services Pvt. Ltd.</span>');
 defined('SESSION_YEAR')        OR define('SESSION_YEAR',"$curyear");
 defined('SITE_SALT')           OR define('SITE_SALT',"Taxefi");

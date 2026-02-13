@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GST Accountancy Services | SoraTax</title>
+    <title>GST Accountancy Services | ApnoTax</title>
     <link rel="icon" href="./images/logo.png">
     <?php include "./temp/inc.php" ?>
 </head>
@@ -28,7 +28,7 @@
                 <h2 class="gst-main-heading">Comprehensive GST Accounting Solutions</h2>
                 <div class="gst-description">
                     <p>GST accountancy refers to the process of managing and maintaining the books of accounts related to Goods and Services Tax (GST) for a business entity. It involves recording, reconciling, and reporting of all GST-related transactions in compliance with the GST laws and regulations.</p>
-                    <p>At SoraTax, we provide end-to-end GST accountancy services that ensure your business stays compliant with all GST requirements while optimizing your tax efficiency. Our expert team handles everything from GST registration to monthly return filing, reconciliation, and annual compliance.</p>
+                    <p>At ApnoTax, we provide end-to-end GST accountancy services that ensure your business stays compliant with all GST requirements while optimizing your tax efficiency. Our expert team handles everything from GST registration to monthly return filing, reconciliation, and annual compliance.</p>
                     <p>With our comprehensive GST accountancy services, you can focus on growing your business while we take care of all your GST-related accounting needs. We maintain accurate records, ensure timely filing, and help you maximize your input tax credits while minimizing compliance risks.</p>
                 </div>
             </div>

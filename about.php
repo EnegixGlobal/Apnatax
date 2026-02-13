@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SoraTax</title>
+    <title>ApnoTax</title>
     <link rel="icon" href="./images/logo.png">
     <?php include "./temp/inc.php" ?>
 </head>
@@ -26,7 +26,7 @@
                 </div>
                 <h2 class="about-main-heading">Who We Are</h2>
                 <div class="about-description">
-                    <p>SoraTax is a leading firm of chartered accountants and tax professionals dedicated to providing comprehensive financial solutions and strategic advisory services. With years of combined experience in accounting, taxation, compliance, and business consulting, we serve as trusted advisors to businesses, entrepreneurs, and individuals across diverse industries.</p>
+                    <p>ApnoTax is a leading firm of chartered accountants and tax professionals dedicated to providing comprehensive financial solutions and strategic advisory services. With years of combined experience in accounting, taxation, compliance, and business consulting, we serve as trusted advisors to businesses, entrepreneurs, and individuals across diverse industries.</p>
                     <p>Our firm represents a coalition of specialized skills and professional expertise, bringing together qualified chartered accountants, tax consultants, financial analysts, and business strategists. We are committed to delivering excellence through meticulous attention to detail, innovative solutions, and a client-centric approach that prioritizes your success.</p>
                     <p>What sets us apart is our deep understanding of the evolving regulatory landscape and our ability to translate complex financial and tax requirements into actionable strategies. We don't just handle your books—we provide strategic insights that help optimize your financial performance, minimize tax liabilities, and ensure full compliance with all applicable regulations.</p>
                     <p>Our collaborative approach means we work as an extension of your team, understanding your business from the inside out. We invest time in comprehending your unique challenges, industry dynamics, and growth objectives, enabling us to deliver tailored solutions that drive measurable results.</p>

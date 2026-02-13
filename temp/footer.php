@@ -46,7 +46,7 @@
                         <h3 class="footer-heading">Contact</h3>
                         <ul class="footer-contact-list">
                            <li>+91 70046 25048</li>
-                           <li>info@soratax.com</li>
+                           <li>info@apnotax.com</li>
                            <li>Near High school stadium Suriya District Giridih Jharkhand 825320</li>
                         </ul>
                      </div>
