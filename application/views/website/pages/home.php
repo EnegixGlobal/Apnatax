@@ -4,7 +4,7 @@
 <head>
    <meta charset="UTF-8">
    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-   <title>SoraTax</title>
+   <title>ApnoTax</title>
    <link rel="icon" href="./images/logo.png">
    <?php include "./temp/inc.php" ?>
 </head>
@@ -277,7 +277,7 @@
                         </div>
                      </div>
                      <div class="why-content">
-                        <p>Our client is immediately informed of engagement problems together with the solution, our dedicated engagement manager is reachable by phone and email and can communicate in your preferred language. SoraTax keep Clients up to date about current affairs, rules and regulations that may relate to their engagement with us.</p>
+                        <p>Our client is immediately informed of engagement problems together with the solution, our dedicated engagement manager is reachable by phone and email and can communicate in your preferred language. ApnoTax keep Clients up to date about current affairs, rules and regulations that may relate to their engagement with us.</p>
                      </div>
                   </div>
                </div>
@@ -291,7 +291,7 @@
                         </div>
                      </div>
                      <div class="why-content">
-                        <p>SoraTax receives a high quantity of due diligence form each client; we Offer Wide range of services and work based on Security. We do not any documents and information of our client to any one. We complete our work on time so we can offer further services.</p>
+                        <p>ApnoTax receives a high quantity of due diligence form each client; we Offer Wide range of services and work based on Security. We do not any documents and information of our client to any one. We complete our work on time so we can offer further services.</p>
                      </div>
                   </div>
                </div>
@@ -305,7 +305,7 @@
                         </div>
                      </div>
                      <div class="why-content">
-                        <p>SoraTax keeps, Clients up to date about current affairs, rules and regulations that may relate to their engagement with us. We have dedicated and expertise Team for the same to provide them solution on time.</p>
+                        <p>ApnoTax keeps, Clients up to date about current affairs, rules and regulations that may relate to their engagement with us. We have dedicated and expertise Team for the same to provide them solution on time.</p>
                      </div>
                   </div>
                </div>
@@ -383,7 +383,7 @@
                         <i class="fa-solid fa-star"></i>
                         <i class="fa-solid fa-star"></i>
                      </div>
-                     <p class="testimonial-quote">"We trust and appreciate excellent customer service of SoraTax and for all our company requirements, We consult only them and recommend SoraTax for stress free and hassle free legal document works."</p>
+                     <p class="testimonial-quote">"We trust and appreciate excellent customer service of ApnoTax and for all our company requirements, We consult only them and recommend ApnoTax for stress free and hassle free legal document works."</p>
                      <div class="testimonial-author">
                         <div class="author-avatar">
                            <img src="./images/avater.webp" alt="Rahul Singh">
@@ -404,7 +404,7 @@
                         <i class="fa-solid fa-star"></i>
                         <i class="fa-solid fa-star"></i>
                      </div>
-                     <p class="testimonial-quote">"Professional service with attention to detail. The team at SoraTax has been instrumental in helping us navigate complex tax regulations and maintain compliance."</p>
+                     <p class="testimonial-quote">"Professional service with attention to detail. The team at ApnoTax has been instrumental in helping us navigate complex tax regulations and maintain compliance."</p>
                      <div class="testimonial-author">
                         <div class="author-avatar">
                            <img src="./images/avater.webp" alt="Sarah Johnson">

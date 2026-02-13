@@ -16,6 +16,8 @@ class Services extends RestController{
         $amount=$this->post('amount');
         $year=$this->post('year');
         $type=empty($this->post('type'))?'':$this->post('type');
+        $service_option=$this->post('service_option'); // Service option for dynamic pricing
+        $period_value=$this->post('period_value'); // Period value for Monthly/Quarterly/Yearly
         
         if(!empty($token) && !empty($service_id) && !empty($year) && !empty($firm_id)){
             $user=$this->account->verify_token($token);
@@ -36,6 +38,41 @@ class Services extends RestController{
                         $types=explode(',',$service['type']);
                         $status=true;
                         $message="";
+                        
+                        // Check if this service has dynamic options
+                        $has_service_options=false;
+                        $service_options_pricing=array();
+                        $service_options_display_names=array();
+                        $selected_option_display='';
+                        
+                        // Check if this service has dynamic options
+                        $service_options=$this->master->getserviceoptionspricing($service_id);
+                        if(!empty($service_options['pricing']) && !empty($service_option)){
+                            $service_options_pricing=$service_options['pricing'];
+                            $service_options_display_names=$service_options['display_names'];
+                            
+                            // Validate selected option exists
+                            if(in_array($service_option, array_keys($service_options_pricing))){
+                                $has_service_options=true;
+                                // Get pricing for selected option
+                                $amount=$service_options_pricing[$service_option];
+                                // Get display name for selected option
+                                $selected_option_display=isset($service_options_display_names[$service_option])?
+                                    $service_options_display_names[$service_option]:
+                                    ucfirst(str_replace('-',' ',$service_option));
+                                // Update service name to include the option
+                                $service['name']=trim($service['name']).' - '.$selected_option_display;
+                                // For services with options, default to Yearly type if not specified
+                                if(empty($type) || !in_array($type, $types)){
+                                    $type=in_array('Yearly', $types)?'Yearly':(count($types)>0?$types[0]:'Yearly');
+                                }
+                            }
+                            else{
+                                $status=false;
+                                $message="Invalid option selected for ".$service['name'];
+                            }
+                        }
+                        
                         if($service_id==1){
                             $status=false;
                             $message="Select Package to Activate ".$service['name'];
@@ -43,9 +80,41 @@ class Services extends RestController{
                                 $message="Select Package and enter Monthly Debit Amount to Activate ".$service['name'];
                             }
                         }
-                        elseif(!in_array($type,$types)){
+                        elseif(!$has_service_options && !in_array($type,$types)){
                             $status=false;
                             $message=$type." option not available for ".$service['name'];
+                        }
+                        elseif($has_service_options && !empty($service_option)){
+                            // Handle services with dynamic options - check for duplicate purchase of same option
+                            $where2="t1.user_id='$user[id]' and t1.service_id='$service_id' and t1.year='$year'";
+                            if(!empty($firm_id)){
+                                $where2.=" and t1.firm_id='$firm_id'";
+                            }
+                            // If period_value is provided, also check for it
+                            if(!empty($period_value)){
+                                $where2.=" and t1.period_value='$period_value'";
+                            }
+                            $purchases=$this->service->getpurchases($where2);
+                            if(!empty($purchases)){
+                                // Check if this specific option was already purchased
+                                foreach($purchases as $purchase){
+                                    // First check service_option column (most reliable)
+                                    if(!empty($purchase['service_option']) && $purchase['service_option']==$service_option){
+                                        $status=false;
+                                        $years=getyearmonthvalues($year);
+                                        $period_msg='';
+                                        if(!empty($period_value)){
+                                            $period_info=getyearmonthvalues($period_value);
+                                            $period_msg=' for '.$period_info['value'];
+                                        }
+                                        else{
+                                            $period_msg=' for '.$years['value'];
+                                        }
+                                        $message="You have already Purchased ".$service['name']." (".$selected_option_display.")".$period_msg."!";
+                                        break;
+                                    }
+                                }
+                            }
                         }
                         elseif($service['type']=='Once'){
                             $where2="t1.user_id='$user[id]' and t1.service_id='$service_id'";
@@ -63,11 +132,24 @@ class Services extends RestController{
                             if($service_for=='Firm'){
                                 $where2.=" and t1.firm_id='$firm_id'";
                             }
-                            $purchases=$this->service->getpurchases($where2);
-                            if(!empty($purchases)){
-                                $status=false;
-                                $years=getyearmonthvalues($year);
-                                $message="You have already Purchased ".$service['name']." for ".$years['value']."!";
+                            // If period_value is provided, also check for it
+                            if(!empty($period_value)){
+                                $where2.=" and t1.period_value='$period_value'";
+                            }
+                            // For services with options, duplicate check already handled above
+                            if(!$has_service_options){
+                                $purchases=$this->service->getpurchases($where2);
+                                if(!empty($purchases)){
+                                    $status=false;
+                                    if(!empty($period_value)){
+                                        $period_info=getyearmonthvalues($period_value);
+                                        $message="You have already Purchased ".$service['name']." for ".$period_info['value']."!";
+                                    }
+                                    else{
+                                        $years=getyearmonthvalues($year);
+                                        $message="You have already Purchased ".$service['name']." for ".$years['value']."!";
+                                    }
+                                }
                             }
                         }
                         elseif($types[0]=='Yearly' && count($types)>1){
@@ -81,10 +163,94 @@ class Services extends RestController{
                                 $message="You have already Purchased this Service!";
                             }*/
                         }
+                        elseif($type=='Monthly'){
+                            // Check annual limit: Maximum 12 monthly purchases per year
+                            $where2="t1.user_id='$user[id]' and t1.service_id='$service_id' and t1.year='$year' and t1.type='Monthly'";
+                            if(!empty($firm_id)){
+                                $where2.=" and t1.firm_id='$firm_id'";
+                            }
+                            $purchases=$this->service->getpurchases($where2);
+                            
+                            // Check if annual limit (12 months) is reached
+                            if(!empty($purchases) && count($purchases)>=12){
+                                $status=false;
+                                $years=getyearmonthvalues($year);
+                                $message="You have reached the annual limit! You can purchase monthly services maximum 12 times per year for ".$years['value']."!";
+                            }
+                            elseif(!empty($period_value)){
+                                // Check for duplicate purchase of specific month
+                                $where3=$where2." and t1.period_value='$period_value'";
+                                $existing=$this->service->getpurchases($where3);
+                                if(!empty($existing)){
+                                    $status=false;
+                                    $period_info=getyearmonthvalues($period_value);
+                                    $message="You have already Purchased ".$service['name']." for ".$period_info['value']."!";
+                                }
+                            }
+                        }
+                        elseif($type=='Quarterly'){
+                            // Check annual limit: Maximum 4 quarterly purchases per year
+                            $where2="t1.user_id='$user[id]' and t1.service_id='$service_id' and t1.year='$year' and t1.type='Quarterly'";
+                            if(!empty($firm_id)){
+                                $where2.=" and t1.firm_id='$firm_id'";
+                            }
+                            $purchases=$this->service->getpurchases($where2);
+                            
+                            // Check if annual limit (4 quarters) is reached
+                            if(!empty($purchases) && count($purchases)>=4){
+                                $status=false;
+                                $years=getyearmonthvalues($year);
+                                $message="You have reached the annual limit! You can purchase quarterly services maximum 4 times per year for ".$years['value']."!";
+                            }
+                            elseif(!empty($period_value)){
+                                // Check for duplicate purchase of specific quarter
+                                $where3=$where2." and t1.period_value='$period_value'";
+                                $existing=$this->service->getpurchases($where3);
+                                if(!empty($existing)){
+                                    $status=false;
+                                    $period_info=getyearmonthvalues($period_value);
+                                    $message="You have already Purchased ".$service['name']." for ".$period_info['value']."!";
+                                }
+                            }
+                        }
+                        elseif($type=='Yearly'){
+                            // Check annual limit: Maximum 1 yearly purchase per year
+                            $where2="t1.user_id='$user[id]' and t1.service_id='$service_id' and t1.year='$year' and t1.type='Yearly'";
+                            if(!empty($firm_id)){
+                                $where2.=" and t1.firm_id='$firm_id'";
+                            }
+                            $purchases=$this->service->getpurchases($where2);
+                            
+                            // Check if annual limit (1 yearly) is reached
+                            if(!empty($purchases) && count($purchases)>=1){
+                                $status=false;
+                                $years=getyearmonthvalues($year);
+                                $message="You have reached the annual limit! You can purchase yearly services maximum 1 time per year for ".$years['value']."!";
+                            }
+                            elseif(!empty($period_value)){
+                                // Check for duplicate purchase of specific year period
+                                $where3=$where2." and t1.period_value='$period_value'";
+                                $existing=$this->service->getpurchases($where3);
+                                if(!empty($existing)){
+                                    $status=false;
+                                    $period_info=getyearmonthvalues($period_value);
+                                    $message="You have already Purchased ".$service['name']." for ".$period_info['value']."!";
+                                }
+                            }
+                        }
+                        
                         if($status){
-                            $service['rate']=$service_id==1?$amount:$service['rate'];
-                            $subtotal=$service['rate'];
-                            if(!empty($types) && count($types)>1){
+                            // Use custom amount for services with options, otherwise use service rate
+                            if($has_service_options && !empty($amount)){
+                                $subtotal=floatval($amount);
+                                $service['rate']=$subtotal; // Update rate for display
+                            }
+                            else{
+                                $service['rate']=$service_id==1?$amount:$service['rate'];
+                                $subtotal=$service['rate'];
+                            }
+                            
+                            if(!$has_service_options && !empty($types) && count($types)>1){
                                 if($type=='Monthly'){
                                     $subtotal=$service['rate'];
                                 }
@@ -126,6 +292,18 @@ class Services extends RestController{
                                           'service_id'=>$service['id'],'firm_id'=>$firm['id'],'service'=>$service['name'],
                                           'rate'=>$service['rate'],'subtotal'=>$subtotal,'gst_amount'=>$gst_amount,
                                           'gst_enabled'=>$gst_enabled?1:0,'amount'=>$total);
+                            
+                            // Store period value for Monthly/Quarterly/Yearly purchases
+                            if(!empty($period_value) && ($type=='Monthly' || $type=='Quarterly' || $type=='Yearly')){
+                                $single['period_value']=$period_value;
+                            }
+                            
+                            // Store service option if applicable
+                            if($has_service_options && !empty($service_option)){
+                                $single['service_option']=$service_option;
+                                $single['service_option_display']=$selected_option_display;
+                            }
+                            
                             $balance=$this->wallet->getwalletbalance($user['id']);
 
                             if($balance>=$total){
@@ -200,6 +378,46 @@ class Services extends RestController{
                     $this->response([
                         'status' => false,
                         'message' => "Service Not Available!"], RestController::HTTP_OK);
+                }
+            }
+            else{
+                $this->response([
+                    'status' => false,
+                    'message' => "User Not Logged In!"], RestController::HTTP_OK);
+            }
+        }
+        else{
+            $this->response([
+                'status' => false,
+                'message' => "Please provide all Details!"], RestController::HTTP_OK);
+        }
+	}
+    
+	public function getserviceoptions_post(){
+        $token=$this->post('token');
+        $service_id=$this->post('service_id');
+        if(!empty($token) && !empty($service_id)){
+            $user=$this->account->verify_token($token);
+            if(!empty($user) && is_array($user) && $user['role']=='customer'){
+                $options = $this->master->getserviceoptions(array('service_id' => $service_id, 'status' => 1), 'all');
+                $pricing = array();
+                $display_names = array();
+                if(!empty($options)){
+                    foreach($options as $option){
+                        $pricing[$option['option_key']] = $option['rate'];
+                        $display_names[$option['option_key']] = $option['display_name'];
+                    }
+                    $this->response([
+                        'status' => true,
+                        'pricing' => $pricing,
+                        'display_names' => $display_names,
+                        'options' => $options
+                    ], RestController::HTTP_OK);
+                }
+                else{
+                    $this->response([
+                        'status' => false,
+                        'message' => "No Options Available for this Service!"], RestController::HTTP_OK);
                 }
             }
             else{

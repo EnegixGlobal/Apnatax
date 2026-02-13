@@ -206,4 +206,65 @@ class Account extends RestController{
         $result=$this->sendotp($where);
     }
     
+    public function changepassword_post(){
+        $token=$this->post('token');
+        $old_password=$this->post('old_password');
+        $new_password=$this->post('new_password');
+        $repassword=$this->post('repassword');
+        
+        if(!empty($token) && !empty($old_password) && !empty($new_password)){
+            $user=$this->account->verify_token($token);
+            if(!empty($user) && is_array($user)){
+                // Verify old password
+                $where=array("id"=>$user['id']);
+                $dbuser=$this->account->getuser($where);
+                if($dbuser['status']===true){
+                    $dbuser=$dbuser['user'];
+                    $password=$old_password.SITE_SALT.$dbuser['salt'];
+                    if(password_verify($password,$dbuser['password'])){
+                        // Verify new password matches repassword if provided
+                        if(!empty($repassword) && $new_password!=$repassword){
+                            $this->response([
+                                'status' => false,
+                                'message' => "New Password and Confirm Password do not Match!"], RestController::HTTP_OK);
+                            return;
+                        }
+                        // Update password
+                        $result=$this->account->updatepassword(array("password"=>$new_password),$where);
+                        if($result['status']===true){
+                            $this->response([
+                                'status' => true,
+                                'message' => $result['message']], RestController::HTTP_OK);
+                        }
+                        else{
+                            $this->response([
+                                'status' => false,
+                                'message' => $result['message']], RestController::HTTP_OK);
+                        }
+                    }
+                    else{
+                        $this->response([
+                            'status' => false,
+                            'message' => "Old Password is Incorrect!"], RestController::HTTP_OK);
+                    }
+                }
+                else{
+                    $this->response([
+                        'status' => false,
+                        'message' => "User Not Found!"], RestController::HTTP_OK);
+                }
+            }
+            else{
+                $this->response([
+                    'status' => false,
+                    'message' => "User Not Logged In!"], RestController::HTTP_OK);
+            }
+        }
+        else{
+            $this->response([
+                'status' => false,
+                'message' => "Please provide all Details!"], RestController::HTTP_OK);
+        }
+    }
+    
 }

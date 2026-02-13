@@ -213,4 +213,73 @@ class Common extends RestController
             ], RestController::HTTP_INTERNAL_ERROR);
         }
     }
+
+    public function getnotifications_post()
+    {
+        $token = $this->post('token');
+        if (!empty($token)) {
+            $user = $this->account->verify_token($token);
+            if (!empty($user) && is_array($user)) {
+                $where = array('t1.user_id' => $user['id'], 't1.status' => 0);
+                $notifications = $this->common->getnotifications($where);
+                if (!empty($notifications)) {
+                    $this->response([
+                        'status' => true,
+                        'notifications' => $notifications
+                    ], RestController::HTTP_OK);
+                } else {
+                    $this->response([
+                        'status' => true,
+                        'notifications' => array(),
+                        'message' => "No notifications available!"
+                    ], RestController::HTTP_OK);
+                }
+            } else {
+                $this->response([
+                    'status' => false,
+                    'message' => "User Not Logged In!"
+                ], RestController::HTTP_OK);
+            }
+        } else {
+            $this->response([
+                'status' => false,
+                'message' => "Please provide all Details!"
+            ], RestController::HTTP_OK);
+        }
+    }
+
+    public function updatenotification_post()
+    {
+        $token = $this->post('token');
+        $notification_id = $this->post('notification_id');
+        if (!empty($token) && !empty($notification_id)) {
+            $user = $this->account->verify_token($token);
+            if (!empty($user) && is_array($user)) {
+                $where = array('id' => $notification_id, 'user_id' => $user['id']);
+                $data = array('status' => 1, 'updated_on' => date('Y-m-d H:i:s'));
+                if ($this->db->update("notify", $data, $where)) {
+                    $this->response([
+                        'status' => true,
+                        'message' => "Notification Updated Successfully!"
+                    ], RestController::HTTP_OK);
+                } else {
+                    $error = $this->db->error();
+                    $this->response([
+                        'status' => false,
+                        'message' => $error['message']
+                    ], RestController::HTTP_OK);
+                }
+            } else {
+                $this->response([
+                    'status' => false,
+                    'message' => "User Not Logged In!"
+                ], RestController::HTTP_OK);
+            }
+        } else {
+            $this->response([
+                'status' => false,
+                'message' => "Please provide all Details!"
+            ], RestController::HTTP_OK);
+        }
+    }
 }

@@ -1,5 +1,5 @@
 <?php
-defined('BASEPATH') OR exit('No direct script access allowed');
+defined('BASEPATH') or exit('No direct script access allowed');
 
 /*
 | -------------------------------------------------------------------------
@@ -74,6 +74,7 @@ $route['bankstatement'] = 'profile/bankstatement';
 $route['api/register'] = 'api/account/register';
 $route['api/verifyotp'] = 'api/account/verifyotp';
 $route['api/login'] = 'api/account/login';
+$route['api/changepassword'] = 'api/account/changepassword';
 
 $route['api/getstates'] = 'api/common/getstates';
 $route['api/getdistricts'] = 'api/common/getdistricts';
@@ -84,6 +85,8 @@ $route['api/getpackagedetails'] = 'api/common/getpackagedetails';
 $route['api/getyears'] = 'api/common/getyears';
 $route['api/getquarters'] = 'api/common/getquarters';
 $route['api/getmonths'] = 'api/common/getmonths';
+$route['api/getnotifications'] = 'api/common/getnotifications';
+$route['api/updatenotification'] = 'api/common/updatenotification';
 
 $route['api/getprofile'] = 'api/profile/getprofile';
 $route['api/updateprofile'] = 'api/profile/updateprofile';
@@ -104,6 +107,7 @@ $route['api/switchpackage'] = 'api/services/switchpackage';
 $route['api/mypackage'] = 'api/services/mypackage';
 $route['api/buyservice'] = 'api/services/buyservice';
 $route['api/getservicetypes'] = 'api/services/getservicetypes';
+$route['api/getserviceoptions'] = 'api/services/getserviceoptions';
 $route['api/myservices'] = 'api/services/myservices';
 $route['api/getservicefields'] = 'api/services/getservicefields';
 $route['api/saveformdata'] = 'api/services/saveformdata';
@@ -124,7 +128,7 @@ $route['api/getchats'] = 'api/chat/getchats';
 $route['api/getchatmessages'] = 'api/chat/getchatmessages';
 $route['api/sendmessage'] = 'api/chat/sendmessage';
 $route['api/newchat'] = 'api/chat/newchat';
-    
+
 $route['api/getreportgroups'] = 'api/reports/getreportgroups';
 $route['api/getreports'] = 'api/reports/getreports';
 $route['api/getaccountancyreports'] = 'api/reports/getaccountancyreports';
@@ -135,5 +139,13 @@ $route['api/getpendingservices'] = 'api/reports/getpendingservices';
 $route['api/getworkreport'] = 'api/reports/getworkreport';
 $route['api/getmonthlyservices'] = 'api/reports/getmonthlyservices';
 
-/*------------------------------APIs-----------------------------*/
+$route['api/getorders'] = 'api/orders/getorders';
+$route['api/getorderdetails'] = 'api/orders/getorderdetails';
+$route['api/downloaddocument'] = 'api/orders/downloaddocument';
 
+$route['api/getcertificates'] = 'api/profile/getcertificates';
+$route['api/getolddata'] = 'api/profile/getolddata';
+
+$route['api/initiatepayment'] = 'api/wallet/initiatepayment';
+
+/*------------------------------APIs-----------------------------*/

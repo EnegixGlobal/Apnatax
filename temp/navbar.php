@@ -2,7 +2,7 @@
 if (!function_exists('base_url')) {
    function base_url($uri)
    {
-      return "https://soratax.com/" . $uri;
+      return "https://apnotax.com/" . $uri;
    }
 }
 ?>
@@ -95,7 +95,7 @@ if (!function_exists('base_url')) {
             </li>
          </ul>
          <div class="taxefi-btn d-flex">
-            <a class="btn btn-dark download-app-btn" href="<?= base_url('download/soratax-latest.apk'); ?>" target="_blank">DOWNLOAD APP</a>
+            <a class="btn btn-dark download-app-btn" href="<?= base_url('download/apnotax-latest.apk'); ?>" target="_blank">DOWNLOAD APP</a>
          </div>
       </div>
    </div>
