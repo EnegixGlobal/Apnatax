@@ -17,7 +17,8 @@ class Common extends RestController
         if (!empty($token)) {
             $verify = $this->account->verify_token($token);
             if ($verify !== false) {
-                $where = ['status' => 1];
+                // Exclude service ID 1 (Account Work) from services listing - it's now only available in packages
+                $where = ['status' => 1, 'id !=' => 1];
                 $services = $this->master->getservices($where);
                 if (!empty($services)) {
                     foreach ($services as $key => $service) {

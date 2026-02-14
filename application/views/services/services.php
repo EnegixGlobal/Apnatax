@@ -1,6 +1,15 @@
             <div class="card">
 
                 <div class="card-body">
+                    <?php if (!empty($has_package)) { ?>
+                    <div class="alert alert-info mb-3">
+                        <i class="fa fa-info-circle"></i> <strong>Note:</strong> You have a service package. You can either:
+                        <ul class="mb-0 mt-2">
+                            <li>Add more services to your package via <a href="<?= base_url('package/'); ?>" class="alert-link">My Package</a> page</li>
+                            <li>Purchase individual services below (they will be separate from your package)</li>
+                        </ul>
+                    </div>
+                    <?php } ?>
                     <div class="row">
                         <div class="col-md-8">
                             <div class="table-responsive">
@@ -23,7 +32,12 @@
                                         ?>
                                                 <tr>
                                                     <td><?= $i; ?></td>
-                                                    <td><?= $single['name']; ?></td>
+                                                    <td>
+                                                        <?= $single['name']; ?>
+                                                        <?php if (!empty($single['in_package'])) { ?>
+                                                            <span class="badge bg-info ms-2" title="This service is in your package">In Package</span>
+                                                        <?php } ?>
+                                                    </td>
                                                     <td><?= $single['rate']; ?></td>
                                                     <td>
                                                         <?php
