@@ -122,6 +122,7 @@ $route['api/deletefirm'] = 'api/profile/deletefirm';
 
 $route['api/checkaccountancy'] = 'api/profile/checkaccountancy';
 $route['api/savemonthlystatement'] = 'api/profile/savemonthlystatement';
+$route['api/savesessdata'] = 'api/profile/savesessdata';
 $route['api/getbankstatements'] = 'api/profile/getbankstatements';
 
 $route['api/getchats'] = 'api/chat/getchats';
