@@ -325,8 +325,25 @@ class Profile extends RestController
     public function addfirm_post()
     {
         $token = $this->post('token');
-        $name = $this->post('name');
-        $gstin = $this->post('gstin');
+        $name = trim($this->post('name'));
+        $gstin = trim($this->post('gstin'));
+
+        // Validate required fields
+        if (empty($token)) {
+            $this->response([
+                'status' => false,
+                'message' => "Token is required!"
+            ], RestController::HTTP_OK);
+            return;
+        }
+
+        if (empty($name)) {
+            $this->response([
+                'status' => false,
+                'message' => "Firm name is required!"
+            ], RestController::HTTP_OK);
+            return;
+        }
 
         if (!empty($token) && !empty($name)) {
             $user = $this->account->verify_token($token);
@@ -334,9 +351,20 @@ class Profile extends RestController
                 $data = array("user_id" => $user['id'], "name" => $name, "gstin" => $gstin);
                 $result = $this->customer->addfirm($data);
                 if ($result['status'] === true) {
+                    // Get the newly created firm to return it using the firm_id from result
+                    $firm_id = isset($result['firm_id']) ? $result['firm_id'] : null;
+                    if ($firm_id) {
+                        $where = array("t1.id" => $firm_id, "t1.user_id" => $user['id']);
+                    } else {
+                        // Fallback: get by name and user_id (most recent)
+                        $where = array("t1.user_id" => $user['id'], "t1.name" => $name, "t1.request" => 0);
+                    }
+                    $firm = $this->customer->getfirms($where, 'single');
+
                     $this->response([
                         'status' => true,
-                        'message' => $result['message']
+                        'message' => $result['message'],
+                        'response' => $firm
                     ], RestController::HTTP_OK);
                 } else {
                     $this->response([
@@ -353,7 +381,7 @@ class Profile extends RestController
         } else {
             $this->response([
                 'status' => false,
-                'message' => "Please provide all Details!"
+                'message' => "Please provide all Details! (Token and Firm Name are required)"
             ], RestController::HTTP_OK);
         }
     }
@@ -798,6 +826,72 @@ class Profile extends RestController
             $this->response([
                 'status' => false,
                 'message' => "Please provide all Details!"
+            ], RestController::HTTP_OK);
+        }
+    }
+
+    public function savesessdata_post()
+    {
+        $token = $this->post('token');
+        $year = trim($this->post('year'));
+        $firm = trim($this->post('firm'));
+
+        // Validate required fields with specific error messages
+        if (empty($token)) {
+            $this->response([
+                'status' => false,
+                'message' => "Token is required!"
+            ], RestController::HTTP_OK);
+            return;
+        }
+
+        if (empty($year)) {
+            $this->response([
+                'status' => false,
+                'message' => "Year is required!"
+            ], RestController::HTTP_OK);
+            return;
+        }
+
+        if (empty($firm)) {
+            $this->response([
+                'status' => false,
+                'message' => "Firm is required!"
+            ], RestController::HTTP_OK);
+            return;
+        }
+
+        if (!empty($token) && !empty($year) && !empty($firm)) {
+            $user = $this->account->verify_token($token);
+            if (!empty($user) && is_array($user) && $user['role'] == 'customer') {
+                $where = array("t1.user_id" => $user['id'], 't1.status' => 1, 't1.request!=' => 1, 't1.id' => $firm);
+                $firmData = $this->customer->getfirms($where, 'single');
+                if (!empty($firmData)) {
+                    // For mobile app, we return the selected year and firm data
+                    // The app will store it locally
+                    $this->response([
+                        'status' => true,
+                        'message' => 'Session data saved successfully',
+                        'year' => $year,
+                        'firm_id' => $firmData['id'],
+                        'firm' => $firmData
+                    ], RestController::HTTP_OK);
+                } else {
+                    $this->response([
+                        'status' => false,
+                        'message' => "Firm not found or not authorized!"
+                    ], RestController::HTTP_OK);
+                }
+            } else {
+                $this->response([
+                    'status' => false,
+                    'message' => "User Not Logged In!"
+                ], RestController::HTTP_OK);
+            }
+        } else {
+            $this->response([
+                'status' => false,
+                'message' => "Please provide all Details (token, year, firm)!"
             ], RestController::HTTP_OK);
         }
     }

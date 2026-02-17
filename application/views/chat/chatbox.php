@@ -13,6 +13,10 @@
                                                         <a class="nav-link" href="" data-bs-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false"><i class="fe fe-more-horizontal"></i></a>
                                                         <div class="dropdown-menu dropdown-menu-end" style="">
                                                             <a class="dropdown-item" href="<?= base_url('chat/'); ?>"><i class="fa fa-times me-1"></i> Close</a>
+                                                            <?php if($this->session->role=='admin'){ ?>
+                                                            <a class="dropdown-item text-danger" href="javascript:void(0);" id="delete-conversation-btn"><i class="fa fa-trash me-1"></i> Delete Conversation</a>
+                                                            <a class="dropdown-item text-danger" href="javascript:void(0);" id="delete-user-chats-from-chatbox-btn"><i class="fa fa-trash me-1"></i> Delete All Chats for This User</a>
+                                                            <?php } ?>
                                                         </div>
                                                     </div>
                                                 </nav>
@@ -54,6 +58,11 @@
                                                 <nav class="nav">
                                                 </nav>
                                             </div>
+                                            <?php if($this->session->role=='admin'){ ?>
+                                            <div class="mt-2 mb-2 mx-3">
+                                                <button type="button" class="btn btn-sm btn-danger" id="delete-all-chats-btn"><i class="fa fa-trash me-1"></i> Delete All Chats</button>
+                                            </div>
+                                            <?php } ?>
                                         </div>
                                     </div>
                                 </div>
