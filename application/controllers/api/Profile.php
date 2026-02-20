@@ -61,25 +61,34 @@ class Profile extends RestController
             $user = $this->account->verify_token($token);
             if (!empty($user) && is_array($user) && $user['role'] == 'customer') {
                 $data = array();
-                $upload_path = './assets/images/profile/';
-                $allowed_types = 'gif|jpg|jpeg|png|svg';
-                $upload = upload_file('photo', $upload_path, $allowed_types, generate_slug($user['name']));
-                if ($upload['status'] === true) {
-                    $this->load->library('imager');
-                    $path = $this->imager->processimage('.' . $upload['path'], 'cropscale', 80, ['width' => 300, 'height' => 300]);
-                    $data['photo'] = $path;
+
+                // Handle photo upload (optional)
+                if (!empty($_FILES['photo']) && isset($_FILES['photo']['tmp_name']) && !empty($_FILES['photo']['tmp_name'])) {
+                    $upload_path = './assets/images/profile/';
+                    $allowed_types = 'gif|jpg|jpeg|png|svg';
+                    $upload = upload_file('photo', $upload_path, $allowed_types, generate_slug($user['name']));
+                    if ($upload['status'] === true) {
+                        $this->load->library('imager');
+                        $path = $this->imager->processimage('.' . $upload['path'], 'cropscale', 80, ['width' => 300, 'height' => 300]);
+                        $data['photo'] = $path;
+                    }
                 }
+
                 if (!empty($name)) {
                     $data['name'] = $name;
                 }
                 if (!empty($email)) {
                     $data['email'] = $email;
                 }
+                if (!empty($mobile)) {
+                    $data['mobile'] = $mobile;
+                }
                 if (!empty($data)) {
                     $result = $this->account->updateuser($data, array("id" => $user['id']));
                     if ($result['status'] === true) {
                         $data['name'] = isset($data['name']) ? $data['name'] : $user['name'];
                         $data['email'] = isset($data['email']) ? $data['email'] : $user['email'];
+                        $data['mobile'] = isset($data['mobile']) ? $data['mobile'] : $user['mobile'];
                         $data['photo'] = isset($data['photo']) ? file_url($data['photo']) : file_url($user['photo']);
                         $this->response([
                             'status' => true,
@@ -327,6 +336,7 @@ class Profile extends RestController
         $token = $this->post('token');
         $name = trim($this->post('name'));
         $gstin = trim($this->post('gstin'));
+        $id = $this->post('id'); // For update operations
 
         // Validate required fields
         if (empty($token)) {
@@ -348,29 +358,63 @@ class Profile extends RestController
         if (!empty($token) && !empty($name)) {
             $user = $this->account->verify_token($token);
             if (!empty($user) && is_array($user) && $user['role'] == 'customer') {
-                $data = array("user_id" => $user['id'], "name" => $name, "gstin" => $gstin);
-                $result = $this->customer->addfirm($data);
-                if ($result['status'] === true) {
-                    // Get the newly created firm to return it using the firm_id from result
-                    $firm_id = isset($result['firm_id']) ? $result['firm_id'] : null;
-                    if ($firm_id) {
-                        $where = array("t1.id" => $firm_id, "t1.user_id" => $user['id']);
-                    } else {
-                        // Fallback: get by name and user_id (most recent)
-                        $where = array("t1.user_id" => $user['id'], "t1.name" => $name, "t1.request" => 0);
+                // Check if this is an update operation
+                if (!empty($id)) {
+                    // Verify that the firm belongs to the user
+                    $where = array("t1.id" => $id, "t1.user_id" => $user['id']);
+                    $existingFirm = $this->customer->getfirms($where, 'single');
+                    if (empty($existingFirm)) {
+                        $this->response([
+                            'status' => false,
+                            'message' => "Firm not found or unauthorized!"
+                        ], RestController::HTTP_OK);
+                        return;
                     }
-                    $firm = $this->customer->getfirms($where, 'single');
 
-                    $this->response([
-                        'status' => true,
-                        'message' => $result['message'],
-                        'response' => $firm
-                    ], RestController::HTTP_OK);
+                    // Update firm
+                    $data = array("id" => $id, "name" => $name, "gstin" => $gstin);
+                    $result = $this->customer->updatefirm($data);
+                    if ($result['status'] === true) {
+                        // Get the updated firm
+                        $where = array("t1.id" => $id, "t1.user_id" => $user['id']);
+                        $firm = $this->customer->getfirms($where, 'single');
+                        $this->response([
+                            'status' => true,
+                            'message' => $result['message'],
+                            'response' => $firm
+                        ], RestController::HTTP_OK);
+                    } else {
+                        $this->response([
+                            'status' => false,
+                            'message' => $result['message']
+                        ], RestController::HTTP_OK);
+                    }
                 } else {
-                    $this->response([
-                        'status' => false,
-                        'message' => $result['message']
-                    ], RestController::HTTP_OK);
+                    // Add new firm
+                    $data = array("user_id" => $user['id'], "name" => $name, "gstin" => $gstin);
+                    $result = $this->customer->addfirm($data);
+                    if ($result['status'] === true) {
+                        // Get the newly created firm to return it using the firm_id from result
+                        $firm_id = isset($result['firm_id']) ? $result['firm_id'] : null;
+                        if ($firm_id) {
+                            $where = array("t1.id" => $firm_id, "t1.user_id" => $user['id']);
+                        } else {
+                            // Fallback: get by name and user_id (most recent)
+                            $where = array("t1.user_id" => $user['id'], "t1.name" => $name, "t1.request" => 0);
+                        }
+                        $firm = $this->customer->getfirms($where, 'single');
+
+                        $this->response([
+                            'status' => true,
+                            'message' => $result['message'],
+                            'response' => $firm
+                        ], RestController::HTTP_OK);
+                    } else {
+                        $this->response([
+                            'status' => false,
+                            'message' => $result['message']
+                        ], RestController::HTTP_OK);
+                    }
                 }
             } else {
                 $this->response([
@@ -398,23 +442,27 @@ class Profile extends RestController
                 if (!empty($firms)) {
                     $this->response([
                         'status' => true,
-                        'firms' => $firms
+                        'response' => $firms,
+                        'message' => 'Firms retrieved successfully'
                     ], RestController::HTTP_OK);
                 } else {
                     $this->response([
                         'status' => false,
+                        'response' => [],
                         'message' => "No Firm Added!"
                     ], RestController::HTTP_OK);
                 }
             } else {
                 $this->response([
                     'status' => false,
+                    'response' => [],
                     'message' => "Unauthorized Access!"
                 ], RestController::HTTP_OK);
             }
         } else {
             $this->response([
                 'status' => false,
+                'response' => [],
                 'message' => "Please provide all Details!"
             ], RestController::HTTP_OK);
         }
@@ -772,7 +820,8 @@ class Profile extends RestController
                     }
                     $this->response([
                         'status' => true,
-                        'certificates' => $certificates
+                        'certificates' => $certificates,
+                        'response' => $certificates
                     ], RestController::HTTP_OK);
                 } else {
                     $this->response([

@@ -96,11 +96,45 @@ class Orders extends RestController
                     // Get documents
                     $documents = $this->service->getuploadeddocuments(['a.order_id' => $order['id']]);
                     if (!empty($documents)) {
+                        $kyc = $this->account->getkyc(['t1.user_id' => $user['id']], 'single');
+                        $seen_kyc_doc_ids = array(); // track already-added KYC document_ids
+                        $clean_documents = array();
+
                         foreach ($documents as $key => $value) {
+                            // Resolve relative asset paths to full URLs
                             if (strpos($value['formvalue'], '/assets/') === 0) {
                                 $documents[$key]['formvalue'] = file_url($value['formvalue']);
+                                $value['formvalue'] = $documents[$key]['formvalue'];
                             }
+
+                            $doc_id = intval($value['document_id']);
+                            if ($doc_id === 0) {
+                                continue;
+                            }
+
+                            // PAN (3) and Aadhar (4) come from KYC — deduplicate and use KYC source
+                            if ($doc_id === 3 || $doc_id === 4) {
+                                if (in_array($doc_id, $seen_kyc_doc_ids)) {
+                                    // Skip the duplicate (file row)
+                                    continue;
+                                }
+                                $seen_kyc_doc_ids[] = $doc_id;
+
+                                // Replace formvalue with fresh KYC value so it is always accurate
+                                if (!empty($kyc)) {
+                                    if ($doc_id === 3 && !empty($kyc['pan'])) {
+                                        $value['formvalue'] = $kyc['pan'];
+                                        $value['file'] = 0; // show as text, not file
+                                    } elseif ($doc_id === 4 && !empty($kyc['aadhar'])) {
+                                        $value['formvalue'] = $kyc['aadhar'];
+                                        $value['file'] = 0;
+                                    }
+                                }
+                            }
+
+                            $clean_documents[] = $value;
                         }
+                        $documents = $clean_documents;
                     } else {
                         // Get service documents template if no documents uploaded
                         $documents = $this->master->getservicedocuments(['t1.service_id' => $order['service_id']]);

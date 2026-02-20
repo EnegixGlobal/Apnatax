@@ -89,17 +89,37 @@ class Common extends RestController
         }
     }
 
+    public function getstates_get()
+    {
+        $states = $this->common->getstates();
+        if (!empty($states)) {
+            $this->response([
+                'status' => true,
+                'response' => $states,
+                'states' => $states
+            ], RestController::HTTP_OK);
+        } else {
+            $this->response([
+                'status' => false,
+                'response' => [],
+                'message' => "No States Found!"
+            ], RestController::HTTP_OK);
+        }
+    }
+
     public function getstates_post()
     {
         $states = $this->common->getstates();
         if (!empty($states)) {
             $this->response([
                 'status' => true,
+                'response' => $states,
                 'states' => $states
             ], RestController::HTTP_OK);
         } else {
             $this->response([
                 'status' => false,
+                'response' => [],
                 'message' => "No States Found!"
             ], RestController::HTTP_OK);
         }
@@ -113,17 +133,20 @@ class Common extends RestController
             if (!empty($districts)) {
                 $this->response([
                     'status' => true,
+                    'response' => $districts,
                     'districts' => $districts
                 ], RestController::HTTP_OK);
             } else {
                 $this->response([
                     'status' => false,
+                    'response' => [],
                     'message' => "No Districts Found!"
                 ], RestController::HTTP_OK);
             }
         } else {
             $this->response([
                 'status' => false,
+                'response' => [],
                 'message' => "Please provide State ID!"
             ], RestController::HTTP_OK);
         }
