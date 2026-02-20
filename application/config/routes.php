@@ -110,6 +110,7 @@ $route['api/getservicetypes'] = 'api/services/getservicetypes';
 $route['api/getserviceoptions'] = 'api/services/getserviceoptions';
 $route['api/myservices'] = 'api/services/myservices';
 $route['api/getservicefields'] = 'api/services/getservicefields';
+$route['api/getservicefieldsfororder'] = 'api/services/getservicefieldsfororder';
 $route['api/saveformdata'] = 'api/services/saveformdata';
 $route['api/formpreview'] = 'api/services/formpreview';
 
@@ -138,6 +139,7 @@ $route['api/getotherfeereport'] = 'api/reports/getotherfeereport';
 $route['api/getpurchasedservices'] = 'api/reports/getpurchasedservices';
 $route['api/getpendingservices'] = 'api/reports/getpendingservices';
 $route['api/getworkreport'] = 'api/reports/getworkreport';
+$route['api/getworkreports'] = 'api/reports/getworkreports';
 $route['api/getmonthlyservices'] = 'api/reports/getmonthlyservices';
 
 $route['api/getorders'] = 'api/orders/getorders';
