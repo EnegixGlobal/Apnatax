@@ -153,15 +153,38 @@ class Reports extends RestController
         }
     }
 
+    /**
+     * Pending services: same logic as web Services::pendingservices()
+     * Requires year + firm; returns only pending (status=0) services that are in the customer's service package.
+     */
     public function getpendingservices_post()
     {
         $token = $this->post('token');
         $firm_id = $this->post('firm_id');
-        if (!empty($token) && !empty($firm_id)) {
+        $year = $this->post('year');
+        if (!empty($token) && !empty($firm_id) && !empty($year)) {
             $user = $this->account->verify_token($token);
             if (!empty($user) && is_array($user) && $user['role'] == 'customer') {
-                $where = "t1.user_id='$user[id]' and t1.firm_id='$firm_id'";
-                $services = $this->service->getpurchasedservices($where);
+                // Get service package for this user/firm/year (same as web)
+                $service_package = $this->customer->getservicepackage([
+                    't1.user_id' => $user['id'],
+                    't1.firm_id' => $firm_id,
+                    't1.year' => $year
+                ], 'single');
+
+                $services = array();
+                if (!empty($service_package) && !empty($service_package['service_ids'])) {
+                    $package_service_ids = array_filter(array_map('trim', explode(',', $service_package['service_ids'])));
+                    if (!empty($package_service_ids)) {
+                        $service_ids_str = implode(',', array_map('intval', $package_service_ids));
+                        $user_id_escaped = $this->db->escape($user['id']);
+                        $firm_id_escaped = $this->db->escape($firm_id);
+                        $year_escaped = $this->db->escape($year);
+                        $where = "t1.user_id={$user_id_escaped} AND t1.firm_id={$firm_id_escaped} AND t1.year={$year_escaped} AND t1.status='0' AND t1.service_id IN ($service_ids_str)";
+                        $services = $this->service->getpurchasedservices($where, 'all', true);
+                    }
+                }
+
                 if (!empty($services)) {
                     $this->response([
                         'status' => true,
@@ -182,7 +205,7 @@ class Reports extends RestController
         } else {
             $this->response([
                 'status' => false,
-                'message' => "Please provide all Details!"
+                'message' => "Please provide token, firm_id and year!"
             ], RestController::HTTP_OK);
         }
     }

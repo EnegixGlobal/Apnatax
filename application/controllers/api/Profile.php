@@ -682,12 +682,96 @@ class Profile extends RestController
                                     if ($upload['status'] === true) {
                                         $data['statement'] = $upload['path'];
                                         $data['uploaded_by'] = $user['id'];
+
+                                        // Save bank statement first to get the ID
                                         $result = $this->service->savebankstatement($data);
+
                                         if ($result['status'] === true) {
-                                            $this->response([
-                                                'status' => true,
-                                                'message' => $result['message']
-                                            ], RestController::HTTP_OK);
+                                            $bank_statement_id = $result['bank_statement_id'];
+
+                                            // Handle multiple creditors statement uploads
+                                            $creditors_upload_errors = array();
+                                            $creditors_upload_success = 0;
+
+                                            if (!empty($_FILES['creditors_statement']['name'][0])) {
+                                                $file_count = count($_FILES['creditors_statement']['name']);
+
+                                                for ($i = 0; $i < $file_count; $i++) {
+                                                    // Create a temporary single file array for upload_file function
+                                                    $_FILES['creditors_statement_single'] = array(
+                                                        'name' => $_FILES['creditors_statement']['name'][$i],
+                                                        'type' => $_FILES['creditors_statement']['type'][$i],
+                                                        'tmp_name' => $_FILES['creditors_statement']['tmp_name'][$i],
+                                                        'error' => $_FILES['creditors_statement']['error'][$i],
+                                                        'size' => $_FILES['creditors_statement']['size'][$i]
+                                                    );
+
+                                                    $upload = upload_file(
+                                                        'creditors_statement_single',
+                                                        $upload_path,
+                                                        $allowed_types,
+                                                        generate_slug($user['name'] . '-creditors-statement-' . $month . '-' . ($i + 1))
+                                                    );
+
+                                                    if ($upload['status'] === true) {
+                                                        // Save to bank_creditors_statements table
+                                                        $creditors_data = array(
+                                                            'bank_statement_id' => $bank_statement_id,
+                                                            'user_id' => $user['id'],
+                                                            'firm_id' => $firm_id,
+                                                            'file_path' => $upload['path'],
+                                                            'file_name' => $_FILES['creditors_statement']['name'][$i],
+                                                            'uploaded_by' => $user['id'],
+                                                            'added_on' => date('Y-m-d H:i:s'),
+                                                            'updated_on' => date('Y-m-d H:i:s')
+                                                        );
+
+                                                        if ($this->db->insert('bank_creditors_statements', $creditors_data)) {
+                                                            $creditors_upload_success++;
+                                                        } else {
+                                                            $creditors_upload_errors[] = 'Failed to save creditors statement file: ' . $_FILES['creditors_statement']['name'][$i];
+                                                        }
+                                                    } else {
+                                                        $creditors_upload_errors[] = 'Creditors Statement ' . ($i + 1) . ': ' . $upload['msg'];
+                                                    }
+
+                                                    // Clean up temporary file array
+                                                    unset($_FILES['creditors_statement_single']);
+                                                }
+
+                                                // Set success/error messages
+                                                if ($creditors_upload_success > 0) {
+                                                    $msg = $result['message'];
+                                                    if ($creditors_upload_success > 1) {
+                                                        $msg .= " " . $creditors_upload_success . " creditors statements uploaded successfully.";
+                                                    } else {
+                                                        $msg .= " Creditors statement uploaded successfully.";
+                                                    }
+                                                    if (!empty($creditors_upload_errors)) {
+                                                        $msg .= " Errors: " . implode('; ', $creditors_upload_errors);
+                                                    }
+                                                    $this->response([
+                                                        'status' => true,
+                                                        'message' => $msg
+                                                    ], RestController::HTTP_OK);
+                                                } else if (!empty($creditors_upload_errors)) {
+                                                    $this->response([
+                                                        'status' => true,
+                                                        'message' => $result['message'] . " Creditors statements failed: " . implode('; ', $creditors_upload_errors)
+                                                    ], RestController::HTTP_OK);
+                                                } else {
+                                                    $this->response([
+                                                        'status' => true,
+                                                        'message' => $result['message']
+                                                    ], RestController::HTTP_OK);
+                                                }
+                                            } else {
+                                                // No creditors statements uploaded, but bank statement is saved
+                                                $this->response([
+                                                    'status' => true,
+                                                    'message' => $result['message']
+                                                ], RestController::HTTP_OK);
+                                            }
                                         } else {
                                             $this->response([
                                                 'status' => false,
@@ -766,11 +850,28 @@ class Profile extends RestController
                             $statements[$key]['year_value'] = $year['value'];
                             $statements[$key]['month_value'] = $month['value'];
                             $statements[$key]['statement'] = file_url($single['statement']);
-                            $statements[$key]['creditors_statement'] = file_url($single['creditors_statement']);
+
+                            // Get multiple creditors statements for this bank statement
+                            $creditors_statements = $this->db->get_where('bank_creditors_statements', array('bank_statement_id' => $single['id']))->result_array();
+                            $statements[$key]['creditors_statements'] = array();
+                            if (!empty($creditors_statements)) {
+                                foreach ($creditors_statements as $cred) {
+                                    $statements[$key]['creditors_statements'][] = array(
+                                        'id' => $cred['id'],
+                                        'file_path' => file_url($cred['file_path']),
+                                        'file_name' => $cred['file_name']
+                                    );
+                                }
+                            }
+
+                            // Keep backward compatibility with old single creditors_statement field
+                            if (!empty($single['creditors_statement'])) {
+                                $statements[$key]['creditors_statement'] = file_url($single['creditors_statement']);
+                            }
                         }
                         $this->response([
                             'status' => true,
-                            'statements' => $statements
+                            'response' => $statements
                         ], RestController::HTTP_OK);
                     } else {
                         $this->response([
