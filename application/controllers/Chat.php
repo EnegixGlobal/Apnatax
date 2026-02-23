@@ -9,24 +9,40 @@ class Chat extends CI_Controller {
     }
 
     public function index() {
-        $data['title']='Chat';
-        $user=getuser();
-        $data['chats']=$this->chat->getchatusers($user['id']);
-        $sender_id = $user['id'];
-        $receiver_id = $this->input->get('receiver_id');
+        try {
+            $data['title']='Chat';
+            $user=getuser();
+            
+            // Get chats with error handling
+            $data['chats'] = $this->chat->getchatusers($user['id']);
+            if ($data['chats'] === false) {
+                log_message('error', 'Failed to get chat users for user ID: ' . $user['id']);
+                $data['chats'] = array();
+            }
+            
+            $sender_id = $user['id'];
+            $receiver_id = $this->input->get('receiver_id');
 
-        $data['receiver_id'] = $receiver_id;
-        if($this->session->role=='admin'){
-            $where="t1.role!='admin'";
-        }
-        else{
-            $where="t1.role='customer' or t1.id=1";
-        }
-        
-        $data['users']=$this->account->getusers($where);
+            $data['receiver_id'] = $receiver_id;
+            if($this->session->role=='admin'){
+                $where="t1.role!='admin'";
+            }
+            else{
+                $where="t1.role='customer' or t1.id=1";
+            }
+            
+            $data['users']=$this->account->getusers($where);
+            if ($data['users'] === false) {
+                log_message('error', 'Failed to get users for chat');
+                $data['users'] = array();
+            }
 
-        $data['bottom_script']=array('file'=>['includes/js/chat.js']);
-        $this->template->load('chat','chat',$data);
+            $data['bottom_script']=array('file'=>['includes/js/chat.js']);
+            $this->template->load('chat','chat',$data);
+        } catch (Exception $e) {
+            log_message('error', 'Error in Chat::index(): ' . $e->getMessage());
+            show_error('An error occurred while loading the chat page. Please try again later.', 500);
+        }
     }
 
     public function send_message() {
