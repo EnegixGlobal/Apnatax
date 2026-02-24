@@ -2,8 +2,19 @@
 $button='';
 ?>
                             <div class="card">
+                                <div class="card-header">
+                                    <h3 class="card-title">KYC Details - <?= !empty($customer['name']) ? $customer['name'] : 'Customer'; ?></h3>
+                                    <div class="card-options">
+                                        <a href="<?= base_url('customers/'); ?>" class="btn btn-sm btn-danger">
+                                            <i class="fa fa-times"></i> Close
+                                        </a>
+                                    </div>
+                                </div>
                                 <div class="card-body">
-                                        <div class="row mb-4">
+                                    <!-- Customer Information Section -->
+                                    <div class="mb-4">
+                                        <h5 class="mb-3"><i class="fa fa-user me-2"></i>Customer Information</h5>
+                                        <div class="row">
                                             <div class="col-md-4">
                                                 <div class="form-group">
                                                     <?php
@@ -32,156 +43,248 @@ $button='';
                                                 </div>
                                             </div>
                                         </div>
+                                    </div>
+                                    
+                                    <hr class="my-4">
+                                    <!-- KYC Documents Section -->
+                                    <div class="mb-4">
+                                        <h5 class="mb-3"><i class="fa fa-id-card me-2"></i>KYC Documents</h5>
                                         <?php if(!empty($kyc)){ ?>
-                                        <div class="row mb-4">
-                                            <div class="col-md-4">
-                                                <div class="form-group">
-                                                    <?php
-                                                        $pan=!empty($kyc['pan'])?$kyc['pan']:'';
-                                                        $attributes=array("id"=>"pan","readonly"=>"true");
-                                                        echo create_form_input("text","pan","PAN",true,$pan,$attributes);  
-                                                    ?>
+                                            <!-- PAN Card Section -->
+                                            <div class="card mb-3">
+                                                <div class="card-body">
+                                                    <h6 class="card-title mb-3"><i class="fa fa-credit-card me-2"></i>PAN Card</h6>
+                                                    <div class="row">
+                                                        <div class="col-md-4">
+                                                            <div class="form-group">
+                                                                <?php
+                                                                    $pan=!empty($kyc['pan'])?$kyc['pan']:'';
+                                                                    $attributes=array("id"=>"pan","readonly"=>"true");
+                                                                    echo create_form_input("text","pan","PAN Number",true,$pan,$attributes);  
+                                                                ?>
+                                                            </div>
+                                                        </div>
+                                                        <div class="col-md-8">
+                                                            <div class="form-group">
+                                                                <?php if(!empty($kyc['pan_image'])){ ?>
+                                                                    <label>PAN Card Image</label>
+                                                                    <div class="mb-2">
+                                                                        <img src="<?= $kyc['pan_image'] ?>" alt="PAN Image" class="img-thumbnail" style="max-height: 200px; max-width: 300px;">
+                                                                    </div>
+                                                                    <div>
+                                                                        <a href="<?= $kyc['pan_image'] ?>" target="_blank" class="btn btn-sm btn-info">
+                                                                            <i class="fa fa-eye"></i> View
+                                                                        </a>
+                                                                        <a href="<?= base_url('customers/download_kyc_document/'.md5($customer['id']).'/pan_image') ?>" class="btn btn-sm btn-success">
+                                                                            <i class="fa fa-download"></i> Download
+                                                                        </a>
+                                                                    </div>
+                                                                <?php } else { ?>
+                                                                    <p class="text-muted"><i class="fa fa-exclamation-circle me-1"></i>PAN Image not uploaded</p>
+                                                                <?php } ?>
+                                                            </div>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </div>
-                                            <div class="col-md-4">
-                                                <div class="form-group">
-                                                    <img src="<?= $kyc['pan_image'] ?>" alt="PAN Image">
+                                            
+                                            <!-- Aadhar Card Section -->
+                                            <div class="card mb-3">
+                                                <div class="card-body">
+                                                    <h6 class="card-title mb-3"><i class="fa fa-id-badge me-2"></i>Aadhar Card</h6>
+                                                    <div class="row">
+                                                        <div class="col-md-4">
+                                                            <div class="form-group">
+                                                                <?php
+                                                                    $aadhar=!empty($kyc['aadhar'])?$kyc['aadhar']:'';
+                                                                    $attributes=array("id"=>"aadhar","readonly"=>"true");
+                                                                    echo create_form_input("text","aadhar","Aadhar Number",true,$aadhar,$attributes);  
+                                                                ?>
+                                                            </div>
+                                                        </div>
+                                                        <div class="col-md-4">
+                                                            <div class="form-group">
+                                                                <label>Aadhar Front</label>
+                                                                <?php if(!empty($kyc['aadhar_image'])){ ?>
+                                                                    <div class="mb-2">
+                                                                        <img src="<?= $kyc['aadhar_image'] ?>" alt="Aadhar Image" class="img-thumbnail" style="max-height: 200px; max-width: 300px;">
+                                                                    </div>
+                                                                    <div>
+                                                                        <a href="<?= $kyc['aadhar_image'] ?>" target="_blank" class="btn btn-sm btn-info">
+                                                                            <i class="fa fa-eye"></i> View
+                                                                        </a>
+                                                                        <a href="<?= base_url('customers/download_kyc_document/'.md5($customer['id']).'/aadhar_image') ?>" class="btn btn-sm btn-success">
+                                                                            <i class="fa fa-download"></i> Download
+                                                                        </a>
+                                                                    </div>
+                                                                <?php } else { ?>
+                                                                    <p class="text-muted"><i class="fa fa-exclamation-circle me-1"></i>Aadhar Front not uploaded</p>
+                                                                <?php } ?>
+                                                            </div>
+                                                        </div>
+                                                        <div class="col-md-4">
+                                                            <div class="form-group">
+                                                                <label>Aadhar Back</label>
+                                                                <?php if(!empty($kyc['aadhar_back'])){ ?>
+                                                                    <div class="mb-2">
+                                                                        <img src="<?= $kyc['aadhar_back'] ?>" alt="Aadhar Back Image" class="img-thumbnail" style="max-height: 200px; max-width: 300px;">
+                                                                    </div>
+                                                                    <div>
+                                                                        <a href="<?= $kyc['aadhar_back'] ?>" target="_blank" class="btn btn-sm btn-info">
+                                                                            <i class="fa fa-eye"></i> View
+                                                                        </a>
+                                                                        <a href="<?= base_url('customers/download_kyc_document/'.md5($customer['id']).'/aadhar_back') ?>" class="btn btn-sm btn-success">
+                                                                            <i class="fa fa-download"></i> Download
+                                                                        </a>
+                                                                    </div>
+                                                                <?php } else { ?>
+                                                                    <p class="text-muted"><i class="fa fa-exclamation-circle me-1"></i>Aadhar Back not uploaded</p>
+                                                                <?php } ?>
+                                                            </div>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                        <div class="row mb-4">
-                                            <div class="col-md-4">
-                                                <div class="form-group">
-                                                    <?php
-                                                        $aadhar=!empty($kyc['aadhar'])?$kyc['aadhar']:'';
-                                                        $attributes=array("id"=>"aadhar","readonly"=>"true");
-                                                        echo create_form_input("text","aadhar","Aadhar",true,$aadhar,$attributes);  
-                                                    ?>
-                                                </div>
+                                        <?php } else { ?>
+                                            <div class="alert alert-warning">
+                                                <i class="fa fa-exclamation-triangle me-2"></i><strong>KYC Details Not Uploaded!</strong> Customer has not uploaded their KYC documents yet.
                                             </div>
-                                            <div class="col-md-4">
-                                                <div class="form-group">
-                                                    <img src="<?= $kyc['aadhar_image'] ?>" alt="Aadhar Image">
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <?php 
-                                            }
-                                        ?>
-                                        <div class="row mb-4">
-                                            <div class="col-md-12">
-                                                <h4>Certificates</h4>
-                                            </div>
-                                        </div>
+                                        <?php } ?>
+                                    </div>
+                                    
+                                    <hr class="my-4">
+                                    <!-- Certificates Section -->
+                                    <div class="mb-4">
+                                        <h5 class="mb-3"><i class="fa fa-certificate me-2"></i>Certificates</h5>
                                         <?= form_open_multipart('customers/uploadcertificates/'.md5($customer['id'])); ?>
-                                        <div class="row mb-4">
-                                            <div class="col-md-6">
-                                                <div class="form-group">
-                                                    <label>TDS Certificate</label>
-                                                    <?php if(!empty($kyc) && !empty($kyc['tds_certificate'])){ ?>
-                                                        <div class="mb-2">
-                                                            <a href="<?= $kyc['tds_certificate'] ?>" target="_blank" class="btn btn-sm btn-info">
-                                                                <i class="fa fa-eye"></i> View TDS Certificate
-                                                            </a>
-                                                            <a href="<?= base_url('customers/delete_certificate/'.md5($customer['id']).'/tds_certificate') ?>" 
-                                                               class="btn btn-sm btn-danger" 
-                                                               onclick="return confirm('Are you sure you want to delete this certificate?');">
-                                                                <i class="fa fa-trash"></i> Delete TDS Certificate
-                                                            </a>
-                                                        </div>
-                                                    <?php } ?>
-                                                    <?php 
-                                                        $attributes=array("id"=>"tds_certificate","accept"=>"image/*|application/pdf");
-                                                        echo create_form_input("file","tds_certificate","Upload TDS Certificate",false,'',$attributes); 
-                                                    ?>
+                                        
+                                        <div class="row">
+                                            <div class="col-md-6 mb-3">
+                                                <div class="card">
+                                                    <div class="card-body">
+                                                        <h6 class="card-title mb-3">TDS Certificate</h6>
+                                                        <?php if(!empty($kyc) && !empty($kyc['tds_certificate'])){ ?>
+                                                            <div class="mb-3">
+                                                                <a href="<?= $kyc['tds_certificate'] ?>" target="_blank" class="btn btn-sm btn-info">
+                                                                    <i class="fa fa-eye"></i> View
+                                                                </a>
+                                                                <a href="<?= base_url('customers/download_certificate/'.md5($customer['id']).'/tds_certificate') ?>" class="btn btn-sm btn-success">
+                                                                    <i class="fa fa-download"></i> Download
+                                                                </a>
+                                                                <a href="<?= base_url('customers/delete_certificate/'.md5($customer['id']).'/tds_certificate') ?>" 
+                                                                   class="btn btn-sm btn-danger" 
+                                                                   onclick="return confirm('Are you sure you want to delete this certificate?');">
+                                                                    <i class="fa fa-trash"></i> Delete
+                                                                </a>
+                                                            </div>
+                                                        <?php } else { ?>
+                                                            <p class="text-muted mb-2"><i class="fa fa-exclamation-circle me-1"></i>Not uploaded</p>
+                                                        <?php } ?>
+                                                        <?php 
+                                                            $attributes=array("id"=>"tds_certificate","accept"=>"image/*|application/pdf");
+                                                            echo create_form_input("file","tds_certificate","Upload TDS Certificate",false,'',$attributes); 
+                                                        ?>
+                                                    </div>
                                                 </div>
                                             </div>
-                                            <div class="col-md-6">
-                                                <div class="form-group">
-                                                    <label>GST Certificate</label>
-                                                    <?php if(!empty($kyc) && !empty($kyc['gst_certificate'])){ ?>
-                                                        <div class="mb-2">
-                                                            <a href="<?= $kyc['gst_certificate'] ?>" target="_blank" class="btn btn-sm btn-info">
-                                                                <i class="fa fa-eye"></i> View GST Certificate
-                                                            </a>
-                                                            <a href="<?= base_url('customers/delete_certificate/'.md5($customer['id']).'/gst_certificate') ?>" 
-                                                               class="btn btn-sm btn-danger" 
-                                                               onclick="return confirm('Are you sure you want to delete this certificate?');">
-                                                                <i class="fa fa-trash"></i> Delete GST Certificate
-                                                            </a>
-                                                        </div>
-                                                    <?php } ?>
-                                                    <?php 
-                                                        $attributes=array("id"=>"gst_certificate","accept"=>"image/*|application/pdf");
-                                                        echo create_form_input("file","gst_certificate","Upload GST Certificate",false,'',$attributes); 
-                                                    ?>
+                                            
+                                            <div class="col-md-6 mb-3">
+                                                <div class="card">
+                                                    <div class="card-body">
+                                                        <h6 class="card-title mb-3">GST Certificate</h6>
+                                                        <?php if(!empty($kyc) && !empty($kyc['gst_certificate'])){ ?>
+                                                            <div class="mb-3">
+                                                                <a href="<?= $kyc['gst_certificate'] ?>" target="_blank" class="btn btn-sm btn-info">
+                                                                    <i class="fa fa-eye"></i> View
+                                                                </a>
+                                                                <a href="<?= base_url('customers/download_certificate/'.md5($customer['id']).'/gst_certificate') ?>" class="btn btn-sm btn-success">
+                                                                    <i class="fa fa-download"></i> Download
+                                                                </a>
+                                                                <a href="<?= base_url('customers/delete_certificate/'.md5($customer['id']).'/gst_certificate') ?>" 
+                                                                   class="btn btn-sm btn-danger" 
+                                                                   onclick="return confirm('Are you sure you want to delete this certificate?');">
+                                                                    <i class="fa fa-trash"></i> Delete
+                                                                </a>
+                                                            </div>
+                                                        <?php } else { ?>
+                                                            <p class="text-muted mb-2"><i class="fa fa-exclamation-circle me-1"></i>Not uploaded</p>
+                                                        <?php } ?>
+                                                        <?php 
+                                                            $attributes=array("id"=>"gst_certificate","accept"=>"image/*|application/pdf");
+                                                            echo create_form_input("file","gst_certificate","Upload GST Certificate",false,'',$attributes); 
+                                                        ?>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            <div class="col-md-6 mb-3">
+                                                <div class="card">
+                                                    <div class="card-body">
+                                                        <h6 class="card-title mb-3">Audit Report</h6>
+                                                        <?php if(!empty($kyc) && !empty($kyc['audit_report'])){ ?>
+                                                            <div class="mb-3">
+                                                                <a href="<?= $kyc['audit_report'] ?>" target="_blank" class="btn btn-sm btn-info">
+                                                                    <i class="fa fa-eye"></i> View
+                                                                </a>
+                                                                <a href="<?= base_url('customers/download_certificate/'.md5($customer['id']).'/audit_report') ?>" class="btn btn-sm btn-success">
+                                                                    <i class="fa fa-download"></i> Download
+                                                                </a>
+                                                                <a href="<?= base_url('customers/delete_certificate/'.md5($customer['id']).'/audit_report') ?>" 
+                                                                   class="btn btn-sm btn-danger" 
+                                                                   onclick="return confirm('Are you sure you want to delete this certificate?');">
+                                                                    <i class="fa fa-trash"></i> Delete
+                                                                </a>
+                                                            </div>
+                                                        <?php } else { ?>
+                                                            <p class="text-muted mb-2"><i class="fa fa-exclamation-circle me-1"></i>Not uploaded</p>
+                                                        <?php } ?>
+                                                        <?php 
+                                                            $attributes=array("id"=>"audit_report","accept"=>"image/*|application/pdf");
+                                                            echo create_form_input("file","audit_report","Upload Audit Report",false,'',$attributes); 
+                                                        ?>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            <div class="col-md-6 mb-3">
+                                                <div class="card">
+                                                    <div class="card-body">
+                                                        <h6 class="card-title mb-3">Income Tax Certificate</h6>
+                                                        <?php if(!empty($kyc) && !empty($kyc['income_tax_certificate'])){ ?>
+                                                            <div class="mb-3">
+                                                                <a href="<?= $kyc['income_tax_certificate'] ?>" target="_blank" class="btn btn-sm btn-info">
+                                                                    <i class="fa fa-eye"></i> View
+                                                                </a>
+                                                                <a href="<?= base_url('customers/download_certificate/'.md5($customer['id']).'/income_tax_certificate') ?>" class="btn btn-sm btn-success">
+                                                                    <i class="fa fa-download"></i> Download
+                                                                </a>
+                                                                <a href="<?= base_url('customers/delete_certificate/'.md5($customer['id']).'/income_tax_certificate') ?>" 
+                                                                   class="btn btn-sm btn-danger" 
+                                                                   onclick="return confirm('Are you sure you want to delete this certificate?');">
+                                                                    <i class="fa fa-trash"></i> Delete
+                                                                </a>
+                                                            </div>
+                                                        <?php } else { ?>
+                                                            <p class="text-muted mb-2"><i class="fa fa-exclamation-circle me-1"></i>Not uploaded</p>
+                                                        <?php } ?>
+                                                        <?php 
+                                                            $attributes=array("id"=>"income_tax_certificate","accept"=>"image/*|application/pdf");
+                                                            echo create_form_input("file","income_tax_certificate","Upload Income Tax Certificate",false,'',$attributes); 
+                                                        ?>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
-                                        <div class="row mb-4">
-                                            <div class="col-md-6">
-                                                <div class="form-group">
-                                                    <label>Audit Report</label>
-                                                    <?php if(!empty($kyc) && !empty($kyc['audit_report'])){ ?>
-                                                        <div class="mb-2">
-                                                            <a href="<?= $kyc['audit_report'] ?>" target="_blank" class="btn btn-sm btn-info">
-                                                                <i class="fa fa-eye"></i> View Audit Report
-                                                            </a>
-                                                            <a href="<?= base_url('customers/delete_certificate/'.md5($customer['id']).'/audit_report') ?>" 
-                                                               class="btn btn-sm btn-danger" 
-                                                               onclick="return confirm('Are you sure you want to delete this certificate?');">
-                                                                <i class="fa fa-trash"></i> Delete Audit Report
-                                                            </a>
-                                                        </div>
-                                                    <?php } ?>
-                                                    <?php 
-                                                        $attributes=array("id"=>"audit_report","accept"=>"image/*|application/pdf");
-                                                        echo create_form_input("file","audit_report","Upload Audit Report",false,'',$attributes); 
-                                                    ?>
-                                                </div>
-                                            </div>
-                                            <div class="col-md-6">
-                                                <div class="form-group">
-                                                    <label>Income Tax Certificate</label>
-                                                    <?php if(!empty($kyc) && !empty($kyc['income_tax_certificate'])){ ?>
-                                                        <div class="mb-2">
-                                                            <a href="<?= $kyc['income_tax_certificate'] ?>" target="_blank" class="btn btn-sm btn-info">
-                                                                <i class="fa fa-eye"></i> View Income Tax Certificate
-                                                            </a>
-                                                            <a href="<?= base_url('customers/delete_certificate/'.md5($customer['id']).'/income_tax_certificate') ?>" 
-                                                               class="btn btn-sm btn-danger" 
-                                                               onclick="return confirm('Are you sure you want to delete this certificate?');">
-                                                                <i class="fa fa-trash"></i> Delete Income Tax Certificate
-                                                            </a>
-                                                        </div>
-                                                    <?php } ?>
-                                                    <?php 
-                                                        $attributes=array("id"=>"income_tax_certificate","accept"=>"image/*|application/pdf");
-                                                        echo create_form_input("file","income_tax_certificate","Upload Income Tax Certificate",false,'',$attributes); 
-                                                    ?>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="row mb-4">
+                                        
+                                        <div class="row mt-3">
                                             <div class="col-md-12">
-                                                <button type="submit" class="btn btn-sm btn-success" name="uploadcertificates">
-                                                    <i class="fa fa-upload"></i> Upload Certificates
+                                                <button type="submit" class="btn btn-primary" name="uploadcertificates">
+                                                    <i class="fa fa-upload me-2"></i>Upload Certificates
                                                 </button>
                                             </div>
                                         </div>
                                         <?= form_close(); ?>
-                                        <?php if(empty($kyc)){ ?>
-                                        <div class="row">
-                                            <div class="col-12">
-                                                <h3 class="text-danger">KYC Details Not Uploaded!</h3>
-                                            </div>
-                                        </div>
-                                        <?php } ?>
-                                        <div class="row">
-                                            <div class="col-12">
-                                                <a href="<?= base_url('customers/'); ?>" class="btn btn-sm btn-danger">Close</a>
-                                            </div>
-                                        </div>
+                                    </div>
                                 </div>
 
                     </div>

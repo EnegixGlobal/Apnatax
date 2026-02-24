@@ -367,10 +367,17 @@ class Services extends CI_Controller
                             }
                         }
                         $data['documents'] = $documents;
-                        $getassessment = $this->db->get_where('assessments', ['order_id' => $order['id'], 'status' => 0]);
+                        // Get assessment - check for status=1 (completed) first, then status=0 (pending) as fallback
+                        $getassessment = $this->db->get_where('assessments', ['order_id' => $order['id'], 'status' => 1]);
                         $assessment = array();
                         if ($getassessment->num_rows() > 0) {
                             $assessment = $getassessment->unbuffered_row('array');
+                        } else {
+                            // Fallback to status=0 for backward compatibility
+                            $getassessment = $this->db->get_where('assessments', ['order_id' => $order['id'], 'status' => 0]);
+                            if ($getassessment->num_rows() > 0) {
+                                $assessment = $getassessment->unbuffered_row('array');
+                            }
                         }
                         $data['assessment'] = $assessment;
                         //print_pre($data,true);

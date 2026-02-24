@@ -455,4 +455,178 @@ class Reports extends CI_Controller
 
         $this->template->load('reports', 'service_customers', $data);
     }
+
+    public function assignmentreports()
+    {
+        if ($this->session->role != 'admin' && $this->session->role != 'superadmin') {
+            redirect('home/');
+        }
+
+        $data = ['title' => 'Assignment Reports'];
+        $data['breadcrumb'] = array("active" => "Assignment Reports");
+        $data['datatable'] = true;
+        $data['alertify'] = true;
+
+        // Get filter parameters
+        $service_id = $this->input->get('service_id') ? $this->input->get('service_id') : NULL;
+        $period = $this->input->get('period') ? $this->input->get('period') : '';
+        $selected_date = $this->input->get('date') ? $this->input->get('date') : NULL;
+        $selected_month = $this->input->get('month') ? $this->input->get('month') : NULL;
+        $selected_year = $this->input->get('year') ? $this->input->get('year') : NULL;
+        $start_date = $this->input->get('start_date') ? $this->input->get('start_date') : NULL;
+        $end_date = $this->input->get('end_date') ? $this->input->get('end_date') : NULL;
+
+        // Get all services for dropdown
+        $services = $this->master->getservices(['status' => 1]);
+        $service_options = array('' => 'Select Service');
+        if (!empty($services)) {
+            foreach ($services as $service) {
+                $service_options[$service['id']] = $service['name'];
+            }
+        }
+
+        // Generate month dropdown options
+        $month_options = array('' => 'Select Month');
+        $current_year = date('Y');
+        for ($i = 0; $i < 12; $i++) {
+            $date = date('Y-m', strtotime("-$i months"));
+            $year = date('Y', strtotime($date . '-01'));
+            $month = date('n', strtotime($date . '-01'));
+            $month_value = date('Ym', strtotime($date . '-01'));
+            $month_label = date('F Y', strtotime($date . '-01'));
+            $month_options[$month_value] = $month_label;
+        }
+
+        // Generate year dropdown options
+        $year_options = array('' => 'Select Year');
+        $current_year = date('Y');
+        for ($i = 0; $i < 5; $i++) {
+            $year = $current_year - $i;
+            $year_options[$year] = $year;
+        }
+
+        $data['services'] = $service_options;
+        $data['month_options'] = $month_options;
+        $data['year_options'] = $year_options;
+        $data['selected_service'] = $service_id;
+        $data['selected_period'] = $period;
+        $data['selected_date'] = $selected_date;
+        $data['selected_month'] = $selected_month;
+        $data['selected_year'] = $selected_year;
+        $data['start_date'] = $start_date;
+        $data['end_date'] = $end_date;
+
+        // Check if assignment_done column exists
+        $table_prefix = $this->db->dbprefix;
+        $assessments_table = $table_prefix . 'assessments';
+        $check_column = $this->db->query("SHOW COLUMNS FROM `{$assessments_table}` LIKE 'assignment_done'");
+        $has_assignment_done = ($check_column && $check_column->num_rows() > 0);
+
+        // Build query to get assignment reports
+        if ($has_assignment_done) {
+            $this->db->select('a.id, a.order_id, a.date as assessment_date, a.assignment_done, a.assignment_done_date, 
+                              p.service_id, s.name as service_name, 
+                              c.user_id as customer_id, c.name as customer_name,
+                              oa.user_id as employee_id, u.username as employee_name, u.name as employee_full_name,
+                              p.added_on as order_date');
+        } else {
+            // Fallback if columns don't exist yet
+            $this->db->select('a.id, a.order_id, a.date as assessment_date, 0 as assignment_done, NULL as assignment_done_date, 
+                              p.service_id, s.name as service_name, 
+                              c.user_id as customer_id, c.name as customer_name,
+                              oa.user_id as employee_id, u.username as employee_name, u.name as employee_full_name,
+                              p.added_on as order_date');
+        }
+
+        // Use subquery to get only the latest order_assign per order_id to prevent duplicates
+        $order_assign_table = $this->db->dbprefix . 'order_assign';
+        $order_assign_subquery = "(SELECT order_id, MAX(id) as max_id FROM {$order_assign_table} WHERE status = 0 GROUP BY order_id) latest_oa";
+
+        $this->db->from('assessments a');
+        $this->db->join('purchases p', 'a.order_id = p.id', 'left');
+        $this->db->join('services s', 'p.service_id = s.id', 'left');
+        $this->db->join('customers c', 'p.user_id = c.user_id', 'left');
+        $this->db->join($order_assign_subquery, 'a.order_id = latest_oa.order_id', 'left', false);
+        $this->db->join('order_assign oa', 'latest_oa.order_id = oa.order_id AND latest_oa.max_id = oa.id', 'left');
+        $this->db->join('users u', 'oa.user_id = u.id', 'left');
+
+        // Group by assessment ID to ensure one row per assessment
+        $this->db->group_by('a.id');
+
+        // Apply filters
+        if (!empty($service_id)) {
+            $this->db->where('p.service_id', $service_id);
+        }
+
+        // Ensure date field is not NULL
+        $this->db->where('a.date IS NOT NULL');
+
+        // Date filter based on period
+        if ($period == 'date' && !empty($selected_date)) {
+            $this->db->where('DATE(a.date)', $selected_date);
+        } elseif ($period == 'month' && !empty($selected_month)) {
+            // selected_month format is YYYYMM (e.g., 202602 for February 2026)
+            // Convert to proper date range for better performance
+            if (strlen($selected_month) == 6) {
+                $year = substr($selected_month, 0, 4);
+                $month = substr($selected_month, 4, 2);
+                $start_date_filter = $year . '-' . $month . '-01';
+                $end_date_filter = date('Y-m-t', strtotime($start_date_filter)); // Last day of month
+                $this->db->where('DATE(a.date) >=', $start_date_filter);
+                $this->db->where('DATE(a.date) <=', $end_date_filter);
+            } else {
+                // Fallback to DATE_FORMAT if format is unexpected
+                $this->db->where('DATE_FORMAT(a.date, "%Y%m")', $selected_month);
+            }
+        } elseif ($period == 'year' && !empty($selected_year)) {
+            $this->db->where('YEAR(a.date)', $selected_year);
+        } elseif ($period == 'custom' && !empty($start_date) && !empty($end_date)) {
+            $this->db->where('DATE(a.date) >=', $start_date);
+            $this->db->where('DATE(a.date) <=', $end_date);
+        }
+
+        $this->db->order_by('a.date', 'DESC');
+        $this->db->order_by('a.id', 'DESC');
+        $query = $this->db->get();
+
+        // Check if query succeeded
+        if ($query === false) {
+            $error = $this->db->error();
+            $last_query = $this->db->last_query();
+            log_message('error', 'Assignment reports query failed: ' . $error['message']);
+            log_message('error', 'Failed SQL Query: ' . $last_query);
+            log_message('error', 'Month filter value: ' . $selected_month . ', Period: ' . $period);
+            $this->session->set_flashdata('err_msg', 'Error loading assignment reports. Check error logs for details.');
+            $assignments = array();
+        } else {
+            $assignments = $query->result_array();
+        }
+
+        // Process assignments to handle assignment_done field (backward compatibility)
+        foreach ($assignments as $key => $assignment) {
+            if (!isset($assignment['assignment_done'])) {
+                $assignments[$key]['assignment_done'] = 0;
+            }
+        }
+
+        $data['assignments'] = $assignments;
+
+        // Calculate totals
+        $total_pending = 0;
+        $total_done = 0;
+        if (!empty($assignments)) {
+            foreach ($assignments as $row) {
+                if (isset($row['assignment_done']) && $row['assignment_done'] == 1) {
+                    $total_done++;
+                } else {
+                    $total_pending++;
+                }
+            }
+        }
+        $data['total_pending'] = $total_pending;
+        $data['total_done'] = $total_done;
+        $data['total_records'] = count($assignments);
+
+        $this->template->load('reports', 'assignment_reports', $data);
+    }
 }

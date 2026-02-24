@@ -26,6 +26,13 @@ if(empty($kyc) || $kyc['status']==0){
                                                                     $aadhar_image="src='".str_replace('//assets/','/assets/',$kyc['aadhar_image'])."'";
                                                                 }
                                                             ?>
+                                                            <?php if(!empty($kyc['aadhar_image'])){ ?>
+                                                                <div class="mt-2">
+                                                                    <a href="<?= base_url('profile/download_kyc_document/aadhar_image') ?>" class="btn btn-sm btn-success">
+                                                                        <i class="fa fa-download"></i> Download Aadhar Front
+                                                                    </a>
+                                                                </div>
+                                                            <?php } ?>
                                                         </div>
                                                         <div class="col-md-6">
                                                             <img <?php echo $aadhar_image; ?> id="aadhar_imagepreview" style="height:150px; width:250px;" >
@@ -43,6 +50,13 @@ if(empty($kyc) || $kyc['status']==0){
                                                                     $aadhar_back="src='".str_replace('//assets/','/assets/',$kyc['aadhar_back'])."'";
                                                                 }
                                                             ?>
+                                                            <?php if(!empty($kyc['aadhar_back'])){ ?>
+                                                                <div class="mt-2">
+                                                                    <a href="<?= base_url('profile/download_kyc_document/aadhar_back') ?>" class="btn btn-sm btn-success">
+                                                                        <i class="fa fa-download"></i> Download Aadhar Back
+                                                                    </a>
+                                                                </div>
+                                                            <?php } ?>
                                                         </div>
                                                         <div class="col-md-6">
                                                             <img <?php echo $aadhar_back; ?> id="aadhar_backpreview" style="height:150px; width:250px;" >
@@ -66,6 +80,13 @@ if(empty($kyc) || $kyc['status']==0){
                                                                     $pan_image="src='".str_replace('//assets/','/assets/',$kyc['pan_image'])."'";
                                                                 }
                                                             ?>
+                                                            <?php if(!empty($kyc['pan_image'])){ ?>
+                                                                <div class="mt-2">
+                                                                    <a href="<?= base_url('profile/download_kyc_document/pan_image') ?>" class="btn btn-sm btn-success">
+                                                                        <i class="fa fa-download"></i> Download PAN Card
+                                                                    </a>
+                                                                </div>
+                                                            <?php } ?>
                                                         </div>
                                                         <div class="col-md-6">
                                                             <img <?php echo $pan_image; ?> id="pan_imagepreview" style="height:150px; width:250px;" >

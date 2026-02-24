@@ -281,6 +281,79 @@ class Orders extends CI_Controller
         redirect($redirect);
     }
 
+    public function markassignmentdone($id = NULL)
+    {
+        $order = $this->service->getpurchases(['md5(t1.id)' => $id], 'single');
+        if (empty($order)) {
+            $this->session->set_flashdata('err_msg', 'Order not found!');
+            redirect('orders/');
+            return;
+        }
+
+        // Check if assessment exists
+        $getassessment = $this->db->get_where('assessments', ['order_id' => $order['id'], 'status' => 1]);
+        if ($getassessment->num_rows() == 0) {
+            // Fallback to status=0 for backward compatibility
+            $getassessment = $this->db->get_where('assessments', ['order_id' => $order['id'], 'status' => 0]);
+        }
+        
+        if ($getassessment->num_rows() == 0) {
+            $this->session->set_flashdata('err_msg', 'Assessment not found!');
+            redirect('orders/viewdocuments/' . md5($order['id']));
+            return;
+        }
+
+        $assessment = $getassessment->unbuffered_row('array');
+        
+        // Check if assignment is already done
+        $assignment_done = isset($assessment['assignment_done']) ? $assessment['assignment_done'] : 0;
+        if ($assignment_done == 1) {
+            $this->session->set_flashdata('err_msg', 'Assignment already marked as done!');
+            redirect('orders/viewdocuments/' . md5($order['id']));
+            return;
+        }
+
+        // Check if user has permission (assigned employee or admin)
+        $getassigned = $this->db->get_where('order_assign', ['order_id' => $order['id'], 'status' => 0]);
+        $assigned = array();
+        if ($getassigned->num_rows() > 0) {
+            $assigned = $getassigned->unbuffered_row('array');
+        }
+
+        $user = getuser();
+        if ($this->session->role != 'admin' && $this->session->role != 'superadmin') {
+            if (empty($assigned) || $assigned['user_id'] != $user['id']) {
+                $this->session->set_flashdata('err_msg', 'You do not have permission to mark this assignment as done!');
+                redirect('orders/viewdocuments/' . md5($order['id']));
+                return;
+            }
+        }
+
+        // Check if assignment_done column exists
+        $check_column = $this->db->query("SHOW COLUMNS FROM `tf_assessments` LIKE 'assignment_done'");
+        if ($check_column->num_rows() == 0) {
+            $this->session->set_flashdata('err_msg', 'Assignment tracking feature is not available. Please run database migration.');
+            redirect('orders/viewdocuments/' . md5($order['id']));
+            return;
+        }
+
+        // Update assessment to mark assignment as done
+        $update_data = array(
+            'assignment_done' => 1,
+            'assignment_done_date' => date('Y-m-d H:i:s'),
+            'updated_on' => date('Y-m-d H:i:s')
+        );
+
+        if ($this->db->update('assessments', $update_data, ['id' => $assessment['id']])) {
+            $this->session->set_flashdata('msg', 'Assignment marked as done successfully!');
+        } else {
+            $error = $this->db->error();
+            $this->session->set_flashdata('err_msg', $error['message']);
+        }
+
+        redirect('orders/viewdocuments/' . md5($order['id']));
+    }
+
     public function getpackage()
     {
         $user_id = $this->input->post('user_id');

@@ -209,6 +209,81 @@ class Customers extends CI_Controller
         redirect('customers/kycdetails/' . $id);
     }
 
+    public function download_certificate($id = NULL, $type = '')
+    {
+        $customer = $this->customer->getcustomers(['md5(t1.id)' => $id], 'single');
+        if (empty($customer)) {
+            redirect('customers/');
+        }
+
+        $allowed_types = array('tds_certificate', 'gst_certificate', 'audit_report', 'income_tax_certificate');
+
+        if (empty($type) || !in_array($type, $allowed_types)) {
+            $this->session->set_flashdata("err_msg", "Invalid certificate type!");
+            redirect('customers/kycdetails/' . $id);
+        }
+
+        // Get KYC data with raw file path (without file_url conversion)
+        $kyc = $this->db->select($type)->where('user_id', $customer['user_id'])->get('kyc')->row_array();
+
+        if (empty($kyc) || empty($kyc[$type])) {
+            $this->session->set_flashdata("err_msg", "Certificate not found!");
+            redirect('customers/kycdetails/' . $id);
+        }
+
+        $file_path = $kyc[$type];
+        $full_path = FCPATH . $file_path;
+
+        // Check if file exists
+        if (!file_exists($full_path)) {
+            $this->session->set_flashdata("err_msg", "Certificate file not found!");
+            redirect('customers/kycdetails/' . $id);
+        }
+
+        // Get filename from path
+        $filename = basename($file_path);
+
+        // Load download helper and force download
+        $this->load->helper('download');
+        force_download($full_path, NULL);
+    }
+
+    public function download_kyc_document($id = NULL, $type = '')
+    {
+        $customer = $this->customer->getcustomers(['md5(t1.id)' => $id], 'single');
+        if (empty($customer)) {
+            redirect('customers/');
+        }
+
+        $allowed_types = array('pan_image', 'aadhar_image', 'aadhar_back');
+
+        if (empty($type) || !in_array($type, $allowed_types)) {
+            $this->session->set_flashdata("err_msg", "Invalid document type!");
+            redirect('customers/kycdetails/' . $id);
+        }
+
+        // Get KYC data with raw file path (without file_url conversion)
+        $kyc = $this->db->select($type)->where('user_id', $customer['user_id'])->get('kyc')->row_array();
+
+        if (empty($kyc) || empty($kyc[$type])) {
+            $this->session->set_flashdata("err_msg", "Document not found!");
+            redirect('customers/kycdetails/' . $id);
+        }
+
+        $file_path = $kyc[$type];
+        $full_path = FCPATH . $file_path;
+
+        // Check if file exists
+        if (!file_exists($full_path)) {
+            $this->session->set_flashdata("err_msg", "Document file not found!");
+            redirect('customers/kycdetails/' . $id);
+        }
+
+        // Load download helper and force download
+        $this->load->helper('download');
+        force_download($full_path, NULL);
+    }
+
     public function delete_certificate($id = NULL, $type = '')
     {
         $customer = $this->customer->getcustomers(['md5(t1.id)' => $id], 'single');
@@ -581,6 +656,98 @@ class Customers extends CI_Controller
             $this->session->set_flashdata("err_msg", "File not found!");
             redirect($_SERVER['HTTP_REFERER']);
         }
+    }
+
+    public function walletrecharge()
+    {
+        // Only allow admin access
+        if ($this->session->role != 'admin' && $this->session->role != 'superadmin') {
+            redirect('customers/');
+        }
+        $data['title'] = "Wallet Recharge";
+        $data['breadcrumb'] = array("customers/" => "Customers", "active" => "Wallet Recharge");
+        $where = array();
+        if ($this->session->role != 'admin' && $this->session->role != 'superadmin') {
+            $where['md5(t1.added_by)'] = $this->session->user;
+        }
+        $data['customers'] = customer_dropdown($where);
+        $this->template->load('customer', 'walletrecharge', $data);
+    }
+
+    public function savewalletrecharge()
+    {
+        // Only allow admin access
+        if ($this->session->role != 'admin' && $this->session->role != 'superadmin') {
+            $this->session->set_flashdata("err_msg", "Unauthorized access!");
+            redirect('customers/');
+        }
+
+        if ($this->input->post('savewalletrecharge') !== NULL) {
+            $user_id = $this->input->post('user_id');
+            $amount = $this->input->post('amount');
+            $payment_method = $this->input->post('payment_method');
+            $remarks = $this->input->post('remarks');
+            $date = $this->input->post('date');
+
+            // Validation
+            if (empty($user_id) || empty($amount) || empty($date)) {
+                $this->session->set_flashdata("err_msg", "Please fill all required fields!");
+                redirect('customers/walletrecharge/');
+            }
+
+            if (!is_numeric($amount) || $amount <= 0) {
+                $this->session->set_flashdata("err_msg", "Please enter a valid amount!");
+                redirect('customers/walletrecharge/');
+            }
+
+            // Verify customer exists
+            $customer = $this->customer->getcustomers(['t1.user_id' => $user_id], 'single');
+            if (empty($customer)) {
+                $this->session->set_flashdata("err_msg", "Customer not found!");
+                redirect('customers/walletrecharge/');
+            }
+
+            // Prepare data for wallet recharge
+            $data = array(
+                'user_id' => $user_id,
+                'date' => $date,
+                'amount' => $amount
+            );
+
+            // Add remarks if provided
+            if (!empty($payment_method)) {
+                $remark_text = "Admin Recharge via " . $payment_method;
+                if (!empty($remarks)) {
+                    $remark_text .= " - " . $remarks;
+                }
+                $data['remarks'] = $remark_text;
+            } elseif (!empty($remarks)) {
+                $data['remarks'] = "Admin Recharge - " . $remarks;
+            }
+
+            // Add wallet recharge
+            $result = $this->wallet->adminrecharge($data);
+            if ($result['status'] === true) {
+                $this->session->set_flashdata("msg", $result['message']);
+            } else {
+                $this->session->set_flashdata("err_msg", $result['message']);
+            }
+        }
+        redirect('customers/walletrecharge/');
+    }
+
+    public function walletrechargelist()
+    {
+        // Only allow admin access
+        if ($this->session->role != 'admin' && $this->session->role != 'superadmin') {
+            redirect('customers/');
+        }
+        $data['title'] = "Wallet Recharge History";
+        $data['breadcrumb'] = array("customers/" => "Customers", "active" => "Wallet Recharge History");
+        $data['datatable'] = true;
+        $where = array();
+        $data['recharges'] = $this->wallet->getwalletrecharges($where);
+        $this->template->load('customer', 'walletrechargelist', $data);
     }
 }
 //url_title

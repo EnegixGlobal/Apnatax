@@ -80,6 +80,56 @@ class Employees extends CI_Controller {
         if($this->input->post('saveemployee')!==NULL){
             $data=$this->input->post();
             unset($data['saveemployee']);
+            
+            // Handle file uploads
+            $upload_path = './assets/documents/employees/';
+            $allowed_types = 'gif|jpg|jpeg|png|pdf';
+            $status = true;
+            $message = array();
+            
+            // Upload PAN Card
+            if (isset($_FILES['pan_file']['tmp_name']) && !empty($_FILES['pan_file']['tmp_name'])) {
+                $pan_filename = generate_slug($data['name'] . '-pan-card');
+                $upload = upload_file('pan_file', $upload_path, $allowed_types, $pan_filename);
+                if ($upload['status'] === true) {
+                    $data['pan_file'] = $upload['path'];
+                } else {
+                    $status = false;
+                    $message[] = "PAN Card - " . trim($upload['msg']);
+                }
+            }
+            
+            // Upload Aadhar Card
+            if (isset($_FILES['aadhar_file']['tmp_name']) && !empty($_FILES['aadhar_file']['tmp_name'])) {
+                $aadhar_filename = generate_slug($data['name'] . '-aadhar-card');
+                $upload = upload_file('aadhar_file', $upload_path, $allowed_types, $aadhar_filename);
+                if ($upload['status'] === true) {
+                    $data['aadhar_file'] = $upload['path'];
+                } else {
+                    $status = false;
+                    $message[] = "Aadhar Card - " . trim($upload['msg']);
+                }
+            }
+            
+            // Upload Terms & Conditions
+            if (isset($_FILES['terms_file']['tmp_name']) && !empty($_FILES['terms_file']['tmp_name'])) {
+                $terms_filename = generate_slug($data['name'] . '-terms-conditions');
+                $upload = upload_file('terms_file', $upload_path, $allowed_types, $terms_filename);
+                if ($upload['status'] === true) {
+                    $data['terms_file'] = $upload['path'];
+                } else {
+                    $status = false;
+                    $message[] = "Terms & Conditions - " . trim($upload['msg']);
+                }
+            }
+            
+            if (!$status) {
+                $message = implode('; ', $message);
+                $this->session->set_flashdata("err_msg", $message);
+                redirect('employees/add/');
+                return;
+            }
+            
             $result=$this->employee->saveemployee($data);
             //print_pre($result,true);
 			if($result['status']===true){
@@ -92,6 +142,75 @@ class Employees extends CI_Controller {
         if($this->input->post('updateemployee')!==NULL){
             $data=$this->input->post();
             unset($data['updateemployee']);
+            
+            // Get existing employee data
+            $employee_id = $data['id'];
+            $existing_employee = $this->employee->getemployees(['t1.id' => $employee_id], 'single');
+            
+            // Handle file uploads
+            $upload_path = './assets/documents/employees/';
+            $allowed_types = 'gif|jpg|jpeg|png|pdf';
+            $status = true;
+            $message = array();
+            
+            // Upload PAN Card
+            if (isset($_FILES['pan_file']['tmp_name']) && !empty($_FILES['pan_file']['tmp_name'])) {
+                // Delete old file if exists
+                if (!empty($existing_employee['pan_file']) && file_exists(FCPATH . $existing_employee['pan_file'])) {
+                    @unlink(FCPATH . $existing_employee['pan_file']);
+                }
+                
+                $pan_filename = generate_slug($data['name'] . '-pan-card');
+                $upload = upload_file('pan_file', $upload_path, $allowed_types, $pan_filename);
+                if ($upload['status'] === true) {
+                    $data['pan_file'] = $upload['path'];
+                } else {
+                    $status = false;
+                    $message[] = "PAN Card - " . trim($upload['msg']);
+                }
+            }
+            
+            // Upload Aadhar Card
+            if (isset($_FILES['aadhar_file']['tmp_name']) && !empty($_FILES['aadhar_file']['tmp_name'])) {
+                // Delete old file if exists
+                if (!empty($existing_employee['aadhar_file']) && file_exists(FCPATH . $existing_employee['aadhar_file'])) {
+                    @unlink(FCPATH . $existing_employee['aadhar_file']);
+                }
+                
+                $aadhar_filename = generate_slug($data['name'] . '-aadhar-card');
+                $upload = upload_file('aadhar_file', $upload_path, $allowed_types, $aadhar_filename);
+                if ($upload['status'] === true) {
+                    $data['aadhar_file'] = $upload['path'];
+                } else {
+                    $status = false;
+                    $message[] = "Aadhar Card - " . trim($upload['msg']);
+                }
+            }
+            
+            // Upload Terms & Conditions
+            if (isset($_FILES['terms_file']['tmp_name']) && !empty($_FILES['terms_file']['tmp_name'])) {
+                // Delete old file if exists
+                if (!empty($existing_employee['terms_file']) && file_exists(FCPATH . $existing_employee['terms_file'])) {
+                    @unlink(FCPATH . $existing_employee['terms_file']);
+                }
+                
+                $terms_filename = generate_slug($data['name'] . '-terms-conditions');
+                $upload = upload_file('terms_file', $upload_path, $allowed_types, $terms_filename);
+                if ($upload['status'] === true) {
+                    $data['terms_file'] = $upload['path'];
+                } else {
+                    $status = false;
+                    $message[] = "Terms & Conditions - " . trim($upload['msg']);
+                }
+            }
+            
+            if (!$status) {
+                $message = implode('; ', $message);
+                $this->session->set_flashdata("err_msg", $message);
+                redirect('employees/edit/' . md5($employee_id));
+                return;
+            }
+            
             $result=$this->employee->updateemployee($data);
 			if($result['status']===true){
 				$this->session->set_flashdata("msg",$result['message']);
@@ -153,6 +272,121 @@ class Employees extends CI_Controller {
             }
         }
         redirect('employees/employeepayment/');
+    }
+    
+    public function myprofile()
+    {
+        // Only allow employee access
+        if ($this->session->role != 'employee' && $this->session->role != 'ca') {
+            redirect('home/');
+        }
+        
+        $user = getuser();
+        $employee = $this->employee->getemployees(array("t1.id" => $user['emp_id']), "single");
+        
+        if (empty($employee)) {
+            $this->session->set_flashdata("err_msg", "Employee profile not found!");
+            redirect('home/');
+        }
+        
+        $data['title'] = "My Profile";
+        $data['breadcrumb'] = array("active" => "My Profile");
+        $data['employee'] = $employee;
+        $this->template->load('employees', 'myprofile', $data);
+    }
+    
+    public function downloaddocument($type = '', $id = NULL)
+    {
+        if (empty($type)) {
+            $this->session->set_flashdata("err_msg", "Invalid request!");
+            redirect('employees/');
+        }
+        
+        $user = getuser();
+        $employee = NULL;
+        
+        // If ID is provided, get that employee (for admin access)
+        if (!empty($id)) {
+            $employee = $this->employee->getemployees(array("md5(t1.id)" => $id), "single");
+            if (empty($employee)) {
+                $this->session->set_flashdata("err_msg", "Employee not found!");
+                redirect('employees/');
+            }
+            
+            // Check access: Admin can access all, employees can only access their own
+            if ($this->session->role != 'admin' && $this->session->role != 'superadmin') {
+                // Check if user is the employee themselves
+                if ($user['emp_id'] != $employee['id']) {
+                    $this->session->set_flashdata("err_msg", "Unauthorized access!");
+                    redirect('employees/myprofile/');
+                }
+            }
+        } else {
+            // No ID provided - employee accessing their own documents
+            if ($this->session->role != 'employee' && $this->session->role != 'ca') {
+                $this->session->set_flashdata("err_msg", "Unauthorized access!");
+                redirect('employees/');
+            }
+            
+            $employee = $this->employee->getemployees(array("t1.id" => $user['emp_id']), "single");
+            if (empty($employee)) {
+                $this->session->set_flashdata("err_msg", "Employee profile not found!");
+                redirect('employees/myprofile/');
+            }
+        }
+        
+        // Define allowed types and their corresponding file fields
+        $allowed_types = array(
+            'pan' => 'pan_file',
+            'aadhar' => 'aadhar_file',
+            'terms' => 'terms_file'
+        );
+        
+        if (!isset($allowed_types[$type])) {
+            $this->session->set_flashdata("err_msg", "Invalid document type!");
+            if (!empty($id)) {
+                redirect('employees/edit/' . $id);
+            } else {
+                redirect('employees/myprofile/');
+            }
+        }
+        
+        $file_field = $allowed_types[$type];
+        $file_path = $employee[$file_field];
+        
+        if (empty($file_path)) {
+            $this->session->set_flashdata("err_msg", "Document not found!");
+            if (!empty($id)) {
+                redirect('employees/edit/' . $id);
+            } else {
+                redirect('employees/myprofile/');
+            }
+        }
+        
+        $full_path = FCPATH . $file_path;
+        
+        // Check if file exists
+        if (!file_exists($full_path)) {
+            $this->session->set_flashdata("err_msg", "File not found on server!");
+            if (!empty($id)) {
+                redirect('employees/edit/' . $id);
+            } else {
+                redirect('employees/myprofile/');
+            }
+        }
+        
+        // Generate filename
+        $extension = pathinfo($file_path, PATHINFO_EXTENSION);
+        $document_names = array(
+            'pan' => 'PAN-Card',
+            'aadhar' => 'Aadhar-Card',
+            'terms' => 'Terms-Conditions'
+        );
+        $filename = $employee['name'] . '-' . $document_names[$type] . '.' . $extension;
+        
+        // Load download helper and force download
+        $this->load->helper('download');
+        force_download($full_path, NULL);
     }
     
 }

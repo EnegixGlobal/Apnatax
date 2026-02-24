@@ -160,4 +160,24 @@ class Users extends CI_Controller {
         redirect($_SERVER['HTTP_REFERER']);
 	}
 	
+	public function myprofile(){
+        // Only allow admin/superadmin access
+        if ($this->session->role != 'admin' && $this->session->role != 'superadmin') {
+            redirect('home/');
+        }
+        
+        $user = getuser();
+        $admin_user = $this->account->getusers(array("t1.id" => $user['id']), "single");
+        
+        if (empty($admin_user)) {
+            $this->session->set_flashdata("err_msg", "Admin profile not found!");
+            redirect('home/');
+        }
+        
+        $data['title'] = "My Profile";
+        $data['breadcrumb'] = array("active" => "My Profile");
+        $data['admin'] = $admin_user;
+        $this->template->load('users', 'myprofile', $data);
+    }
+	
 }

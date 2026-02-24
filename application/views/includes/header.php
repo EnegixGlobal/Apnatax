@@ -338,19 +338,19 @@
                                                 <i class="fe fe-align-right"></i>
                                             </a>
                                         </div>
-                                        <!-- SIDE-MENU --><?php */?>
+                                        <!-- SIDE-MENU --><?php */ ?>
                                         <?php /*?><div class="d-flex country">
                                             <a class="nav-link icon theme-layout nav-link-bg layout-setting">
                                                 <span class="dark-layout"><i class="fe fe-moon"></i></span>
                                                 <span class="light-layout"><i class="fe fe-sun"></i></span>
                                             </a>
-                                        </div><?php */?>
+                                        </div><?php */ ?>
                                         <!-- NOTIFICATIONS -->
                                         <?php
-                                            $notifications=getnotifications();
+                                        $notifications = getnotifications();
                                         ?>
                                         <div class="dropdown  d-flex notifications">
-                                            <a class="nav-link icon" data-bs-toggle="<?= count($notifications)>0?'dropdown':'' ?>" aria-expanded="true"><i class="fe fe-bell"></i><sup><?= count($notifications) ?></sup>
+                                            <a class="nav-link icon" data-bs-toggle="<?= count($notifications) > 0 ? 'dropdown' : '' ?>" aria-expanded="true"><i class="fe fe-bell"></i><sup><?= count($notifications) ?></sup>
                                             </a>
                                             <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow" data-bs-popper="none">
                                                 <div class="drop-heading border-bottom">
@@ -360,53 +360,47 @@
                                                     </div>
                                                 </div>
                                                 <div class="notifications-menu ps">
-                                                    <?php  
-                                                        if(!empty($notifications)){
-                                                            foreach($notifications as $notification){
-                                                                $text=$link="";
-                                                                if($notification['type']=='Assign'){
-                                                                    if($notification['order_id']!==NULL){
-                                                                        $link='';
-                                                                    }
-                                                                    else{
-                                                                        $link=base_url('orders/');
-                                                                    }
+                                                    <?php
+                                                    if (!empty($notifications)) {
+                                                        foreach ($notifications as $notification) {
+                                                            $text = $link = "";
+                                                            if ($notification['type'] == 'Assign') {
+                                                                if ($notification['order_id'] !== NULL) {
+                                                                    $link = '';
+                                                                } else {
+                                                                    $link = base_url('orders/');
                                                                 }
-                                                                elseif($notification['type']=='New'){
-                                                                    if($notification['order_id']!==NULL){
-                                                                        $link=base_url('orders/');
-                                                                    }
-                                                                    else{
-                                                                        $link=base_url('orders/');
-                                                                    }
+                                                            } elseif ($notification['type'] == 'New') {
+                                                                if ($notification['order_id'] !== NULL) {
+                                                                    $link = base_url('orders/');
+                                                                } else {
+                                                                    $link = base_url('orders/');
                                                                 }
-                                                                elseif($notification['type']=='Documents Uploaded'){
-                                                                    if($notification['order_id']!==NULL){
-                                                                        $link=base_url('orders/viewdocuments/'.md5($notification['order_id']));
-                                                                    }
-                                                                    else{
-                                                                        $link=base_url('orders/');
-                                                                    }
+                                                            } elseif ($notification['type'] == 'Documents Uploaded') {
+                                                                if ($notification['order_id'] !== NULL) {
+                                                                    $link = base_url('orders/viewdocuments/' . md5($notification['order_id']));
+                                                                } else {
+                                                                    $link = base_url('orders/');
                                                                 }
-                                                                else{
-                                                                    $link=base_url('/');
-                                                                    $text=$notification['task_type'].' Scheduled';
-                                                                }
-                                                    ?>
-                                                    <a class="dropdown-item d-flex view-notification" href="<?= $link; ?>" data-value=<?= md5('notify-'.$notification['id']) ?>>
-                                                        <div class="me-3 notifyimg  bg-primary brround box-shadow-primary">
-                                                            <i class="fe fe-mail"></i>
-                                                        </div>
-                                                        <div class="mt-1 wd-80p">
-                                                            <h5 class="notification-label mb-1">
-                                                                <?= $notification['message']; ?>
-                                                            </h5>
-                                                            <span class="notification-subtext"><?= $text ?></span>
-                                                        </div>
-                                                    </a>
-                                                    <?php 
+                                                            } else {
+                                                                $link = base_url('/');
+                                                                $text = $notification['task_type'] . ' Scheduled';
                                                             }
+                                                    ?>
+                                                            <a class="dropdown-item d-flex view-notification" href="<?= $link; ?>" data-value=<?= md5('notify-' . $notification['id']) ?>>
+                                                                <div class="me-3 notifyimg  bg-primary brround box-shadow-primary">
+                                                                    <i class="fe fe-mail"></i>
+                                                                </div>
+                                                                <div class="mt-1 wd-80p">
+                                                                    <h5 class="notification-label mb-1">
+                                                                        <?= $notification['message']; ?>
+                                                                    </h5>
+                                                                    <span class="notification-subtext"><?= $text ?></span>
+                                                                </div>
+                                                            </a>
+                                                    <?php
                                                         }
+                                                    }
                                                     ?>
                                                 </div>
                                             </div>
@@ -429,20 +423,40 @@
                                                         <small class="text-muted"><?= $this->session->role ?></small>
                                                     </div>
                                                 </div>
-                                                <div class="dropdown-divider m-0"></div><?php */?>
+                                                <div class="dropdown-divider m-0"></div><?php */ ?>
                                                 <a class="dropdown-item" href="#">
                                                     <?= $this->session->name; ?>
                                                 </a>
-                                                <a class="dropdown-item" href="<?= $this->session->role=='customer'?base_url('profile/'):base_url('editpassword/') ?>">
-                                                    <i class="dropdown-icon fe fe-user"></i> Profile
-                                                </a>
+                                                <?php if ($this->session->role == 'customer') { ?>
+                                                    <a class="dropdown-item" href="<?= base_url('profile/'); ?>">
+                                                        <i class="dropdown-icon fe fe-user"></i> Profile
+                                                    </a>
+                                                <?php } elseif ($this->session->role == 'admin' || $this->session->role == 'superadmin') { ?>
+                                                    <a class="dropdown-item" href="<?= base_url('users/myprofile/'); ?>">
+                                                        <i class="dropdown-icon fe fe-user"></i> My Profile
+                                                    </a>
+                                                    <a class="dropdown-item" href="<?= base_url('editpassword/'); ?>">
+                                                        <i class="dropdown-icon fe fe-lock"></i> Edit Password
+                                                    </a>
+                                                <?php } elseif ($this->session->role == 'employee' || $this->session->role == 'ca') { ?>
+                                                    <a class="dropdown-item" href="<?= base_url('employees/myprofile/'); ?>">
+                                                        <i class="dropdown-icon fe fe-user"></i> My Profile
+                                                    </a>
+                                                    <a class="dropdown-item" href="<?= base_url('editpassword/'); ?>">
+                                                        <i class="dropdown-icon fe fe-lock"></i> Edit Password
+                                                    </a>
+                                                <?php } else { ?>
+                                                    <a class="dropdown-item" href="<?= base_url('editpassword/'); ?>">
+                                                        <i class="dropdown-icon fe fe-lock"></i> Edit Password
+                                                    </a>
+                                                <?php } ?>
                                                 <?php /*?><a class="dropdown-item" href="email-inbox.html">
                                                     <i class="dropdown-icon fe fe-mail"></i> Inbox
                                                     <span class="badge bg-danger rounded-pill float-end">5</span>
                                                 </a>
                                                 <a class="dropdown-item" href="lockscreen.html">
                                                     <i class="dropdown-icon fe fe-lock"></i> Lockscreen
-                                                </a><?php */?>
+                                                </a><?php */ ?>
                                                 <a class="dropdown-item" href="<?= base_url('logout/'); ?>">
                                                     <i class="dropdown-icon fa fa-lock"></i> Log out
                                                 </a>

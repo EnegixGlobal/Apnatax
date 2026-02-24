@@ -88,6 +88,38 @@ class Profile extends CI_Controller
         force_download($full_path, NULL);
     }
 
+    public function download_kyc_document($type = '')
+    {
+        $user = getuser();
+        $allowed_types = array('pan_image', 'aadhar_image', 'aadhar_back');
+
+        if (empty($type) || !in_array($type, $allowed_types)) {
+            $this->session->set_flashdata("err_msg", "Invalid document type!");
+            redirect('profile/kyc');
+        }
+
+        // Get KYC data with raw file path (without file_url conversion)
+        $kyc = $this->db->select($type)->where('user_id', $user['id'])->get('kyc')->row_array();
+
+        if (empty($kyc) || empty($kyc[$type])) {
+            $this->session->set_flashdata("err_msg", "Document not found!");
+            redirect('profile/kyc');
+        }
+
+        $file_path = $kyc[$type];
+        $full_path = FCPATH . $file_path;
+
+        // Check if file exists
+        if (!file_exists($full_path)) {
+            $this->session->set_flashdata("err_msg", "Document file not found!");
+            redirect('profile/kyc');
+        }
+
+        // Load download helper and force download
+        $this->load->helper('download');
+        force_download($full_path, NULL);
+    }
+
     public function bankstatement()
     {
         $data['title'] = "Monthly Bank Statement";
