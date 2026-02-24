@@ -91,12 +91,48 @@
                                     <?php
                                     }
                                     ?>
+                                    <?php
+                                    // Always show Add button row, even after saving
+                                    if(!empty($service_package)){
+                                    ?>
+                                    <tr>
+                                        <td>
+                                            <?= create_form_input('select','service_id[]','',false,'',['class'=>'service_id'],service_dropdown(['id>'=>1])); ?>
+                                        </td>
+                                        <?php /*?><td>
+                                            <?= create_form_input('select','type[]','',true,'',['class'=>'type'],array(''=>'Select Type')); ?>
+                                        </td><?php */?>
+                                        <td>
+                                            <button type="button" class="btn btn-sm btn-info add-btn"><i class="fa fa-plus"></i> Add</button>
+                                        </td>
+                                    </tr>
+                                    <?php
+                                    }
+                                    ?>
                                 </tbody>
                             </table>
-                            <?php
-                            if(empty($service_package)){
-                            ?>
                             <button type="submit" name="savepackage" class="btn btn-sm btn-success">Save Package</button>
+                            <?php
+                            // Show delete request button if package exists and no delete request is pending (request=0) or if rejected (request=2)
+                            if(!empty($service_package) && ($service_package['request'] == 0 || $service_package['request'] == 2)){
+                            ?>
+                            <button type="button" class="btn btn-sm btn-danger" id="request-delete-btn" style="margin-left: 10px;">
+                                <i class="fa fa-trash"></i> Request Package Deletion
+                            </button>
+                            <?php
+                            if($service_package['request'] == 2){
+                            ?>
+                            <span class="badge badge-danger" style="margin-left: 10px; padding: 8px 12px;">
+                                <i class="fa fa-times"></i> Previous Request Was Rejected
+                            </span>
+                            <?php
+                            }
+                            }
+                            elseif(!empty($service_package) && $service_package['request'] == 1){
+                            ?>
+                            <span class="badge badge-warning" style="margin-left: 10px; padding: 8px 12px;">
+                                <i class="fa fa-clock-o"></i> Delete Request Pending Admin Approval
+                            </span>
                             <?php
                             }
                             ?>
@@ -135,6 +171,20 @@
                         $(this).closest('div').find('.status').val(1);
                         $(this).html('<i class="fa fa-trash" ></i> Delete');
                         $(this).removeClass('undo-btn').addClass('del-btn');
+                    });
+                    $('body').on('click','#request-delete-btn',function(){
+                        if(confirm("Are you sure you want to request package deletion? Admin will review your request.")){
+                            $.ajax({
+                                type:'post',
+                                url:'<?= base_url('package/requestdelete'); ?>',
+                                success:function(data){
+                                    window.location.reload();
+                                },
+                                error:function(){
+                                    alert('Error occurred while submitting delete request!');
+                                }
+                            });
+                        }
                     });
                 });
             </script>
