@@ -306,6 +306,30 @@ class Customers extends CI_Controller
         $this->template->load('customer', 'firmdeleterequests', $data);
     }
 
+    public function packagedeleterequests()
+    {
+        $data['title'] = "Package Delete Requests";
+        //$data['subtitle']="Sample Subtitle";
+        $data['breadcrumb'] = array();
+        $data['datatable'] = true;
+
+        // Check if request column exists in service_packages table
+        $check_column = $this->db->query("SHOW COLUMNS FROM `tf_service_packages` LIKE 'request'");
+        if ($check_column->num_rows() == 0) {
+            // Column doesn't exist, show message to run migration
+            $data['packages'] = array();
+            $data['migration_needed'] = true;
+        } else {
+            // Only filter by request, not status (service_packages table doesn't have status column)
+            $where = array('t1.request' => 1);
+            $data['packages'] = $this->customer->getservicepackage($where);
+            if ($data['packages'] === false || $data['packages'] === null) {
+                $data['packages'] = array();
+            }
+        }
+        $this->template->load('customer', 'packagedeleterequests', $data);
+    }
+
 
     public function savecustomer()
     {
@@ -385,6 +409,35 @@ class Customers extends CI_Controller
             $status = $status == 1 ? 0 : 1;
             logupdateoperations('firms', ['status' => $status, 'request' => $request], ['id' => $firm['id']]);
             $result = $this->db->update('firms', ['status' => $status, 'request' => $request], ['id' => $firm['id']]);
+            if ($result) {
+                $this->session->set_flashdata("msg", $message);
+            } else {
+                $error = $this->db->error();
+                $this->session->set_flashdata("err_msg", $error['message']);
+            }
+        }
+    }
+
+    public function updatepackagestatus()
+    {
+        $id = $this->input->post('id');
+        $status = $this->input->post('status');
+        // Only filter by request, not status (service_packages table doesn't have status column)
+        $package = $this->customer->getservicepackage(["md5(concat('package-id-',t1.id))" => $id, 't1.request' => 1], 'single');
+        if (!empty($package)) {
+            $message = $status == 1 ? "Package Deleted Successfully" : "Package Delete Request Rejected!";
+            $request = $status == 1 ? 1 : 2;
+
+            if ($status == 1) {
+                // Approve: Delete the package record
+                logupdateoperations('service_packages', ['request' => $request], ['id' => $package['id']]);
+                $result = $this->db->delete('service_packages', ['id' => $package['id']]);
+            } else {
+                // Reject: Just update request to 2
+                logupdateoperations('service_packages', ['request' => $request], ['id' => $package['id']]);
+                $result = $this->db->update('service_packages', ['request' => $request], ['id' => $package['id']]);
+            }
+
             if ($result) {
                 $this->session->set_flashdata("msg", $message);
             } else {

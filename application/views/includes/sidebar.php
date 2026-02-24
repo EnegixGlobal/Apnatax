@@ -45,6 +45,7 @@
                             <li><a href="<?= base_url('customers/customerpurchases/'); ?>" class="slide-item <?= activate_menu('customers/customerpurchases'); ?>"> Customer Purchases</a></li>
                             <li><a href="<?= base_url('customers/packageswitchrequests/'); ?>" class="slide-item <?= activate_menu('customers/packageswitchrequests'); ?>"> Customer Package Switch Request</a></li>
                             <li><a href="<?= base_url('customers/firmdeleterequests/'); ?>" class="slide-item <?= activate_menu('customers/firmdeleterequests'); ?>"> Firm Delete Request</a></li>
+                            <li><a href="<?= base_url('customers/packagedeleterequests/'); ?>" class="slide-item <?= activate_menu('customers/packagedeleterequests'); ?>"> Package Delete Request</a></li>
                             <li><a href="<?= base_url('customers/customerwisereport/'); ?>" class="slide-item <?= activate_menu('customers/customerwisereport'); ?>"> Customer Wise Report</a></li>
                         </ul>
                     </li>

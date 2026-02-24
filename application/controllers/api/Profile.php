@@ -440,6 +440,11 @@ class Profile extends RestController
                 $data = array("t1.user_id" => $user['id'], 't1.status' => 1, 't1.request!=' => 1);
                 $firms = $this->customer->getfirms($data);
                 if (!empty($firms)) {
+                    // Add can_request_delete: false if firm has package or purchases (matches web checkfirmservice)
+                    foreach ($firms as &$firm) {
+                        $firm['can_request_delete'] = !checkfirmservice($user, $firm['id']);
+                    }
+                    unset($firm);
                     $this->response([
                         'status' => true,
                         'response' => $firms,
@@ -479,6 +484,13 @@ class Profile extends RestController
                 $data = array("t1.user_id" => $user['id'], 't1.id' => $firm_id);
                 $firm = $this->customer->getfirms($data, 'single');
                 if (!empty($firm)) {
+                    if (checkfirmservice($user, $firm['id'])) {
+                        $this->response([
+                            'status' => false,
+                            'message' => "Cannot request deletion - firm has active package or purchases!"
+                        ], RestController::HTTP_OK);
+                        return;
+                    }
                     if ($firm['request'] == 0) {
                         $this->db->update('firms', ['request' => 1], ['id' => $firm['id']]);
                         $this->response([

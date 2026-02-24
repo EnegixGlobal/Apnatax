@@ -261,20 +261,49 @@ class Customer_model extends CI_Model
 
     public function getservicepackage($where = array(), $type = "all")
     {
-        $columns = "t1.*,t2.name as customer_name";
+        $columns = "t1.*,t2.name as customer_name,t3.name as firm_name";
         $this->db->select($columns);
         $this->db->where($where);
         $this->db->from('service_packages t1');
         $this->db->join('customers t2', 't1.user_id=t2.user_id');
+        $this->db->join('firms t3', 't1.firm_id=t3.id', 'left');
         $query = $this->db->get();
+        
+        // Check if query failed
+        if ($query === false) {
+            $error = $this->db->error();
+            log_message('error', 'getservicepackage query failed: ' . $error['message']);
+            return $type == 'all' ? array() : null;
+        }
+        
         if ($type == 'all') {
             $array = $query->result_array();
+            // Populate services for each package
+            foreach ($array as $key => $package) {
+                if (!empty($package['service_ids'])) {
+                    $s_ids = explode(',', $package['service_ids']);
+                    $s_ids = array_filter(array_map('trim', $s_ids));
+                    if (!empty($s_ids)) {
+                        $where_services = "status='1' and id in ('" . implode("','", $s_ids) . "')";
+                        $array[$key]['services'] = $this->master->getservices($where_services);
+                    } else {
+                        $array[$key]['services'] = array();
+                    }
+                } else {
+                    $array[$key]['services'] = array();
+                }
+            }
         } else {
             $array = $query->unbuffered_row('array');
             if (!empty($array)) {
                 $s_ids = explode(',', $array['service_ids']);
-                $where = "status='1' and id in ('" . implode("','", $s_ids) . "')";
-                $array['services'] = $this->master->getservices($where);
+                $s_ids = array_filter(array_map('trim', $s_ids));
+                if (!empty($s_ids)) {
+                    $where_services = "status='1' and id in ('" . implode("','", $s_ids) . "')";
+                    $array['services'] = $this->master->getservices($where_services);
+                } else {
+                    $array['services'] = array();
+                }
             }
         }
         return $array;
