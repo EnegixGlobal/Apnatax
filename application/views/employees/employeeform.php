@@ -101,6 +101,58 @@
                                                     </div>
                                                 </div>
                                             </div>
+                                            <div class="row">
+                                                <div class="col-12">
+                                                    <h4>Document Uploads</h4>
+                                                </div>
+                                            </div>
+                                            <div class="row">
+                                                <div class="col-md-4">
+                                                    <div class="form-group">
+                                                        <label for="pan_file" class="form-label">PAN Card <?= $form=='add' ? '<span class="text-danger">*</span>' : ''; ?></label>
+                                                        <input type="file" class="form-control" name="pan_file" id="pan_file" accept=".pdf,.jpg,.jpeg,.png" <?= $form=='add' ? 'required' : ''; ?>>
+                                                        <small class="text-muted">Upload PAN card (PDF, JPG, PNG)</small>
+                                                        <?php
+                                                        if (!empty($employee['pan_file'])) {
+                                                            echo '<div class="mt-2">';
+                                                            echo '<a href="' . file_url($employee['pan_file']) . '" target="_blank" class="btn btn-sm btn-info"><i class="fa fa-eye"></i> View</a> ';
+                                                            echo '<a href="' . base_url('employees/downloaddocument/pan/' . md5($employee['id'])) . '" class="btn btn-sm btn-success"><i class="fa fa-download"></i> Download</a>';
+                                                            echo '</div>';
+                                                        }
+                                                        ?>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <div class="form-group">
+                                                        <label for="aadhar_file" class="form-label">Aadhar Card <?= $form=='add' ? '<span class="text-danger">*</span>' : ''; ?></label>
+                                                        <input type="file" class="form-control" name="aadhar_file" id="aadhar_file" accept=".pdf,.jpg,.jpeg,.png" <?= $form=='add' ? 'required' : ''; ?>>
+                                                        <small class="text-muted">Upload Aadhar card (PDF, JPG, PNG)</small>
+                                                        <?php
+                                                        if (!empty($employee['aadhar_file'])) {
+                                                            echo '<div class="mt-2">';
+                                                            echo '<a href="' . file_url($employee['aadhar_file']) . '" target="_blank" class="btn btn-sm btn-info"><i class="fa fa-eye"></i> View</a> ';
+                                                            echo '<a href="' . base_url('employees/downloaddocument/aadhar/' . md5($employee['id'])) . '" class="btn btn-sm btn-success"><i class="fa fa-download"></i> Download</a>';
+                                                            echo '</div>';
+                                                        }
+                                                        ?>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <div class="form-group">
+                                                        <label for="terms_file" class="form-label">Terms & Conditions <?= $form=='add' ? '<span class="text-danger">*</span>' : ''; ?></label>
+                                                        <input type="file" class="form-control" name="terms_file" id="terms_file" accept=".pdf,.jpg,.jpeg,.png" <?= $form=='add' ? 'required' : ''; ?>>
+                                                        <small class="text-muted">Upload Terms & Conditions (PDF, JPG, PNG)</small>
+                                                        <?php
+                                                        if (!empty($employee['terms_file'])) {
+                                                            echo '<div class="mt-2">';
+                                                            echo '<a href="' . file_url($employee['terms_file']) . '" target="_blank" class="btn btn-sm btn-info"><i class="fa fa-eye"></i> View</a> ';
+                                                            echo '<a href="' . base_url('employees/downloaddocument/terms/' . md5($employee['id'])) . '" class="btn btn-sm btn-success"><i class="fa fa-download"></i> Download</a>';
+                                                            echo '</div>';
+                                                        }
+                                                        ?>
+                                                    </div>
+                                                </div>
+                                            </div>
                                             <?php /*?><div class="row">
                                                 <div class="lead">Account Details</div>
                                                 <div class="col-md-4">

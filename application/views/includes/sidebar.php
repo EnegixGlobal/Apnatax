@@ -42,6 +42,8 @@
                             <li class="side-menu-label1"><a href="javascript:void(0)">Customers</a></li>
                             <li><a href="<?= base_url('customers/'); ?>" class="slide-item <?= activate_menu('customers'); ?>"> Customers</a></li>
                             <li><a href="<?= base_url('customers/addcustomer/'); ?>" class="slide-item <?= activate_menu('customers/addcustomer'); ?>"> Add Customer</a></li>
+                            <li><a href="<?= base_url('customers/walletrecharge/'); ?>" class="slide-item <?= activate_menu('customers/walletrecharge'); ?>"> Wallet Recharge</a></li>
+                            <li><a href="<?= base_url('customers/walletrechargelist/'); ?>" class="slide-item <?= activate_menu('customers/walletrechargelist'); ?>"> Wallet Recharge History</a></li>
                             <li><a href="<?= base_url('customers/customerpurchases/'); ?>" class="slide-item <?= activate_menu('customers/customerpurchases'); ?>"> Customer Purchases</a></li>
                             <li><a href="<?= base_url('customers/packageswitchrequests/'); ?>" class="slide-item <?= activate_menu('customers/packageswitchrequests'); ?>"> Customer Package Switch Request</a></li>
                             <li><a href="<?= base_url('customers/firmdeleterequests/'); ?>" class="slide-item <?= activate_menu('customers/firmdeleterequests'); ?>"> Firm Delete Request</a></li>
@@ -57,6 +59,7 @@
                             <?php /*?><li><a href="<?= base_url('orders/yearlyturnover/'); ?>" class="slide-item <?= activate_menu('orders/yearlyturnover'); ?>"> Add Turnover</a></li><?php */ ?>
                             <li><a href="<?= base_url('orders/monthlyturnover/'); ?>" class="slide-item <?= activate_menu('orders/monthlyturnover'); ?>"> Add Turnover</a></li>
                             <li><a href="<?= base_url('orders/turnoversheet/'); ?>" class="slide-item <?= activate_menu('orders/turnoversheet'); ?>"> Turnover Sheet</a></li>
+                            <li><a href="<?= base_url('reports/assignmentreports/'); ?>" class="slide-item <?= activate_menu('reports/assignmentreports'); ?>"> Assignment Reports</a></li>
                         </ul>
                     </li>
                     <li class="slide <?= activate_dropdown(['employees', 'wallet']) ?>">

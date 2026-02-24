@@ -141,9 +141,35 @@ class Wallet_model extends CI_Model{
         }
     }
     
+    public function adminrecharge($data){
+        $merchant_transaction_id=generatetransactionid();
+        $datetime=date('Y-m-d H:i:s');
+        $data['merchant_transaction_id']=$merchant_transaction_id;
+        $data['merchant_user_id']=$data['user_id'];
+        $data['status']=1; // Directly approved for admin recharge
+        $data['added_on']=$data['updated_on']=$datetime;
+        if($this->db->insert("wallet",$data)){
+            return array("status"=>true,"message"=>"Wallet Recharged Successfully!");
+        }
+        else{
+            $error=$this->db->error();
+            return array("status"=>false,"message"=>$error['message']);
+        }
+    }
+    
     public function gettransactions($where1=array(),$where2=array(),$order_by="date"){
-        $columns1="concat('transaction-',md5(concat('transaction',id))) as id,date,amount,
-                    merchant_transaction_id as transaction_id,'' as remarks,updated_on as added_on,'credit' as trans_type,'topup' as type,'' as service_name";
+        // Check if remarks column exists in wallet table
+        $table_name = $this->db->dbprefix('wallet');
+        $columns_check = $this->db->query("SHOW COLUMNS FROM `{$table_name}` LIKE 'remarks'");
+        $has_remarks = $columns_check->num_rows() > 0;
+        
+        if($has_remarks){
+            $columns1="concat('transaction-',md5(concat('transaction',id))) as id,date,amount,
+                        merchant_transaction_id as transaction_id,COALESCE(remarks,'') as remarks,updated_on as added_on,'credit' as trans_type,'topup' as type,'' as service_name";
+        } else {
+            $columns1="concat('transaction-',md5(concat('transaction',id))) as id,date,amount,
+                        merchant_transaction_id as transaction_id,'' as remarks,updated_on as added_on,'credit' as trans_type,'topup' as type,'' as service_name";
+        }
         $this->db->select($columns1);
         $this->db->where($where1);
         $this->db->from('wallet');
@@ -199,6 +225,41 @@ class Wallet_model extends CI_Model{
             $error=$this->db->error();
             return array("status"=>false,"message"=>"Accountancy Payment already paid for this month!");
         }
+    }
+    
+    public function getwalletrecharges($where=array(),$type="all"){
+        $columns="t1.*,t2.name as customer_name,t2.mobile as customer_mobile,t2.email as customer_email";
+        $this->db->select($columns);
+        $this->db->from('wallet t1');
+        $this->db->join('customers t2','t1.user_id=t2.user_id','left');
+        $this->db->where('t1.status',1); // Only show approved recharges
+        
+        // Check if remarks column exists and filter only admin recharges
+        $table_name = $this->db->dbprefix('wallet');
+        $columns_check = $this->db->query("SHOW COLUMNS FROM `{$table_name}` LIKE 'remarks'");
+        $has_remarks = $columns_check->num_rows() > 0;
+        
+        if($has_remarks){
+            // Only show transactions where remarks contains "Admin Recharge"
+            $this->db->where("(t1.remarks LIKE '%Admin Recharge%' OR t1.remarks LIKE '%admin recharge%')");
+        } else {
+            // If remarks column doesn't exist, we can't filter, so return empty
+            // This ensures we only show admin recharges when remarks column is available
+            $this->db->where('1=0'); // Return no results if remarks column doesn't exist
+        }
+        
+        if(!empty($where)){
+            $this->db->where($where);
+        }
+        $this->db->order_by('t1.added_on','desc');
+        $query=$this->db->get();
+        if($type=='all'){
+            $array=$query->result_array();
+        }
+        else{
+            $array=$query->unbuffered_row('array');
+        }
+        return $array;
     }
     
     

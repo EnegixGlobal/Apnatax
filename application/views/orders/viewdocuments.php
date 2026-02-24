@@ -150,7 +150,22 @@ if ($order['status'] == 2) {
                 }
             ?>
                 <a href="<?= file_url($assessment['file']) ?>" target="_blank" download class="btn btn-sm btn-info"><i class="fa fa-download"></i> Download Assessment File</a>
-            <?php
+                <?php
+                // Show "Mark Assignment Done" button if assignment is not already done
+                // Check if assignment_done field exists (for backward compatibility)
+                $assignment_done = isset($assessment['assignment_done']) ? $assessment['assignment_done'] : 0;
+                if ($assignment_done == 0 && !empty($assigned)) {
+                    // Only show to the assigned employee or admin
+                    if ($this->session->role == 'admin' || $this->session->role == 'superadmin' || (md5($assigned['user_id']) == $this->session->user)) {
+                ?>
+                        <a href="<?= base_url('orders/markassignmentdone/' . md5($order['id'])); ?>" class="btn btn-sm btn-success" onclick="return confirm('Are you sure you want to mark this assignment as done?');"><i class="fa fa-check"></i> Mark Assignment Done</a>
+                <?php
+                    }
+                } elseif ($assignment_done == 1) {
+                ?>
+                    <span class="btn btn-sm btn-success disabled"><i class="fa fa-check-circle"></i> Assignment Done</span>
+                <?php
+                }
             }
             ?>
             <?php

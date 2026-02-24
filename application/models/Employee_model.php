@@ -22,6 +22,7 @@ class Employee_model extends CI_Model
             if (!empty($userdata['username']) && !empty($userdata['password']) && !empty($userdata['role'])) {
                 unset($userdata['dob'], $userdata['address'], $userdata['parent_id'], $userdata['state'], $userdata['area_id']);
                 unset($userdata['district'], $userdata['pan'], $userdata['aadhar'], $userdata['percent']);
+                unset($userdata['pan_file'], $userdata['aadhar_file'], $userdata['terms_file']);
                 $userdata['emp_id'] = $emp_id;
                 $result = $this->account->adduser($userdata);
                 if ($result['status'] === true) {

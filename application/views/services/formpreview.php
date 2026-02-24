@@ -122,7 +122,7 @@ elseif($order['status']==4){
                                             <div class="col-12">
                                                 <?= $status ?>
                                                 <?php
-                                                    if($order['status']==4){
+                                                    if($order['status']==4 && !empty($assessment) && isset($assessment['file']) && !empty($assessment['file'])){
                                                         $extension=substr($assessment['file'], -4);
                                                         $extension=trim($extension,'.');
                                                         if($extension=='png' || $extension=='jpg'|| $extension=='jpeg'){
