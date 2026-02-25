@@ -30,6 +30,8 @@ class Profile extends CI_Controller
         $options = district_dropdown($customer['parent_id']);
         $data['districts'] = $options;
 
+        // Get user photo for display
+        $data['user'] = $user;
 
         $data['form'] = 'update';
         $this->template->load('profile', 'profile', $data);
@@ -167,6 +169,37 @@ class Profile extends CI_Controller
             $data = $this->input->post();
             unset($data['updateprofile']);
             $user = getuser();
+            
+            // Handle photo upload
+            if (!empty($_FILES['photo']) && isset($_FILES['photo']['tmp_name']) && !empty($_FILES['photo']['tmp_name'])) {
+                $upload_path = './assets/images/profile/';
+                $allowed_types = 'gif|jpg|jpeg|png|svg';
+                $upload = upload_file('photo', $upload_path, $allowed_types, generate_slug($user['name'] . '-profile'));
+                if ($upload['status'] === true) {
+                    $path = $upload['path'];
+                    
+                    // Try to process image if GD extension is available
+                    if (extension_loaded('gd')) {
+                        try {
+                            $this->load->library('imager');
+                            $path = $this->imager->processimage('.' . $upload['path'], 'cropscale', 80, ['width' => 300, 'height' => 300]);
+                        } catch (Exception $e) {
+                            // If image processing fails, use original uploaded file
+                            $path = $upload['path'];
+                        }
+                    }
+                    
+                    $photo_data = array('photo' => $path);
+                    $where = array('id' => $user['id']);
+                    $photo_result = $this->account->updatephoto($photo_data, $where);
+                    if ($photo_result['status'] === false) {
+                        $this->session->set_flashdata("err_msg", "Profile updated but photo upload failed: " . $photo_result['message']);
+                    }
+                } else {
+                    $this->session->set_flashdata("err_msg", "Photo upload failed: " . $upload['msg']);
+                }
+            }
+            
             //print_pre($data,true);
             $result = $this->customer->updatecustomer($data);
             if ($result['status'] === true) {

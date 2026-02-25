@@ -179,5 +179,51 @@ class Users extends CI_Controller {
         $data['admin'] = $admin_user;
         $this->template->load('users', 'myprofile', $data);
     }
+    
+    public function updateprofile(){
+        // Only allow admin/superadmin access
+        if ($this->session->role != 'admin' && $this->session->role != 'superadmin') {
+            redirect('home/');
+        }
+        
+        if ($this->input->post('updateprofile') !== NULL) {
+            $user = getuser();
+            
+            // Handle photo upload
+            if (!empty($_FILES['photo']) && isset($_FILES['photo']['tmp_name']) && !empty($_FILES['photo']['tmp_name'])) {
+                $upload_path = './assets/images/profile/';
+                $allowed_types = 'gif|jpg|jpeg|png|svg';
+                $upload = upload_file('photo', $upload_path, $allowed_types, generate_slug($user['name'] . '-profile'));
+                if ($upload['status'] === true) {
+                    $path = $upload['path'];
+                    
+                    // Try to process image if GD extension is available
+                    if (extension_loaded('gd')) {
+                        try {
+                            $this->load->library('imager');
+                            $path = $this->imager->processimage('.' . $upload['path'], 'cropscale', 80, ['width' => 300, 'height' => 300]);
+                        } catch (Exception $e) {
+                            // If image processing fails, use original uploaded file
+                            $path = $upload['path'];
+                        }
+                    }
+                    
+                    $photo_data = array('photo' => $path);
+                    $where = array('id' => $user['id']);
+                    $photo_result = $this->account->updatephoto($photo_data, $where);
+                    if ($photo_result['status'] === true) {
+                        $this->session->set_flashdata("msg", "Profile Photo Updated Successfully!");
+                    } else {
+                        $this->session->set_flashdata("err_msg", "Photo upload failed: " . $photo_result['message']);
+                    }
+                } else {
+                    $this->session->set_flashdata("err_msg", "Photo upload failed: " . $upload['msg']);
+                }
+            } else {
+                $this->session->set_flashdata("err_msg", "Please select a photo to upload!");
+            }
+        }
+        redirect('users/myprofile/');
+    }
 	
 }

@@ -413,8 +413,22 @@
                                         </div>
                                         <div class="dropdown d-flex profile-1">
                                             <a href="javascript:void(0)" data-bs-toggle="dropdown" class="nav-link leading-none d-flex">
-                                                <img src="<?= file_url('includes/images/users/21.jpg'); ?>" alt="profile-user"
-                                                    class="avatar  profile-user brround cover-image">
+                                                <?php
+                                                $user = getuser();
+                                                $user_name = !empty($user['name']) ? $user['name'] : 'User';
+                                                $first_letter = strtoupper(substr($user_name, 0, 1));
+
+                                                // Get user photo
+                                                if (!empty($user['photo'])) {
+                                                    $photo_url = file_url($user['photo']);
+                                                } else {
+                                                    // Use default placeholder with user's initial
+                                                    $photo_url = base_url('profileimage/?letter=' . $first_letter);
+                                                }
+                                                ?>
+                                                <img src="<?= $photo_url; ?>" alt="profile-user"
+                                                    class="avatar  profile-user brround cover-image"
+                                                    onerror="this.src='<?= base_url('profileimage/?letter=' . $first_letter); ?>'">
                                             </a>
                                             <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
                                                 <?php /*?><div class="drop-heading">
