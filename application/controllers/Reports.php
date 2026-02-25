@@ -523,19 +523,36 @@ class Reports extends CI_Controller
         $has_assignment_done = ($check_column && $check_column->num_rows() > 0);
 
         // Build query to get assignment reports
+        // Use aggregate functions to comply with ONLY_FULL_GROUP_BY mode
         if ($has_assignment_done) {
-            $this->db->select('a.id, a.order_id, a.date as assessment_date, a.assignment_done, a.assignment_done_date, 
-                              p.service_id, s.name as service_name, 
-                              c.user_id as customer_id, c.name as customer_name,
-                              oa.user_id as employee_id, u.username as employee_name, u.name as employee_full_name,
-                              p.added_on as order_date');
+            $this->db->select('a.id, 
+                              MAX(a.order_id) as order_id, 
+                              MAX(a.date) as assessment_date, 
+                              MAX(a.assignment_done) as assignment_done, 
+                              MAX(a.assignment_done_date) as assignment_done_date, 
+                              MAX(p.service_id) as service_id, 
+                              MAX(s.name) as service_name, 
+                              MAX(c.user_id) as customer_id, 
+                              MAX(c.name) as customer_name,
+                              MAX(oa.user_id) as employee_id, 
+                              MAX(u.username) as employee_name, 
+                              MAX(u.name) as employee_full_name,
+                              MAX(p.added_on) as order_date');
         } else {
             // Fallback if columns don't exist yet
-            $this->db->select('a.id, a.order_id, a.date as assessment_date, 0 as assignment_done, NULL as assignment_done_date, 
-                              p.service_id, s.name as service_name, 
-                              c.user_id as customer_id, c.name as customer_name,
-                              oa.user_id as employee_id, u.username as employee_name, u.name as employee_full_name,
-                              p.added_on as order_date');
+            $this->db->select('a.id, 
+                              MAX(a.order_id) as order_id, 
+                              MAX(a.date) as assessment_date, 
+                              0 as assignment_done, 
+                              NULL as assignment_done_date, 
+                              MAX(p.service_id) as service_id, 
+                              MAX(s.name) as service_name, 
+                              MAX(c.user_id) as customer_id, 
+                              MAX(c.name) as customer_name,
+                              MAX(oa.user_id) as employee_id, 
+                              MAX(u.username) as employee_name, 
+                              MAX(u.name) as employee_full_name,
+                              MAX(p.added_on) as order_date');
         }
 
         // Use subquery to get only the latest order_assign per order_id to prevent duplicates
@@ -551,6 +568,7 @@ class Reports extends CI_Controller
         $this->db->join('users u', 'oa.user_id = u.id', 'left');
 
         // Group by assessment ID to ensure one row per assessment
+        // Using MAX() for other columns to comply with ONLY_FULL_GROUP_BY mode
         $this->db->group_by('a.id');
 
         // Apply filters
