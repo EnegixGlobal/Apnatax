@@ -5,6 +5,24 @@
                 <h5 class="card-title mb-0">My Profile</h5>
             </div>
             <div class="card-body">
+                <?= form_open_multipart('users/updateprofile/'); ?>
+                <div class="row mb-4">
+                    <div class="col-md-12">
+                        <div class="form-group text-center">
+                            <label class="form-label"><strong>Profile Photo</strong></label>
+                            <div class="mb-3">
+                                <?php
+                                $photo_url = !empty($admin['photo']) ? file_url($admin['photo']) : base_url('profileimage/?letter=' . strtoupper(substr($admin['name'], 0, 1)));
+                                ?>
+                                <img src="<?= $photo_url; ?>" id="photo_preview" class="rounded-circle" style="width: 150px; height: 150px; object-fit: cover; border: 3px solid #ddd; cursor: pointer;" onclick="document.getElementById('photo').click();" alt="Profile Photo">
+                                <input type="file" name="photo" id="photo" accept="image/*" style="display: none;" onchange="getPhoto(this, 'photo_preview')">
+                                <div class="mt-2">
+                                    <small class="text-muted">Click on image to change photo (Max size: 5MB, Formats: JPG, PNG, GIF)</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 <div class="row mb-4">
                     <div class="col-md-6">
                         <div class="form-group">
@@ -75,8 +93,28 @@
                     <?php } ?>
                 </div>
                 <?php } ?>
+                <div class="row mb-4">
+                    <div class="col-md-12 text-center">
+                        <button type="submit" name="updateprofile" class="btn btn-success">
+                            <i class="fa fa-upload"></i> Update Profile Photo
+                        </button>
+                    </div>
+                </div>
+                <?= form_close(); ?>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+    function getPhoto(input, previewId){
+        if (input.files && input.files[0]) {
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById(previewId).src = e.target.result;
+            };
+            reader.readAsDataURL(input.files[0]);
+        }
+    }
+</script>
 
