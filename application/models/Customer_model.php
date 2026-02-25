@@ -19,7 +19,9 @@ class Customer_model extends CI_Model
                 'email' => $data['email']
             );
             $userdata['role'] = 'customer';
-            $userdata['password'] = '';
+            // Use provided password, or default to mobile number if not provided
+            $userdata['password'] = !empty($data['password']) ? $data['password'] : $data['mobile'];
+            $userdata['status'] = 1; // Set status to active for bulk imported users
             $result = $this->account->register($userdata);
         } else {
             $result = array('status' => true, 'user_id' => $data['user_id'], 'old' => $data['old']);
@@ -31,6 +33,8 @@ class Customer_model extends CI_Model
             $data['user_id'] = $user_id;
             $datetime = date('Y-m-d H:i:s');
             $data['added_on'] = $data['updated_on'] = $datetime;
+            // Remove password from customer data (it's stored in users table)
+            unset($data['password']);
             if ($this->db->get_where('customers', array('mobile' => $data['mobile']))->num_rows() == 0) {
                 if ($this->db->insert("customers", $data)) {
                     $customer_id = $this->db->insert_id();
@@ -268,14 +272,14 @@ class Customer_model extends CI_Model
         $this->db->join('customers t2', 't1.user_id=t2.user_id');
         $this->db->join('firms t3', 't1.firm_id=t3.id', 'left');
         $query = $this->db->get();
-        
+
         // Check if query failed
         if ($query === false) {
             $error = $this->db->error();
             log_message('error', 'getservicepackage query failed: ' . $error['message']);
             return $type == 'all' ? array() : null;
         }
-        
+
         if ($type == 'all') {
             $array = $query->result_array();
             // Populate services for each package
@@ -401,5 +405,173 @@ class Customer_model extends CI_Model
                 "message" => $error['message'] ?: "Failed to update GST settings"
             );
         }
+    }
+
+    public function deletecustomer($customer_id)
+    {
+        // Enable error reporting temporarily to capture database errors
+        $old_debug = $this->db->db_debug;
+        $this->db->db_debug = TRUE;
+
+        $this->db->trans_start();
+
+        // Get customer data
+        $customer = $this->getcustomers(array('t1.id' => $customer_id), 'single');
+        if (empty($customer)) {
+            $this->db->db_debug = $old_debug;
+            return array("status" => false, "message" => "Customer not found!");
+        }
+
+        $user_id = $customer['user_id'];
+        $deleted_data = array();
+
+        // 1. Delete bank creditors statements files
+        $bank_statement_ids = $this->db->select('id')->where('user_id', $user_id)->get('bank_statements')->result_array();
+        $bank_statement_ids = array_column($bank_statement_ids, 'id');
+
+        if (!empty($bank_statement_ids)) {
+            $creditors_statements = $this->db->select('file_path')
+                ->where_in('bank_statement_id', $bank_statement_ids)
+                ->get('bank_creditors_statements')->result_array();
+
+            foreach ($creditors_statements as $cred) {
+                if (!empty($cred['file_path']) && file_exists(FCPATH . $cred['file_path'])) {
+                    @unlink(FCPATH . $cred['file_path']);
+                }
+            }
+            $this->db->where_in('bank_statement_id', $bank_statement_ids);
+            $this->db->delete('bank_creditors_statements');
+        }
+
+        // 2. Delete bank statements files
+        $bank_statements = $this->db->select('statement, creditors_statement')
+            ->where('user_id', $user_id)
+            ->get('bank_statements')->result_array();
+
+        foreach ($bank_statements as $stmt) {
+            if (!empty($stmt['statement']) && file_exists(FCPATH . $stmt['statement'])) {
+                @unlink(FCPATH . $stmt['statement']);
+            }
+            if (!empty($stmt['creditors_statement']) && file_exists(FCPATH . $stmt['creditors_statement'])) {
+                @unlink(FCPATH . $stmt['creditors_statement']);
+            }
+        }
+        $this->db->delete('bank_statements', array('user_id' => $user_id));
+
+        // 3. Delete KYC files
+        $kyc = $this->db->where('user_id', $user_id)->get('kyc')->row_array();
+        if (!empty($kyc)) {
+            $kyc_files = array('pan_image', 'aadhar_image', 'aadhar_back', 'tds_certificate', 'gst_certificate', 'audit_report', 'income_tax_certificate');
+            foreach ($kyc_files as $file_field) {
+                if (!empty($kyc[$file_field]) && file_exists(FCPATH . $kyc[$file_field])) {
+                    @unlink(FCPATH . $kyc[$file_field]);
+                }
+            }
+            $this->db->delete('kyc', array('user_id' => $user_id));
+        }
+
+        // 4. Delete old client data files
+        $old_data = $this->db->select('file_path')->where('user_id', $user_id)->get('old_client_data')->result_array();
+        foreach ($old_data as $old) {
+            if (!empty($old['file_path']) && file_exists(FCPATH . $old['file_path'])) {
+                @unlink(FCPATH . $old['file_path']);
+            }
+        }
+        $this->db->delete('old_client_data', array('user_id' => $user_id));
+
+        // 5. Delete user photo if exists
+        $user = $this->db->where('id', $user_id)->get('users')->row_array();
+        if (!empty($user['photo']) && file_exists(FCPATH . $user['photo'])) {
+            @unlink(FCPATH . $user['photo']);
+        }
+
+        // 6. Delete assessments, order_assign, commission, and documents (need to get purchase IDs first)
+        $purchase_ids = $this->db->select('id')->where('user_id', $user_id)->get('purchases')->result_array();
+        $purchase_ids = array_column($purchase_ids, 'id');
+        if (!empty($purchase_ids)) {
+            $this->db->where_in('order_id', $purchase_ids);
+            $this->db->delete('assessments');
+
+            $this->db->where_in('order_id', $purchase_ids);
+            $this->db->delete('order_assign');
+
+            $this->db->where_in('order_id', $purchase_ids);
+            $this->db->delete('commission');
+
+            // Delete documents linked to these orders
+            $this->db->where_in('order_id', $purchase_ids);
+            $this->db->delete('documents');
+        }
+
+        // 7. Delete related data from various tables
+        $this->db->delete('accountancy', array('user_id' => $user_id));
+        $this->db->delete('acc_payment', array('user_id' => $user_id));
+        $this->db->delete('wallet', array('user_id' => $user_id));
+        // Note: 'payment' table is for employee payments (uses emp_id), not customer payments, so skip it
+        $this->db->delete('purchases', array('user_id' => $user_id));
+        $this->db->delete('formdata', array('user_id' => $user_id));
+        $this->db->delete('chats', array('sender_id' => $user_id));
+        $this->db->delete('chats', array('receiver_id' => $user_id));
+
+        // Delete addresses if table exists
+        if ($this->db->table_exists('addresses')) {
+            $this->db->delete('addresses', array('user_id' => $user_id));
+        }
+
+        $this->db->delete('customer_packages', array('user_id' => $user_id));
+        $this->db->delete('service_packages', array('user_id' => $user_id));
+        $this->db->delete('tokens', array('user_id' => $user_id));
+        $this->db->delete('notify', array('user_id' => $user_id));
+
+        // Delete security deposit if table exists
+        $check_security = $this->db->query("SHOW TABLES LIKE 'security_deposit'");
+        if ($check_security->num_rows() > 0) {
+            $this->db->delete('security_deposit', array('user_id' => $user_id));
+        }
+
+        // 8. Delete firms (and any firm-related files if they exist)
+        $firms = $this->db->where('user_id', $user_id)->get('firms')->result_array();
+        $this->db->delete('firms', array('user_id' => $user_id));
+
+        // 9. Delete customer record
+        $this->db->delete('customers', array('id' => $customer_id));
+
+        // 10. Delete user account
+        $this->db->delete('users', array('id' => $user_id));
+
+        $this->db->trans_complete();
+
+        // Restore original debug setting
+        $this->db->db_debug = $old_debug;
+
+        if ($this->db->trans_status() === FALSE) {
+            $error = $this->db->error();
+            $error_message = 'Unknown database error occurred';
+            $error_code = '';
+
+            // Try to get error message
+            if (!empty($error['message'])) {
+                $error_message = $error['message'];
+            } else {
+                // Check last query error
+                $last_error = $this->db->last_query();
+                if ($last_error) {
+                    $error_message = 'Database query failed. Please check logs for details.';
+                }
+            }
+
+            if (!empty($error['code'])) {
+                $error_code = ' (Error Code: ' . $error['code'] . ')';
+            }
+
+            // Log detailed error information
+            log_message('error', 'Customer deletion failed for customer_id: ' . $customer_id . ', user_id: ' . $user_id);
+            log_message('error', 'Database error: ' . $error_message . $error_code);
+            log_message('error', 'Last query: ' . $this->db->last_query());
+
+            return array("status" => false, "message" => "Failed to delete customer: " . $error_message . $error_code);
+        }
+
+        return array("status" => true, "message" => "Customer and all related data deleted successfully!");
     }
 }
