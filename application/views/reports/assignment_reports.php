@@ -167,16 +167,19 @@
                 <?php
                 if (!empty($assignments)) {
                     foreach ($assignments as $row) {
+                        // Ensure all required fields have values
                         $status = (isset($row['assignment_done']) && $row['assignment_done'] == 1) ? 'Done' : 'Pending';
                         $status_class = ($status == 'Done') ? 'status-done' : 'status-pending';
-                        $done_date = (!empty($row['assignment_done_date'])) ? date('d-m-Y H:i', strtotime($row['assignment_done_date'])) : '-';
-                        $assessment_date = !empty($row['assessment_date']) ? date('d-m-Y', strtotime($row['assessment_date'])) : '-';
-                        $employee_name = !empty($row['employee_full_name']) ? $row['employee_full_name'] : (!empty($row['employee_name']) ? $row['employee_name'] : 'Not Assigned');
+                        $done_date = (!empty($row['assignment_done_date']) && $row['assignment_done_date'] != '0000-00-00 00:00:00') ? date('d-m-Y H:i', strtotime($row['assignment_done_date'])) : '-';
+                        $assessment_date = !empty($row['assessment_date']) && $row['assessment_date'] != '0000-00-00' ? date('d-m-Y', strtotime($row['assessment_date'])) : '-';
+                        $employee_name = !empty($row['employee_full_name']) ? htmlspecialchars($row['employee_full_name'], ENT_QUOTES, 'UTF-8') : (!empty($row['employee_name']) ? htmlspecialchars($row['employee_name'], ENT_QUOTES, 'UTF-8') : 'Not Assigned');
+                        $service_name = !empty($row['service_name']) ? htmlspecialchars($row['service_name'], ENT_QUOTES, 'UTF-8') : 'N/A';
+                        $customer_name = !empty($row['customer_name']) ? htmlspecialchars($row['customer_name'], ENT_QUOTES, 'UTF-8') : 'N/A';
                 ?>
                         <tr>
                             <td><?= $assessment_date; ?></td>
-                            <td><?= !empty($row['service_name']) ? $row['service_name'] : 'N/A'; ?></td>
-                            <td><?= !empty($row['customer_name']) ? $row['customer_name'] : 'N/A'; ?></td>
+                            <td><?= $service_name; ?></td>
+                            <td><?= $customer_name; ?></td>
                             <td><?= $employee_name; ?></td>
                             <td><span class="status-badge <?= $status_class; ?>"><?= $status; ?></span></td>
                             <td><?= $done_date; ?></td>
@@ -198,36 +201,121 @@
 
 <script>
     $(document).ready(function() {
-        // Initialize DataTable if available
-        if ($.fn.DataTable) {
+        function initializeDataTable() {
+            // Check if DataTables is available - wait for it if needed
+            if (typeof $.fn.DataTable === 'undefined') {
+                // Wait up to 2 seconds for DataTables to load
+                var attempts = 0;
+                var maxAttempts = 20;
+                var checkInterval = setInterval(function() {
+                    attempts++;
+                    if (typeof $.fn.DataTable !== 'undefined') {
+                        clearInterval(checkInterval);
+                        doInitialize();
+                    } else if (attempts >= maxAttempts) {
+                        clearInterval(checkInterval);
+                        console.warn('DataTables library failed to load after ' + (maxAttempts * 100) + 'ms');
+                    }
+                }, 100);
+                return;
+            }
+
+            doInitialize();
+        }
+
+        function doInitialize() {
             // Check if table exists
             var table = $('#assignment_table');
-            if (table.length > 0) {
-                // Destroy existing DataTable instance if it exists
-                if ($.fn.DataTable.isDataTable('#assignment_table')) {
-                    $('#assignment_table').DataTable().destroy();
+            if (table.length === 0) {
+                console.warn('Table #assignment_table not found');
+                return;
+            }
+
+            // Validate table structure before initialization
+            var thead = table.find('thead');
+            var tbody = table.find('tbody');
+            var headerCount = thead.find('th').length;
+
+            // Check if table has valid structure
+            if (thead.length === 0 || tbody.length === 0 || headerCount === 0) {
+                console.error('Table is missing thead, tbody, or headers. Cannot initialize DataTable.');
+                return;
+            }
+
+            // Count data rows (excluding colspan rows like "No records found")
+            var dataRows = tbody.find('tr').filter(function() {
+                return $(this).find('td[colspan]').length === 0;
+            });
+
+            // Skip DataTable initialization if there are no data rows
+            // DataTables cannot initialize on tables with only colspan rows
+            if (dataRows.length === 0) {
+                console.log('No data rows found. Skipping DataTable initialization.');
+                return;
+            }
+
+            // Validate all data rows have correct number of cells
+            var isValid = true;
+            dataRows.each(function() {
+                var row = $(this);
+                var cellCount = row.find('td').length;
+                if (cellCount !== headerCount) {
+                    isValid = false;
+                    console.error('Row has ' + cellCount + ' cells but header has ' + headerCount + ' columns');
                 }
-                
-                // Initialize DataTable
+            });
+
+            if (!isValid) {
+                console.error('Table structure is invalid. Cannot initialize DataTable.');
+                return;
+            }
+
+            // Destroy existing DataTable instance if it exists
+            if ($.fn.DataTable.isDataTable('#assignment_table')) {
                 try {
-                    table.DataTable({
-                        "order": [[0, "desc"]],
-                        "pageLength": 25,
-                        "lengthMenu": [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
-                        "responsive": true,
-                        "autoWidth": false
-                    });
+                    $('#assignment_table').DataTable().destroy();
+                    table.removeClass('dataTable');
                 } catch (e) {
-                    console.error('DataTable initialization error:', e);
+                    console.warn('Error destroying existing DataTable:', e);
                 }
             }
+
+            // Initialize DataTable
+            try {
+                table.DataTable({
+                    "order": [
+                        [0, "desc"]
+                    ],
+                    "pageLength": 25,
+                    "lengthMenu": [
+                        [10, 25, 50, 100, -1],
+                        [10, 25, 50, 100, "All"]
+                    ],
+                    "responsive": true,
+                    "autoWidth": false,
+                    "language": {
+                        "emptyTable": "No assignment records found"
+                    }
+                });
+            } catch (e) {
+                console.error('DataTable initialization error:', e);
+                console.error('Error details:', {
+                    message: e.message,
+                    headerCount: headerCount,
+                    dataRowCount: dataRows.length,
+                    totalRowCount: tbody.find('tr').length
+                });
+            }
         }
+
+        // Initialize DataTable
+        initializeDataTable();
 
         // Show/hide period-specific fields
         $('#period').on('change', function() {
             var period = $(this).val();
             $('#date_div, #month_div, #year_div, #start_date_div, #end_date_div').hide();
-            
+
             if (period == 'date') {
                 $('#date_div').show();
             } else if (period == 'month') {
@@ -240,4 +328,3 @@
         });
     });
 </script>
-
