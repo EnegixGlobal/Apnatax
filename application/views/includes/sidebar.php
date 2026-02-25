@@ -42,6 +42,7 @@
                             <li class="side-menu-label1"><a href="javascript:void(0)">Customers</a></li>
                             <li><a href="<?= base_url('customers/'); ?>" class="slide-item <?= activate_menu('customers'); ?>"> Customers</a></li>
                             <li><a href="<?= base_url('customers/addcustomer/'); ?>" class="slide-item <?= activate_menu('customers/addcustomer'); ?>"> Add Customer</a></li>
+                            <li><a href="<?= base_url('customers/bulkimport/'); ?>" class="slide-item <?= activate_menu('customers/bulkimport'); ?>"> Bulk Import Customers</a></li>
                             <li><a href="<?= base_url('customers/walletrecharge/'); ?>" class="slide-item <?= activate_menu('customers/walletrecharge'); ?>"> Wallet Recharge</a></li>
                             <li><a href="<?= base_url('customers/walletrechargelist/'); ?>" class="slide-item <?= activate_menu('customers/walletrechargelist'); ?>"> Wallet Recharge History</a></li>
                             <li><a href="<?= base_url('customers/customerpurchases/'); ?>" class="slide-item <?= activate_menu('customers/customerpurchases'); ?>"> Customer Purchases</a></li>

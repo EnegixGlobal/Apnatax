@@ -749,5 +749,272 @@ class Customers extends CI_Controller
         $data['recharges'] = $this->wallet->getwalletrecharges($where);
         $this->template->load('customer', 'walletrechargelist', $data);
     }
+
+    public function bulkimport()
+    {
+        // Only allow admin access
+        if ($this->session->role != 'admin' && $this->session->role != 'superadmin') {
+            redirect('customers/');
+        }
+        $data['title'] = "Bulk Customer Import";
+        $data['breadcrumb'] = array("customers/" => "Customers", "active" => "Bulk Import");
+
+        // Get import results from session if available
+        $import_results = $this->session->userdata('bulk_import_results');
+        if (!empty($import_results)) {
+            $data['import_results'] = $import_results;
+            // Clear session data after displaying
+            $this->session->unset_userdata('bulk_import_results');
+        }
+
+        $this->template->load('customer', 'bulkimport', $data);
+    }
+
+    public function downloadtemplate()
+    {
+        // Only allow admin access
+        if ($this->session->role != 'admin' && $this->session->role != 'superadmin') {
+            redirect('customers/');
+        }
+
+        $filename = 'customer_import_template.csv';
+        header('Content-Type: text/csv');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Cache-Control: must-revalidate, post-check=0, pre-check=0');
+        header('Pragma: public');
+
+        $output = fopen('php://output', 'w');
+
+        // CSV Headers
+        fputcsv($output, array('Name', 'Mobile', 'Email', 'Address', 'State', 'District', 'Pincode'));
+
+        // Sample row
+        fputcsv($output, array('John Doe', '9876543210', 'john@example.com', '123 Main Street', 'Maharashtra', 'Mumbai', '400001'));
+
+        fclose($output);
+        exit;
+    }
+
+    public function processbulkimport()
+    {
+        // Only allow admin access
+        if ($this->session->role != 'admin' && $this->session->role != 'superadmin') {
+            redirect('customers/');
+        }
+
+        if ($this->input->post('bulkimport') !== NULL) {
+            $user = getuser();
+            $default_password = $this->input->post('default_password');
+
+            // Check if file was uploaded
+            if (empty($_FILES['csv_file']['tmp_name'])) {
+                $this->session->set_flashdata("err_msg", "Please select a CSV file to upload!");
+                redirect('customers/bulkimport/');
+            }
+
+            $file = $_FILES['csv_file'];
+
+            // Validate file type
+            $file_ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+            if ($file_ext !== 'csv') {
+                $this->session->set_flashdata("err_msg", "Only CSV files are allowed!");
+                redirect('customers/bulkimport/');
+            }
+
+            // Validate file size (5MB max)
+            if ($file['size'] > 5 * 1024 * 1024) {
+                $this->session->set_flashdata("err_msg", "File size exceeds 5MB limit!");
+                redirect('customers/bulkimport/');
+            }
+
+            // Read CSV file
+            $handle = fopen($file['tmp_name'], 'r');
+            if ($handle === false) {
+                $this->session->set_flashdata("err_msg", "Failed to read CSV file!");
+                redirect('customers/bulkimport/');
+            }
+
+            // Skip header row
+            $header = fgetcsv($handle);
+
+            $results = array(
+                'success_count' => 0,
+                'error_count' => 0,
+                'duplicate_count' => 0,
+                'total_count' => 0,
+                'errors' => array(),
+                'credentials' => array()
+            );
+
+            $row_num = 1;
+            $max_rows = 200; // Limit to 200 customers per import
+
+            while (($data = fgetcsv($handle)) !== false && $results['total_count'] < $max_rows) {
+                $row_num++;
+                $results['total_count']++;
+
+                // Validate required fields
+                if (empty($data[0]) || empty($data[1])) {
+                    $results['error_count']++;
+                    $results['errors'][] = "Row $row_num: Name and Mobile are required";
+                    continue;
+                }
+
+                $customer_data = array(
+                    'name' => trim($data[0]),
+                    'mobile' => trim($data[1]),
+                    'email' => !empty($data[2]) ? trim($data[2]) : '',
+                    'address' => !empty($data[3]) ? trim($data[3]) : '',
+                    'state' => !empty($data[4]) ? trim($data[4]) : '',
+                    'district' => !empty($data[5]) ? trim($data[5]) : '',
+                    'pincode' => !empty($data[6]) ? trim($data[6]) : '',
+                    'added_by' => $user['id'],
+                    'gst_enabled' => 0
+                );
+
+                // Validate mobile number
+                if (!preg_match('/^[0-9]{10}$/', $customer_data['mobile'])) {
+                    $results['error_count']++;
+                    $results['errors'][] = "Row $row_num: Invalid mobile number (must be 10 digits)";
+                    continue;
+                }
+
+                // Check for duplicate mobile
+                $existing = $this->db->get_where('customers', array('mobile' => $customer_data['mobile']))->num_rows();
+                if ($existing > 0) {
+                    $results['duplicate_count']++;
+                    continue;
+                }
+
+                // Handle state and district
+                if (!empty($customer_data['state'])) {
+                    $state = $this->db->get_where('area', array('name' => $customer_data['state'], 'parent_id' => 0))->row_array();
+                    if (!empty($state)) {
+                        $customer_data['parent_id'] = $state['id'];
+                    }
+                }
+
+                if (!empty($customer_data['district']) && !empty($customer_data['parent_id'])) {
+                    $district = $this->db->get_where('area', array('name' => $customer_data['district'], 'parent_id' => $customer_data['parent_id']))->row_array();
+                    if (!empty($district)) {
+                        $customer_data['area_id'] = $district['id'];
+                    }
+                }
+
+                // Set password for customer (use default password or mobile number)
+                $password = !empty($default_password) ? $default_password : $customer_data['mobile'];
+                $customer_data['password'] = $password;
+
+                // Save customer
+                $result = $this->customer->savecustomer($customer_data);
+
+                if ($result['status'] === true) {
+                    $results['success_count']++;
+
+                    // Store credentials for download
+                    $results['credentials'][] = array(
+                        'name' => $customer_data['name'],
+                        'mobile' => $customer_data['mobile'],
+                        'username' => $customer_data['mobile'],
+                        'password' => $password,
+                        'email' => $customer_data['email']
+                    );
+                } else {
+                    $results['error_count']++;
+                    $results['errors'][] = "Row $row_num: " . $result['message'];
+                }
+            }
+
+            fclose($handle);
+
+            // Store results in session for display
+            $this->session->set_userdata('bulk_import_results', $results);
+            $this->session->set_userdata('bulk_import_credentials', $results['credentials']);
+
+            if ($results['success_count'] > 0) {
+                $this->session->set_flashdata("msg", "Bulk import completed! {$results['success_count']} customers imported successfully.");
+            } else {
+                $this->session->set_flashdata("err_msg", "No customers were imported. Please check the errors below.");
+            }
+        }
+
+        redirect('customers/bulkimport/');
+    }
+
+    public function downloadcredentials()
+    {
+        // Only allow admin access
+        if ($this->session->role != 'admin' && $this->session->role != 'superadmin') {
+            redirect('customers/');
+        }
+
+        $credentials = $this->session->userdata('bulk_import_credentials');
+
+        if (empty($credentials)) {
+            $this->session->set_flashdata("err_msg", "No credentials available to download!");
+            redirect('customers/bulkimport/');
+        }
+
+        $filename = 'customer_login_credentials_' . date('Y-m-d_H-i-s') . '.csv';
+        header('Content-Type: text/csv');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Cache-Control: must-revalidate, post-check=0, pre-check=0');
+        header('Pragma: public');
+
+        $output = fopen('php://output', 'w');
+
+        // CSV Headers
+        fputcsv($output, array('Name', 'Mobile', 'Username', 'Password', 'Email'));
+
+        // Data rows
+        foreach ($credentials as $cred) {
+            fputcsv($output, array(
+                $cred['name'],
+                $cred['mobile'],
+                $cred['username'],
+                $cred['password'],
+                $cred['email']
+            ));
+        }
+
+        fclose($output);
+        exit;
+    }
+
+    public function deletecustomer()
+    {
+        // Only allow admin access
+        if ($this->session->role != 'admin' && $this->session->role != 'superadmin') {
+            $this->output->set_content_type('application/json')->set_output(json_encode([
+                'status' => false,
+                'message' => 'Unauthorized access!'
+            ]));
+            return;
+        }
+
+        $id = $this->input->post('id');
+        if (empty($id)) {
+            $this->output->set_content_type('application/json')->set_output(json_encode([
+                'status' => false,
+                'message' => 'Customer ID is required!'
+            ]));
+            return;
+        }
+
+        // Get customer by md5 hash
+        $customer = $this->customer->getcustomers(['md5(t1.id)' => $id], 'single');
+        if (empty($customer)) {
+            $this->output->set_content_type('application/json')->set_output(json_encode([
+                'status' => false,
+                'message' => 'Customer not found!'
+            ]));
+            return;
+        }
+
+        // Delete customer and all related data
+        $result = $this->customer->deletecustomer($customer['id']);
+
+        $this->output->set_content_type('application/json')->set_output(json_encode($result));
+    }
 }
 //url_title
