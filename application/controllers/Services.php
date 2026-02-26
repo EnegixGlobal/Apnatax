@@ -20,6 +20,8 @@ class Services extends CI_Controller
         $data['breadcrumb'] = array("active" => "Services");
         $user = getuser();
         $data['user'] = $user;
+        $firm_id = $this->session->firm;
+        $year    = $this->session->year;
         $where = array();
         $services = $this->master->getservices($where);
 
@@ -36,8 +38,21 @@ class Services extends CI_Controller
             }
         }
 
+        // Collect service IDs that are already in the user's service package
+        $package_service_ids = array();
+        if (!empty($user['id']) && !empty($firm_id) && !empty($year)) {
+            $service_package = $this->customer->getservicepackage(
+                ['t1.user_id' => $user['id'], 't1.firm_id' => $firm_id, 't1.year' => $year],
+                'single'
+            );
+            if (!empty($service_package) && !empty($service_package['service_ids'])) {
+                $package_service_ids = array_map('trim', explode(',', $service_package['service_ids']));
+                $package_service_ids = array_filter($package_service_ids);
+            }
+        }
+
         $data['services'] = $services;
-        //print_pre($data,true);
+        $data['package_service_ids'] = $package_service_ids;
         $data['datatable'] = true;
         $this->template->load('services', 'services', $data);
     }
@@ -98,10 +113,21 @@ class Services extends CI_Controller
         // Pass group_by as a parameter or handle it in the model
         $services = $this->service->getpurchasedservices($where, 'all', true); // Pass flag for group_by
 
+        // Get service package to retrieve service options from package
+        $service_package = $this->customer->getservicepackage(['t1.user_id' => $user['id'], 't1.firm_id' => $firm_id, 't1.year' => $year], 'single');
+        $package_service_options = array();
+        if (!empty($service_package) && !empty($service_package['service_option_ids'])) {
+            $package_service_options = json_decode($service_package['service_option_ids'], true);
+            if (!is_array($package_service_options)) {
+                $package_service_options = array();
+            }
+        }
+
         // Log for debugging
         if (ENVIRONMENT !== 'production') {
             log_message('debug', 'purchasedservices - User ID: ' . $user['id'] . ', Firm ID: ' . $firm_id . ', Year: ' . $year);
             log_message('debug', 'purchasedservices - Services found: ' . count($services));
+            log_message('debug', 'purchasedservices - Package service options: ' . json_encode($package_service_options));
             // Also log the WHERE clause for debugging
             log_message('debug', 'purchasedservices - WHERE: ' . json_encode($where));
         }
@@ -111,8 +137,31 @@ class Services extends CI_Controller
                 $services[$key]['name'] = $service['service_name'];
                 $services[$key]['count'] = '';
                 $services[$key]['link'] = ('services/monthlyservices/' . $service['service_slug']);
-                // Keep option display for showing in view (will be shown in separate column)
-                $services[$key]['service_option_display'] = !empty($service['service_option_display']) ? $service['service_option_display'] : '';
+                
+                // First check if service_option_display exists in purchase record (for manually purchased services)
+                $service_option_display = !empty($service['service_option_display']) ? $service['service_option_display'] : '';
+                
+                // If not found in purchase record, check package service options
+                if (empty($service_option_display) && !empty($package_service_options)) {
+                    $service_id = $service['service_id'];
+                    if (!empty($package_service_options[$service_id])) {
+                        $option_id = $package_service_options[$service_id];
+                        // Handle both old array format and new single value format for backward compatibility
+                        if (is_array($option_id)) {
+                            $option_id = !empty($option_id[0]) ? $option_id[0] : '';
+                        }
+                        
+                        if (!empty($option_id)) {
+                            // Get option display name from service_options table
+                            $option = $this->master->getserviceoptions(array('id' => $option_id, 'status' => 1), 'single');
+                            if (!empty($option) && !empty($option['display_name'])) {
+                                $service_option_display = $option['display_name'];
+                            }
+                        }
+                    }
+                }
+                
+                $services[$key]['service_option_display'] = $service_option_display;
             }
         } else {
             // Log when no services found for debugging
@@ -146,18 +195,68 @@ class Services extends CI_Controller
         $service_package = $this->customer->getservicepackage(['t1.user_id' => $user['id'], 't1.firm_id' => $firm_id, 't1.year' => $year], 'single');
 
         $services = array();
+        $package_service_ids = array();
+
+        // Get service IDs from current year package
         if (!empty($service_package) && !empty($service_package['service_ids'])) {
-            // Get service IDs from the package
             $package_service_ids = explode(',', $service_package['service_ids']);
-            if (!empty($package_service_ids)) {
-                // Filter to only show pending services that are part of the package
-                $service_ids_str = implode(',', array_map('intval', $package_service_ids));
-                // Use proper escaping for SQL query
-                $user_id_escaped = $this->db->escape($user['id']);
-                $firm_id_escaped = $this->db->escape($firm_id);
-                $year_escaped = $this->db->escape($year);
-                $where = "t1.user_id={$user_id_escaped} AND t1.firm_id={$firm_id_escaped} AND t1.year={$year_escaped} AND t1.status='0' AND t1.service_id IN ($service_ids_str)";
-                $services = $this->service->getpurchasedservices($where, 'all', true); // Pass flag for group_by
+        }
+
+        // Also check for expired packages (packages from previous years)
+        // Use raw query for != operator
+        $user_id_escaped = $this->db->escape($user['id']);
+        $firm_id_escaped = $this->db->escape($firm_id);
+        $year_escaped = $this->db->escape($year);
+        $expired_query = $this->db->query("SELECT t1.* FROM tf_service_packages t1 
+            LEFT JOIN tf_customers t2 ON t1.user_id=t2.user_id 
+            LEFT JOIN tf_firms t3 ON t1.firm_id=t3.id 
+            WHERE t1.user_id={$user_id_escaped} AND t1.firm_id={$firm_id_escaped} AND t1.year!={$year_escaped}");
+        $expired_packages = $expired_query->result_array();
+
+        // Collect service IDs from expired packages
+        if (!empty($expired_packages)) {
+            foreach ($expired_packages as $expired_package) {
+                if (!empty($expired_package['service_ids'])) {
+                    $expired_service_ids = explode(',', $expired_package['service_ids']);
+                    $package_service_ids = array_merge($package_service_ids, $expired_service_ids);
+                }
+            }
+        }
+
+        // Remove duplicates
+        $package_service_ids = array_unique(array_filter($package_service_ids));
+
+        if (!empty($package_service_ids)) {
+            // Filter to show pending services that are part of current or expired packages
+            $service_ids_str = implode(',', array_map('intval', $package_service_ids));
+            // Use proper escaping for SQL query
+            $user_id_escaped = $this->db->escape($user['id']);
+            $firm_id_escaped = $this->db->escape($firm_id);
+            $year_escaped = $this->db->escape($year);
+            $where = "t1.user_id={$user_id_escaped} AND t1.firm_id={$firm_id_escaped} AND t1.year={$year_escaped} AND t1.status='0' AND t1.service_id IN ($service_ids_str)";
+            $services = $this->service->getpurchasedservices($where, 'all', true); // Pass flag for group_by
+
+            // Also get pending services from expired packages
+            if (!empty($expired_packages)) {
+                foreach ($expired_packages as $expired_package) {
+                    if (!empty($expired_package['service_ids'])) {
+                        $expired_year = $expired_package['year'];
+                        $expired_service_ids = explode(',', $expired_package['service_ids']);
+                        $expired_service_ids_str = implode(',', array_map('intval', $expired_service_ids));
+                        $expired_year_escaped = $this->db->escape($expired_year);
+                        $where_expired = "t1.user_id={$user_id_escaped} AND t1.firm_id={$firm_id_escaped} AND t1.year={$expired_year_escaped} AND t1.status='0' AND t1.service_id IN ($expired_service_ids_str)";
+                        $expired_services = $this->service->getpurchasedservices($where_expired, 'all', true);
+
+                        // Mark expired services
+                        if (!empty($expired_services)) {
+                            foreach ($expired_services as $key => $expired_service) {
+                                $expired_services[$key]['expired_package'] = true;
+                                $expired_services[$key]['expired_year'] = $expired_year;
+                            }
+                            $services = array_merge($services, $expired_services);
+                        }
+                    }
+                }
             }
         }
 
@@ -676,6 +775,22 @@ class Services extends CI_Controller
                     } else {
                         $status = false;
                         $message = "Invalid option selected for " . $service['name'];
+                    }
+                }
+
+                // Check if service is already included in the user's service package (skip for service_id=1 / accountancy)
+                if ($service_id != 1) {
+                    $service_package = $this->customer->getservicepackage(
+                        ['t1.user_id' => $user['id'], 't1.firm_id' => $firm_id, 't1.year' => $year],
+                        'single'
+                    );
+                    if (!empty($service_package) && !empty($service_package['service_ids'])) {
+                        $package_service_ids = array_map('trim', explode(',', $service_package['service_ids']));
+                        if (in_array((string)$service_id, $package_service_ids)) {
+                            $this->session->set_flashdata("err_msg", $service['name'] . " is already included in your service package. You cannot purchase it separately.");
+                            redirect($_SERVER['HTTP_REFERER']);
+                            return;
+                        }
                     }
                 }
 

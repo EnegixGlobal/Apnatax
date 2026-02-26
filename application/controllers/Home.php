@@ -223,46 +223,9 @@ class Home extends CI_Controller {
     }
     
     public function paymentresponse(){
-        $user=$this->input->get('user');
-        $merchant_transaction_id=$this->input->get('merchant_transaction_id');
-        $year=$this->input->get('year');
-        $firm=$this->input->get('firm');
-        $getuser=$this->account->getuser(["md5(concat('user-id-',id))"=>$user]);
-        if($getuser['status']===true){
-            $user=$getuser['user'];
-            $data=array();
-            $data['user']=md5($user['id']);
-            $data['name']=$user['name'];
-            $data['emp_id']=$user['emp_id'];
-            $data['role']=$user['role'];
-            $data['project']=PROJECT_NAME;
-            if(!empty($year)){
-                $data['year']=$year;
-            }
-            if(!empty($firm)){
-                $data['firm']=$firm;
-            }
-            $this->session->set_userdata($data);
-            
-            $wallet=$this->wallet->getwallet(["merchant_transaction_id"=>$merchant_transaction_id],'single');
-            $data=array('status'=>1,'payment_details'=>$details);
-            if(!empty($wallet)){
-                $result=$this->wallet->updatepayment($data,['id'=>$wallet['id']]);
-                if($result['status']==true){ 
-                    $this->session->set_flashdata("msg",$result['message']);
-                }
-                else{
-                    $this->session->set_flashdata("err_msg",$result['message']);
-                }
-            }
-            else{
-                $this->session->set_userdata('err_msg',"Please Try Again!");
-            }
-        }
-        else{
-            $this->session->set_userdata('err_msg',"Please Try Again!");
-        }
-        redirect('mywallet/');
+        // This method was used earlier for PhonePe payment redirection.
+        // Kept for backward compatibility – now simply redirects to wallet page.
+        redirect('wallet/mywallet/');
     }
     
 	public function unsubscribe(){
@@ -425,6 +388,61 @@ class Home extends CI_Controller {
 
         // Respond to the webhook provider (optional)
         echo "Webhook received successfully.";
+    }
+
+    public function razorpay_callback(){
+        // Handle Razorpay payment completion
+        $razorpay_payment_id = $this->input->post('razorpay_payment_id');
+        $razorpay_order_id   = $this->input->post('razorpay_order_id');
+        $razorpay_signature  = $this->input->post('razorpay_signature');
+
+        if (empty($razorpay_payment_id) || empty($razorpay_order_id) || empty($razorpay_signature)) {
+            $this->session->set_flashdata('err_msg', 'Payment failed or cancelled. Please try again.');
+            redirect('wallet/mywallet/');
+        }
+
+        $this->load->library('Razorpay_lib');
+
+        // Verify signature
+        $is_valid = $this->razorpay_lib->verify_signature($razorpay_order_id, $razorpay_payment_id, $razorpay_signature);
+
+        if (!$is_valid) {
+            $this->session->set_flashdata('err_msg', 'Payment verification failed. Please contact support.');
+            redirect('wallet/mywallet/');
+        }
+
+        // Fetch order to get receipt (merchant_transaction_id)
+        $orderResponse = $this->razorpay_lib->fetch_order($razorpay_order_id);
+        if (empty($orderResponse['success']) || empty($orderResponse['data']['receipt'])) {
+            $this->session->set_flashdata('err_msg', 'Unable to verify payment order. Please contact support.');
+            redirect('wallet/mywallet/');
+        }
+
+        $orderData = $orderResponse['data'];
+        $merchant_transaction_id = $orderData['receipt'];
+
+        // Update wallet payment status
+        $payment_details = json_encode([
+            'razorpay_payment_id' => $razorpay_payment_id,
+            'razorpay_order_id'   => $razorpay_order_id,
+            'razorpay_signature'  => $razorpay_signature,
+        ]);
+
+        $wallet = $this->wallet->getwallet(['merchant_transaction_id' => $merchant_transaction_id], 'single');
+
+        if (!empty($wallet)) {
+            $data = ['status' => 1, 'payment_details' => $payment_details];
+            $result = $this->wallet->updatepayment($data, ['id' => $wallet['id']]);
+            if (!empty($result['status'])) {
+                $this->session->set_flashdata('msg', !empty($result['message']) ? $result['message'] : 'Wallet recharged successfully.');
+            } else {
+                $this->session->set_flashdata('err_msg', !empty($result['message']) ? $result['message'] : 'Payment captured but wallet update failed. Please contact support.');
+            }
+        } else {
+            $this->session->set_flashdata('err_msg', 'Payment captured but transaction not found. Please contact support.');
+        }
+
+        redirect('wallet/mywallet/');
     }
     
     public function redirecturl2(){

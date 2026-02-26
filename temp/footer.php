@@ -45,8 +45,8 @@
                      <div class="footer-contact">
                         <h3 class="footer-heading">Contact</h3>
                         <ul class="footer-contact-list">
-                           <li>+91 70046 25048</li>
-                           <li>info@apnotax.com</li>
+                           <li>+91 91539 92348</li>
+                           <li>apnotax@gmail.com </li>
                            <li>Near High school stadium Suriya District Giridih Jharkhand 825320</li>
                         </ul>
                      </div>
@@ -61,7 +61,7 @@
             </div>
             <div class="col-lg-6 col-md-6 col-sm-12">
                <div class="footer-bottom-links">
-                  <a href="#">Privacy Policy</a> | <a href="#">T&C</a> | <span>Created by enegix</span>
+                  <a href="#">Privacy Policy</a> | <a href="#">T&C</a></span>
                </div>
             </div>
          </div>

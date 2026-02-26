@@ -152,7 +152,7 @@
                         <a class="side-menu__item <?= activate_dropdown(['reports'], []) ?>" data-bs-toggle="slide" href="javascript:void(0)"><i class="side-menu__icon  fa fa-list-alt"></i><span class="side-menu__label">Fee Report</span><i class="angle fe fe-chevron-right"></i></a>
                         <ul class="slide-menu">
                             <li class="side-menu-label1"><a href="javascript:void(0)">Fee Report</a></li>
-                            <li><a href="<?= base_url('reports/'); ?>" class="slide-item <?= activate_menu('reports'); ?>"> Accountancy Report</a></li>
+                            <li><a href="<?= base_url('reports/'); ?>" class="slide-item <?= activate_menu('reports'); ?>"> Accounting Fee</a></li>
                             <li><a href="<?= base_url('reports/otherfee/'); ?>" class="slide-item <?= activate_menu('reports/otherfee'); ?>"> Other Fee</a></li>
                         </ul>
                     </li>
