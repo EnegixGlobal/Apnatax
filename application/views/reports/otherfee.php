@@ -2,6 +2,27 @@
     .cell-right{
         text-align: right;
     }
+    .table-responsive {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        width: 100%;
+    }
+    #acc_table {
+        min-width: 100%;
+        white-space: nowrap;
+    }
+    #acc_table th,
+    #acc_table td {
+        white-space: nowrap;
+        padding: 8px;
+    }
+    #acc_table tfoot tr {
+        font-weight: bold;
+        background-color: #f8f9fa;
+    }
+    #acc_table tfoot td {
+        font-weight: bold;
+    }
 </style>
 <?php
 $user_id=$year='';
@@ -15,8 +36,9 @@ if($this->session->flashdata('year')!==NULL){
                                 <div class="card-body">
                                     <div class="row my-4">
                                         <div class="col-md-12">
-                                            <div id="result">
-                                                <table class="table table-bordered" id="acc_table">
+                                            <div class="table-responsive">
+                                                <div id="result">
+                                                    <table class="table table-bordered" id="acc_table">
                                                     <thead>
                                                         <tr>
                                                             <?php
@@ -55,19 +77,20 @@ if($this->session->flashdata('year')!==NULL){
                                                     </tbody>
                                                     <?php if(!empty($footer)){ ?>
                                                     <tfoot>
-                                                        <tr>
+                                                        <tr class="total-row">
                                                             <?php
                                                                 foreach($footer as $value){
                                                             ?>
-                                                            <td><?= $value; ?></td>
+                                                            <td><strong><?= $value; ?></strong></td>
                                                             <?php
                                                                 }
                                                             ?>
                                                         </tr>
                                                     </tfoot>
                                                     <?php } ?>
-                                                </table>
-                                                <div id="acc_json" class="d-none"><?= json_encode($result); ?></div>
+                                                    </table>
+                                                    <div id="acc_json" class="d-none"><?= json_encode($result); ?></div>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>

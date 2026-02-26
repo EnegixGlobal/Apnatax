@@ -18,8 +18,8 @@ class Reports extends CI_Controller
 
     public function index()
     {
-        $data = ['title' => 'Accountancy Reports'];
-        $data['breadcrumb'] = array("active" => "Accountancy Reports");
+        $data = ['title' => 'Accounting Fee'];
+        $data['breadcrumb'] = array("active" => "Accounting Fee");
         $data['alertify'] = true;
         $user = getuser();
         $year = $this->session->year;
@@ -167,8 +167,16 @@ class Reports extends CI_Controller
         $year = $this->session->year;
         $firm_id = $this->session->firm;
         $user_id = $user['id'];
+
+        // Validate required session data
+        if (empty($year) || empty($firm_id)) {
+            $this->session->set_flashdata('err_msg', 'Please select Year and Firm!');
+            redirect($_SERVER['HTTP_REFERER'] ?? 'home/');
+            return;
+        }
+
         $years = getyearmonthvalues($year);
-        $where = array('t1.user_id' => $user['id'], 't1.date>=' => $years['year1'] . '-04-01', 't1.date<=' => $years['year2'] . '-03-31');
+        $where = array('t1.user_id' => $user['id'], 't1.firm_id' => $firm_id, 't1.date>=' => $years['year1'] . '-04-01', 't1.date<=' => $years['year2'] . '-03-31');
         $purchases = $this->service->getpurchases($where);
         $services = $this->master->getservices();
         $report = array();
@@ -272,7 +280,7 @@ class Reports extends CI_Controller
         $user = getuser();
         $folders = array();
         $folder = array();
-        $folder['name'] = "Accountancy Report";
+        $folder['name'] = "Accounting Fee";
         $folder['count'] = '';
         $folder['link'] = ('reports/');
         $folders[] = $folder;

@@ -20,6 +20,7 @@
                                             foreach ($services as $single) {
                                                 $i++;
                                                 $single = checkservicepurchase($single, $user, $this->session->firm);
+                                                $in_package = !empty($package_service_ids) && in_array((string)$single['id'], $package_service_ids);
                                         ?>
                                                 <tr>
                                                     <td><?= $i; ?></td>
@@ -27,7 +28,13 @@
                                                     <td><?= $single['rate']; ?></td>
                                                     <td>
                                                         <?php
-                                                        if ($single['buy_status'] === true) {
+                                                        if ($in_package) {
+                                                        ?>
+                                                            <a href="<?= base_url('package/'); ?>" class="badge bg-info" style="font-size:12px; text-decoration:none;" title="View your service package">
+                                                                <i class="fa fa-cube"></i> In Package
+                                                            </a>
+                                                        <?php
+                                                        } elseif ($single['buy_status'] === true) {
                                                         ?>
                                                             <button type="button" class="btn btn-sm btn-success buy-btn" value="<?= $single['id'] ?>" data-types="<?= htmlspecialchars($single['type'], ENT_QUOTES); ?>" data-service-name="<?= htmlspecialchars($single['name'], ENT_QUOTES); ?>"><i class="fa fa-shopping-cart"></i> Purchase</button>
                                                         <?php

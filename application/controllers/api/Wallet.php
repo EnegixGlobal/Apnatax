@@ -78,66 +78,34 @@ class Wallet extends RestController
         if (!empty($token) && !empty($amount) && !empty($merchant_transaction_id)) {
             $user = $this->account->verify_token($token);
             if (!empty($user) && is_array($user) && $user['role'] == 'customer') {
-                $this->load->library('phonepe');
-                $redirect_url = base_url('home/paymentresponse/');
-                $data = array(
-                    'amount' => $amount,
-                    'user_id' => $user['id'],
-                    'mobile' => $user['mobile'],
-                    'transactionId' => $merchant_transaction_id,
-                    'redirect_url' => $redirect_url
-                );
-                // Generate PhonePe payment URL
-                $merchantId = PHONEPE_MERCHANT_ID;
-                $saltKey = PHONEPE_SALT_KEY;
-                $saltIndex = PHONEPE_SALT_INDEX;
-                $env = PHONEPE_ENV;
+                // Use Razorpay for initiating payment (mobile / API clients)
+                $this->load->library('Razorpay_lib');
 
-                $base_url = $env == 'sandbox' ? 'https://api-preprod.phonepe.com/apis/hermes' : 'https://api-preprod.phonepe.com/apis/hermes';
+                $notes = [
+                    'user_id'        => $user['id'],
+                    'purpose'        => 'wallet_topup',
+                    'wallet_txn_id'  => $merchant_transaction_id,
+                    'source'         => 'api',
+                ];
 
-                $payload = array(
-                    "merchantId" => $merchantId,
-                    "merchantTransactionId" => $merchant_transaction_id,
-                    "merchantUserId" => $user['id'],
-                    "amount" => $amount * 100,
-                    "redirectUrl" => $redirect_url,
-                    "redirectMode" => "POST",
-                    "callbackUrl" => base_url('home/phonepewebhook'),
-                    "mobileNumber" => $user['mobile'],
-                    "paymentInstrument" => array("type" => "PAY_PAGE")
-                );
+                $orderResponse = $this->razorpay_lib->create_order($amount, $merchant_transaction_id, $notes);
 
-                $payloadJson = json_encode($payload, JSON_UNESCAPED_SLASHES);
-                $base64Payload = base64_encode($payloadJson);
-                $xVerify = hash('sha256', $base64Payload . "/pg/v1/pay" . $saltKey) . "###" . $saltIndex;
-
-                $apiUrl = $base_url . "/pg/v1/pay";
-
-                $ch = curl_init($apiUrl);
-                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                curl_setopt($ch, CURLOPT_HTTPHEADER, array(
-                    "Content-Type: application/json",
-                    "X-VERIFY: $xVerify"
-                ));
-                curl_setopt($ch, CURLOPT_POST, true);
-                curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode(array("request" => $base64Payload)));
-                $response = curl_exec($ch);
-                $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                curl_close($ch);
-
-                $responseData = json_decode($response, true);
-
-                if (!empty($responseData['success']) && $responseData['success'] === true) {
-                    $paymentUrl = $responseData['data']['instrumentResponse']['redirectInfo']['url'];
+                if (!empty($orderResponse['success']) && !empty($orderResponse['data']['id'])) {
+                    $order = $orderResponse['data'];
                     $this->response([
-                        'status' => true,
-                        'payment_url' => $paymentUrl,
-                        'merchant_transaction_id' => $merchant_transaction_id
+                        'status'                 => true,
+                        'gateway'                => 'razorpay',
+                        'razorpay_key_id'        => RAZORPAY_KEY_ID,
+                        'razorpay_order_id'      => $order['id'],
+                        'merchant_transaction_id' => $merchant_transaction_id,
+                        'amount'                 => $order['amount'],
+                        'currency'               => $order['currency'],
                     ], RestController::HTTP_OK);
                 } else {
+                    $message = !empty($orderResponse['error']['description']) ? $orderResponse['error']['description'] : "Payment Initiation Failed!";
                     $this->response([
                         'status' => false,
-                        'message' => !empty($responseData['message']) ? $responseData['message'] : "Payment Initiation Failed!"
+                        'message' => $message
                     ], RestController::HTTP_OK);
                 }
             } else {

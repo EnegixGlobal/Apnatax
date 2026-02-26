@@ -528,6 +528,7 @@ class Profile extends RestController
         $token = $this->post('token');
         $firm_id = $this->post('firm_id');
         $service_ids = $this->post('service_ids');
+        $service_option_ids = $this->post('service_option_ids'); // JSON format: {"service_id": ["option_id1", "option_id2"], ...}
         $year = $this->post('year');
         if (!empty($token) && !empty($service_ids) && !empty($year) && !empty($firm_id)) {
             $user = $this->account->verify_token($token);
@@ -539,7 +540,30 @@ class Profile extends RestController
                     $where = "status='1' and id in ('" . implode("','", $s_ids) . "')";
                     $services = $this->master->getservices($where);
                     if (!empty($services)) {
-                        $data = array('user_id' => $user['id'], 'firm_id' => $firm_id, 'year' => $year, 'service_ids' => $service_ids);
+                        // Process service options - convert to JSON if provided
+                        $service_option_ids_json = NULL;
+                        if (!empty($service_option_ids)) {
+                            // If it's already a JSON string, validate it; otherwise try to decode
+                            if (is_string($service_option_ids)) {
+                                $decoded = json_decode($service_option_ids, true);
+                                if (json_last_error() === JSON_ERROR_NONE) {
+                                    $service_option_ids_json = $service_option_ids;
+                                } else {
+                                    // If not valid JSON, try to parse as array
+                                    $service_option_ids_json = json_encode($service_option_ids);
+                                }
+                            } else {
+                                $service_option_ids_json = json_encode($service_option_ids);
+                            }
+                        }
+
+                        $data = array(
+                            'user_id' => $user['id'],
+                            'firm_id' => $firm_id,
+                            'year' => $year,
+                            'service_ids' => $service_ids,
+                            'service_option_ids' => $service_option_ids_json
+                        );
                         $result = $this->customer->createpackage($data);
                         if ($result['status'] === true) {
                             $this->response([
@@ -607,6 +631,72 @@ class Profile extends RestController
                     $this->response([
                         'status' => false,
                         'message' => "Firm not Selected!"
+                    ], RestController::HTTP_OK);
+                }
+            } else {
+                $this->response([
+                    'status' => false,
+                    'message' => "Unauthorized Access!"
+                ], RestController::HTTP_OK);
+            }
+        } else {
+            $this->response([
+                'status' => false,
+                'message' => "Please provide all Details!"
+            ], RestController::HTTP_OK);
+        }
+    }
+
+    public function requestpackagedelete_post()
+    {
+        $token = $this->post('token');
+        $firm_id = $this->post('firm_id');
+        $year = $this->post('year');
+
+        if (!empty($token) && !empty($firm_id) && !empty($year)) {
+            $user = $this->account->verify_token($token);
+            if (!empty($user) && is_array($user) && $user['role'] == 'customer') {
+                // Check if request column exists
+                $check_column = $this->db->query("SHOW COLUMNS FROM `tf_service_packages` LIKE 'request'");
+                if ($check_column->num_rows() == 0) {
+                    $this->response([
+                        'status' => false,
+                        'message' => "Delete request feature is not available. Please contact administrator."
+                    ], RestController::HTTP_OK);
+                    return;
+                }
+
+                $where = array('t1.user_id' => $user['id'], 't1.firm_id' => $firm_id, 't1.year' => $year);
+                $service_package = $this->customer->getservicepackage($where, 'single');
+                if (!empty($service_package)) {
+                    // Check if request field exists in the result
+                    if (!isset($service_package['request'])) {
+                        $service_package['request'] = 0;
+                    }
+                    // Allow request if no request (0) or if rejected (2) - can re-request after rejection
+                    if ($service_package['request'] == 0 || $service_package['request'] == 2) {
+                        if ($this->db->update('service_packages', ['request' => 1], ['id' => $service_package['id']])) {
+                            $message = $service_package['request'] == 2 ? "Package Delete Request Resubmitted! Admin will review your request." : "Package Delete Request Saved! Admin will review your request.";
+                            $this->response([
+                                'status' => true,
+                                'message' => $message
+                            ], RestController::HTTP_OK);
+                        } else {
+                            $this->response([
+                                'status' => false,
+                                'message' => "Failed to save delete request!"
+                            ], RestController::HTTP_OK);
+                        }
+                    } else {
+                        $this->response([
+                            'status' => false,
+                            'message' => "Delete Request already submitted!"
+                        ], RestController::HTTP_OK);
+                    }
+                } else {
+                    $this->response([
+                        'status' => false,
+                        'message' => "Package not found!"
                     ], RestController::HTTP_OK);
                 }
             } else {

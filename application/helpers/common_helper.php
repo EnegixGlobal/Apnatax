@@ -461,7 +461,16 @@ if (!function_exists('checkservicepurchase')) {
     function checkservicepurchase($service, $user, $firm_id, $year = NULL)
     {
         $CI = get_instance();
-        $year = empty($year) ? $CI->session->year : $year;
+        // Use provided year, or try to get from session, or use current year
+        if (empty($year)) {
+            if (isset($CI->session) && !empty($CI->session->year)) {
+                $year = $CI->session->year;
+            } else {
+                // Fallback to current financial year if no session
+                $currentYear = date('Y');
+                $year = $currentYear . ($currentYear + 1); // Format: "20232024"
+            }
+        }
         $service_for = $service['service_for'];
         $types = explode(',', $service['type']);
         $status = true;

@@ -1,5 +1,5 @@
 <?php
-defined('BASEPATH') OR exit('No direct script access allowed');
+defined('BASEPATH') or exit('No direct script access allowed');
 
 /*
 |--------------------------------------------------------------------------
@@ -11,7 +11,7 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 | of this setting
 |
 */
-defined('SHOW_DEBUG_BACKTRACE') OR define('SHOW_DEBUG_BACKTRACE', TRUE);
+defined('SHOW_DEBUG_BACKTRACE') or define('SHOW_DEBUG_BACKTRACE', TRUE);
 
 /*
 |--------------------------------------------------------------------------
@@ -26,10 +26,10 @@ defined('SHOW_DEBUG_BACKTRACE') OR define('SHOW_DEBUG_BACKTRACE', TRUE);
 | always be used to set the mode correctly.
 |
 */
-defined('FILE_READ_MODE')  OR define('FILE_READ_MODE', 0644);
-defined('FILE_WRITE_MODE') OR define('FILE_WRITE_MODE', 0666);
-defined('DIR_READ_MODE')   OR define('DIR_READ_MODE', 0755);
-defined('DIR_WRITE_MODE')  OR define('DIR_WRITE_MODE', 0755);
+defined('FILE_READ_MODE')  or define('FILE_READ_MODE', 0644);
+defined('FILE_WRITE_MODE') or define('FILE_WRITE_MODE', 0666);
+defined('DIR_READ_MODE')   or define('DIR_READ_MODE', 0755);
+defined('DIR_WRITE_MODE')  or define('DIR_WRITE_MODE', 0755);
 
 /*
 |--------------------------------------------------------------------------
@@ -39,14 +39,14 @@ defined('DIR_WRITE_MODE')  OR define('DIR_WRITE_MODE', 0755);
 | These modes are used when working with fopen()/popen()
 |
 */
-defined('FOPEN_READ')                           OR define('FOPEN_READ', 'rb');
-defined('FOPEN_READ_WRITE')                     OR define('FOPEN_READ_WRITE', 'r+b');
-defined('FOPEN_WRITE_CREATE_DESTRUCTIVE')       OR define('FOPEN_WRITE_CREATE_DESTRUCTIVE', 'wb'); // truncates existing file data, use with care
-defined('FOPEN_READ_WRITE_CREATE_DESTRUCTIVE')  OR define('FOPEN_READ_WRITE_CREATE_DESTRUCTIVE', 'w+b'); // truncates existing file data, use with care
-defined('FOPEN_WRITE_CREATE')                   OR define('FOPEN_WRITE_CREATE', 'ab');
-defined('FOPEN_READ_WRITE_CREATE')              OR define('FOPEN_READ_WRITE_CREATE', 'a+b');
-defined('FOPEN_WRITE_CREATE_STRICT')            OR define('FOPEN_WRITE_CREATE_STRICT', 'xb');
-defined('FOPEN_READ_WRITE_CREATE_STRICT')       OR define('FOPEN_READ_WRITE_CREATE_STRICT', 'x+b');
+defined('FOPEN_READ')                           or define('FOPEN_READ', 'rb');
+defined('FOPEN_READ_WRITE')                     or define('FOPEN_READ_WRITE', 'r+b');
+defined('FOPEN_WRITE_CREATE_DESTRUCTIVE')       or define('FOPEN_WRITE_CREATE_DESTRUCTIVE', 'wb'); // truncates existing file data, use with care
+defined('FOPEN_READ_WRITE_CREATE_DESTRUCTIVE')  or define('FOPEN_READ_WRITE_CREATE_DESTRUCTIVE', 'w+b'); // truncates existing file data, use with care
+defined('FOPEN_WRITE_CREATE')                   or define('FOPEN_WRITE_CREATE', 'ab');
+defined('FOPEN_READ_WRITE_CREATE')              or define('FOPEN_READ_WRITE_CREATE', 'a+b');
+defined('FOPEN_WRITE_CREATE_STRICT')            or define('FOPEN_WRITE_CREATE_STRICT', 'xb');
+defined('FOPEN_READ_WRITE_CREATE_STRICT')       or define('FOPEN_READ_WRITE_CREATE_STRICT', 'x+b');
 
 /*
 |--------------------------------------------------------------------------
@@ -73,59 +73,69 @@ defined('FOPEN_READ_WRITE_CREATE_STRICT')       OR define('FOPEN_READ_WRITE_CREA
 |       http://tldp.org/LDP/abs/html/exitcodes.html
 |
 */
-defined('EXIT_SUCCESS')        OR define('EXIT_SUCCESS', 0); // no errors
-defined('EXIT_ERROR')          OR define('EXIT_ERROR', 1); // generic error
-defined('EXIT_CONFIG')         OR define('EXIT_CONFIG', 3); // configuration error
-defined('EXIT_UNKNOWN_FILE')   OR define('EXIT_UNKNOWN_FILE', 4); // file not found
-defined('EXIT_UNKNOWN_CLASS')  OR define('EXIT_UNKNOWN_CLASS', 5); // unknown class
-defined('EXIT_UNKNOWN_METHOD') OR define('EXIT_UNKNOWN_METHOD', 6); // unknown class member
-defined('EXIT_USER_INPUT')     OR define('EXIT_USER_INPUT', 7); // invalid user input
-defined('EXIT_DATABASE')       OR define('EXIT_DATABASE', 8); // database error
-defined('EXIT__AUTO_MIN')      OR define('EXIT__AUTO_MIN', 9); // lowest automatically-assigned error code
-defined('EXIT__AUTO_MAX')      OR define('EXIT__AUTO_MAX', 125); // highest automatically-assigned error code
+defined('EXIT_SUCCESS')        or define('EXIT_SUCCESS', 0); // no errors
+defined('EXIT_ERROR')          or define('EXIT_ERROR', 1); // generic error
+defined('EXIT_CONFIG')         or define('EXIT_CONFIG', 3); // configuration error
+defined('EXIT_UNKNOWN_FILE')   or define('EXIT_UNKNOWN_FILE', 4); // file not found
+defined('EXIT_UNKNOWN_CLASS')  or define('EXIT_UNKNOWN_CLASS', 5); // unknown class
+defined('EXIT_UNKNOWN_METHOD') or define('EXIT_UNKNOWN_METHOD', 6); // unknown class member
+defined('EXIT_USER_INPUT')     or define('EXIT_USER_INPUT', 7); // invalid user input
+defined('EXIT_DATABASE')       or define('EXIT_DATABASE', 8); // database error
+defined('EXIT__AUTO_MIN')      or define('EXIT__AUTO_MIN', 9); // lowest automatically-assigned error code
+defined('EXIT__AUTO_MAX')      or define('EXIT__AUTO_MAX', 125); // highest automatically-assigned error code
 
 ///////////////////////////////////////////////
-$startyear='2023';
+$startyear = '2023';
 $curyear = date('Y');
-if($startyear<$curyear){
-    $curyear=$startyear.'-'.$curyear;
+if ($startyear < $curyear) {
+	$curyear = $startyear . '-' . $curyear;
 }
-defined('PROJECT_NAME')        OR define('PROJECT_NAME','ApnoTax'); 
-defined('OUR_BRAND')       	   OR define('OUR_BRAND','<b>Developed & Managed </b> by <span class="text-danger"> Tripledots Software Services Pvt. Ltd.</span>');
-defined('SESSION_YEAR')        OR define('SESSION_YEAR',"$curyear");
-defined('SITE_SALT')           OR define('SITE_SALT',"Taxefi");
-defined('TP')        		   OR define('TP',"tf_"); // Table Prefix
-defined('PRE')                 OR define('PRE',"<pre>");
-defined('HEADERTHEME')         OR define('HEADERTHEME',"theme1"); // default themelight1
-defined('LOGOTHEME')           OR define('LOGOTHEME',"theme1"); //default theme6
+defined('PROJECT_NAME')        or define('PROJECT_NAME', 'ApnoTax');
+defined('OUR_BRAND')       	   or define('OUR_BRAND', '<b>Developed & Managed </b> by <span class="text-danger"> Tripledots Software Services Pvt. Ltd.</span>');
+defined('SESSION_YEAR')        or define('SESSION_YEAR', "$curyear");
+defined('SITE_SALT')           or define('SITE_SALT', "Taxefi");
+defined('TP')        		   or define('TP', "tf_"); // Table Prefix
+defined('PRE')                 or define('PRE', "<pre>");
+defined('HEADERTHEME')         or define('HEADERTHEME', "theme1"); // default themelight1
+defined('LOGOTHEME')           or define('LOGOTHEME', "theme1"); //default theme6
 
 /*-------------Notification---------------*/
-defined('NFROM')               OR define('NFROM',"top");
-defined('NALIGN')              OR define('NALIGN',"center");
-defined('NANIMATEIN')          OR define('NANIMATEIN',"flipInY");
-defined('NANIMATEOUT')         OR define('NANIMATEOUT',"flipOutY");
+defined('NFROM')               or define('NFROM', "top");
+defined('NALIGN')              or define('NALIGN', "center");
+defined('NANIMATEIN')          or define('NANIMATEIN', "flipInY");
+defined('NANIMATEOUT')         or define('NANIMATEOUT', "flipOutY");
 
 /*-------------Notification---------------*/
 
-defined('REQUEST_LOG')         OR define('REQUEST_LOG',TRUE); //REQUEST_LOG
-defined('CI_DEBUGGER')         OR define('CI_DEBUGGER',TRUE);
+defined('REQUEST_LOG')         or define('REQUEST_LOG', TRUE); //REQUEST_LOG
+defined('CI_DEBUGGER')         or define('CI_DEBUGGER', TRUE);
 
 /////////////////////////////////////////////
 
-defined('PHONEPE_MERCHANT_ID')    OR define('PHONEPE_MERCHANT_ID','PGTESTPAYUAT105'); //MERCHANT_ID
-defined('PHONEPE_SALT_KEY')       OR define('PHONEPE_SALT_KEY','c45b52fe-f2c5-4ef6-a6b5-131aa89ed133'); //SALT_KEY
-defined('PHONEPE_SALT_INDEX')     OR define('PHONEPE_SALT_INDEX','1'); //SALT_INDEX
-defined('PHONEPE_ENV')            OR define('PHONEPE_ENV','sandbox'); //PHONEPE_ENV
+defined('PHONEPE_MERCHANT_ID')    or define('PHONEPE_MERCHANT_ID', 'PGTESTPAYUAT105'); //MERCHANT_ID
+defined('PHONEPE_SALT_KEY')       or define('PHONEPE_SALT_KEY', 'c45b52fe-f2c5-4ef6-a6b5-131aa89ed133'); //SALT_KEY
+defined('PHONEPE_SALT_INDEX')     or define('PHONEPE_SALT_INDEX', '1'); //SALT_INDEX
+defined('PHONEPE_ENV')            or define('PHONEPE_ENV', 'sandbox'); //PHONEPE_ENV
+
+/////////////////////////////////////////////
+// Razorpay Configuration
+// IMPORTANT: Set these to your actual Razorpay credentials in your local env.
+// Do NOT commit real live keys to version control.
+
+// defined('RAZORPAY_KEY_ID')        or define('RAZORPAY_KEY_ID', 'rzp_live_SK31frYH5VlyOw');
+// defined('RAZORPAY_KEY_SECRET')    or define('RAZORPAY_KEY_SECRET', '0QF4hDSZfy80XpCJBiZ1mb0d');
+defined('RAZORPAY_KEY_ID')        or define('RAZORPAY_KEY_ID', 'rzp_test_WjIc9lHqMXp8Ma');
+defined('RAZORPAY_KEY_SECRET')    or define('RAZORPAY_KEY_SECRET', '6Fq6oGGBt3N7s2REGjjw2Vu7');
+defined('RAZORPAY_CURRENCY')      or define('RAZORPAY_CURRENCY', 'INR');
 
 /////////////////////////////////////////////
 
-if(isset($_SERVER['HTTP_HOST']) && $_SERVER['HTTP_HOST']=='localhost'){
-	defined('DB_HOST')		? null : define('DB_HOST','localhost');
+if (isset($_SERVER['HTTP_HOST']) && $_SERVER['HTTP_HOST'] == 'localhost') {
+	defined('DB_HOST')		? null : define('DB_HOST', 'localhost');
 	defined('DB_USER')		? null : define('DB_USER', 'root');
-	defined('DB_PASSWORD')	? null : define('DB_PASS','');
-	defined('DB_NAME')		? null : define('DB_NAME','db_taxefi');
-}
-else{
+	defined('DB_PASSWORD')	? null : define('DB_PASS', '');
+	defined('DB_NAME')		? null : define('DB_NAME', 'db_taxefi');
+} else {
 	defined('DB_HOST')      ? null : define('DB_HOST', '127.0.0.1');
 	defined('DB_USER')      ? null : define('DB_USER', 'u711511560_user_taxefi');
 	defined('DB_PASSWORD')  ? null : define('DB_PASS', 'Taxefi@123#$');

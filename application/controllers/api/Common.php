@@ -14,16 +14,58 @@ class Common extends RestController
     public function getservices_post()
     {
         $token = $this->post('token');
+        $firm_id = $this->post('firm_id'); // Optional: for purchase status check
+        $year = $this->post('year'); // Optional: for purchase status check
+
         if (!empty($token)) {
             $verify = $this->account->verify_token($token);
-            if ($verify !== false) {
+            if ($verify !== false && is_array($verify) && $verify['role'] == 'customer') {
+                $this->load->helper('common'); // Load common helper for checkservicepurchase
+
                 $where = ['status' => 1];
                 $services = $this->master->getservices($where);
+
                 if (!empty($services)) {
+                    // Load service options for services that have dynamic options (like website)
                     foreach ($services as $key => $service) {
+                        $service_options = $this->master->getserviceoptions(array('service_id' => $service['id'], 'status' => 1), 'all');
+                        if (!empty($service_options)) {
+                            $services[$key]['has_options'] = true;
+                            $services[$key]['options'] = $service_options;
+                        } else {
+                            $services[$key]['has_options'] = false;
+                        }
+
+                        // Convert types and services_for to arrays
                         $services[$key]['types'] = explode(',', $service['type']);
                         $services[$key]['services_for'] = explode(',', $service['service_for']);
+
+                        // Apply purchase check logic (same as website) if firm_id and year provided
+                        // Website calls: checkservicepurchase($single, $user, $this->session->firm, $this->session->year)
+                        if (!empty($firm_id) && !empty($year)) {
+                            // Call checkservicepurchase with explicit year (matches website exactly)
+                            // This checks:
+                            // - Service ID 1: Package already selected
+                            // - Once type: Already purchased
+                            // - Yearly: Max 1 per year
+                            // - Quarterly: Max 4 per year  
+                            // - Monthly: Max 12 per year
+                            $services[$key] = checkservicepurchase($services[$key], $verify, $firm_id, $year);
+
+                            // Ensure buy_status is boolean (not undefined) - convert to boolean explicitly
+                            $services[$key]['buy_status'] = isset($services[$key]['buy_status']) ? (bool)$services[$key]['buy_status'] : true;
+                            $services[$key]['message'] = isset($services[$key]['message']) ? $services[$key]['message'] : '';
+                        } else {
+                            // If firm/year not provided, default to allowing purchase (for backward compatibility)
+                            // But log warning so we know when this happens
+                            $services[$key]['buy_status'] = true;
+                            $services[$key]['message'] = '';
+                            if (empty($firm_id) || empty($year)) {
+                                log_message('debug', 'getservices_post: firm_id or year not provided. Service ID: ' . $services[$key]['id'] . ' - Purchase checks skipped.');
+                            }
+                        }
                     }
+
                     $this->response([
                         'status' => true,
                         'services' => $services

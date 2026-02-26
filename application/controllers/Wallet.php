@@ -151,18 +151,39 @@ class Wallet extends CI_Controller
             }
             $result = $this->wallet->addtowallet($data);
             if ($result['status'] === true) {
-                $params = "user=" . md5('user-id-' . $user['id']) . '&merchant_transaction_id=' . $result['merchant_transaction_id'];
-                $params .= "&year=" . $this->session->year . "&firm=" . $this->session->firm;
-                $this->load->library('phonepe');
-                $redirect_url = base_url('home/paymentresponse/?' . $params);
-                $data = array(
-                    'amount' => $data['amount'],
-                    'user_id' => $user['id'],
-                    'mobile' => $user['mobile'],
-                    'transactionId' => $result['merchant_transaction_id'],
-                    'redirect_url' => $redirect_url
-                );
-                $this->phonepe->initiatePayment($data);
+                // Create Razorpay order for wallet top-up
+                $this->load->library('Razorpay_lib');
+
+                $merchant_transaction_id = $result['merchant_transaction_id'];
+                $notes = [
+                    'user_id'  => $user['id'],
+                    'purpose'  => 'wallet_topup',
+                    'wallet_txn_id' => $merchant_transaction_id,
+                ];
+
+                $orderResponse = $this->razorpay_lib->create_order($amount, $merchant_transaction_id, $notes);
+
+                if (!empty($orderResponse['success']) && !empty($orderResponse['data']['id'])) {
+                    $order = $orderResponse['data'];
+
+                    // Load Razorpay Checkout view
+                    $viewData = [
+                        'razorpay_key_id'   => RAZORPAY_KEY_ID,
+                        'order_id'          => $order['id'],
+                        'amount_paise'      => $order['amount'],
+                        'currency'          => $order['currency'],
+                        'user'              => $user,
+                        'merchant_txn_id'   => $merchant_transaction_id,
+                        'callback_url'      => base_url('home/razorpay_callback'),
+                        'display_amount'    => $amount,
+                    ];
+
+                    $this->load->view('razorpay', $viewData);
+                } else {
+                    $error_message = !empty($orderResponse['error']['description']) ? $orderResponse['error']['description'] : 'Unable to initiate payment. Please try again.';
+                    $this->session->set_flashdata("err_msg", $error_message);
+                    redirect('wallet/mywallet/');
+                }
             } else {
                 $this->session->set_flashdata("err_msg", $result['message']);
                 redirect('wallet/mywallet/');

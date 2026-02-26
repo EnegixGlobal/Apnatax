@@ -116,6 +116,7 @@ $route['api/formpreview'] = 'api/services/formpreview';
 
 $route['api/createpackage'] = 'api/profile/createpackage';
 $route['api/myservicepackage'] = 'api/profile/myservicepackage';
+$route['api/requestpackagedelete'] = 'api/profile/requestpackagedelete';
 
 $route['api/addfirm'] = 'api/profile/addfirm';
 $route['api/myfirms'] = 'api/profile/myfirms';
