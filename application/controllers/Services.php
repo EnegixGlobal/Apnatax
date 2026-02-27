@@ -12,6 +12,8 @@ class Services extends CI_Controller
         if ($this->session->role != 'customer') {
             redirect('home/');
         }
+        // Load invoice model for billing
+        $this->load->model('Invoice_model', 'invoice');
     }
 
     public function index()
@@ -137,10 +139,10 @@ class Services extends CI_Controller
                 $services[$key]['name'] = $service['service_name'];
                 $services[$key]['count'] = '';
                 $services[$key]['link'] = ('services/monthlyservices/' . $service['service_slug']);
-                
+
                 // First check if service_option_display exists in purchase record (for manually purchased services)
                 $service_option_display = !empty($service['service_option_display']) ? $service['service_option_display'] : '';
-                
+
                 // If not found in purchase record, check package service options
                 if (empty($service_option_display) && !empty($package_service_options)) {
                     $service_id = $service['service_id'];
@@ -150,7 +152,7 @@ class Services extends CI_Controller
                         if (is_array($option_id)) {
                             $option_id = !empty($option_id[0]) ? $option_id[0] : '';
                         }
-                        
+
                         if (!empty($option_id)) {
                             // Get option display name from service_options table
                             $option = $this->master->getserviceoptions(array('id' => $option_id, 'status' => 1), 'single');
@@ -160,7 +162,7 @@ class Services extends CI_Controller
                         }
                     }
                 }
-                
+
                 $services[$key]['service_option_display'] = $service_option_display;
             }
         } else {
@@ -260,11 +262,229 @@ class Services extends CI_Controller
             }
         }
 
+        /**
+         * Renewal candidates:
+         * - Services that existed in any expired package for this firm/user
+         * - But are NOT present in the current year's package
+         * These are shown as "Renew" rows without requiring an existing purchase.
+         */
+        $renewals = array();
+
+        // Build quick lookup for current year package service IDs
+        $current_service_ids = array();
+        if (!empty($service_package) && !empty($service_package['service_ids'])) {
+            $current_ids_raw = explode(',', $service_package['service_ids']);
+            $current_service_ids = array_filter(array_map('trim', $current_ids_raw));
+        }
+
+        if (!empty($expired_packages)) {
+            foreach ($expired_packages as $expired_package) {
+                if (empty($expired_package['service_ids'])) {
+                    continue;
+                }
+                $expired_service_ids = array_filter(array_map('trim', explode(',', $expired_package['service_ids'])));
+                foreach ($expired_service_ids as $sid) {
+                    if ($sid === '') {
+                        continue;
+                    }
+                    // Skip if already in current package
+                    if (in_array($sid, $current_service_ids, true)) {
+                        continue;
+                    }
+                    // Avoid duplicates across multiple expired years
+                    if (isset($renewals[$sid])) {
+                        continue;
+                    }
+
+                    // Get service details
+                    $service = $this->master->getservices(array('id' => $sid), 'single');
+                    if (empty($service)) {
+                        continue;
+                    }
+
+                    // Optional: if you want to consider debit_date, you can add checks here
+                    // For now, any service from expired packages that is not in current package is a renewal candidate.
+
+                    $renewals[$sid] = array(
+                        'id' => 0,
+                        'service_id' => (int)$sid,
+                        'service_name' => $service['name'],
+                        'service_slug' => $service['slug'],
+                        'month' => '',
+                        'amount' => $service['rate'],
+                        'is_renewal' => 1,
+                        'expired_year' => $expired_package['year']
+                    );
+                }
+            }
+        }
+
+        // Merge real pending purchases with renewal candidates
+        if (!empty($renewals)) {
+            $services = array_merge($services, array_values($renewals));
+        }
+
         $data['services'] = $services;
         //print_pre($data,true);
         $data['datatable'] = true;
         //$data['folders']=$folders;
         $this->template->load('services', 'pendingservices', $data);
+    }
+
+    /**
+     * Renew a service from expired package into current year's package.
+     * - Adds the service_id back into current year service_packages row (create or update).
+     * - Does NOT create a purchase; this is purely package-level renewal for now.
+     */
+    public function renewservice()
+    {
+        // Only customers can renew
+        if ($this->session->role != 'customer') {
+            echo json_encode(array('status' => false, 'message' => 'Unauthorized request.'));
+            return;
+        }
+
+        $service_id = $this->input->post('service_id');
+        $user = getuser();
+        $year = $this->session->year;
+        $firm_id = $this->session->firm;
+
+        if (empty($service_id) || !is_numeric($service_id)) {
+            echo json_encode(array('status' => false, 'message' => 'Invalid service selected.'));
+            return;
+        }
+        if (empty($user['id']) || empty($firm_id) || empty($year)) {
+            echo json_encode(array('status' => false, 'message' => 'Please select Year and Firm before renewing services.'));
+            return;
+        }
+
+        // Make sure service exists and is active
+        $service = $this->master->getservices(array('id' => $service_id, 'status' => 1), 'single');
+        if (empty($service)) {
+            echo json_encode(array('status' => false, 'message' => 'Service not found or inactive.'));
+            return;
+        }
+
+        // Check that this service existed in at least one expired package for this user/firm
+        $user_id_escaped = $this->db->escape($user['id']);
+        $firm_id_escaped = $this->db->escape($firm_id);
+        $year_escaped = $this->db->escape($year);
+        $service_id_int = (int)$service_id;
+
+        $expired_check_sql = "
+            SELECT t1.*
+            FROM " . $this->db->dbprefix('service_packages') . " t1
+            WHERE t1.user_id = {$user_id_escaped}
+              AND t1.firm_id = {$firm_id_escaped}
+              AND t1.year != {$year_escaped}
+              AND FIND_IN_SET(" . $service_id_int . ", t1.service_ids) > 0
+            LIMIT 1
+        ";
+        $expired_row = $this->db->query($expired_check_sql)->unbuffered_row('array');
+
+        if (empty($expired_row)) {
+            echo json_encode(array('status' => false, 'message' => 'This service is not part of any previous package for renewal.'));
+            return;
+        }
+
+        // Get or create current year package
+        $current_package = $this->customer->getservicepackage(
+            array('t1.user_id' => $user['id'], 't1.firm_id' => $firm_id, 't1.year' => $year),
+            'single'
+        );
+
+        $current_ids = array();
+        if (!empty($current_package) && !empty($current_package['service_ids'])) {
+            $current_ids_raw = explode(',', $current_package['service_ids']);
+            $current_ids = array_filter(array_map('trim', $current_ids_raw));
+        }
+
+        // If already present in current package, nothing to do
+        if (in_array((string)$service_id_int, $current_ids, true)) {
+            echo json_encode(array('status' => true, 'message' => 'Service is already active in your current package.'));
+            return;
+        }
+
+        $current_ids[] = (string)$service_id_int;
+        $current_ids = array_unique(array_filter($current_ids));
+
+        $data = array(
+            'user_id' => $user['id'],
+            'firm_id' => $firm_id,
+            'year' => $year,
+            'service_ids' => implode(',', $current_ids)
+        );
+
+        // Preserve existing service_option_ids if any
+        if (!empty($current_package) && isset($current_package['service_option_ids'])) {
+            $data['service_option_ids'] = $current_package['service_option_ids'];
+        }
+
+        $result = $this->customer->createpackage($data);
+
+        if (!empty($result['status']) && $result['status'] === true) {
+            // Create an invoice for this renewed service (package-level billing)
+            try {
+                // Fetch customer & firm info for billing header
+                $customer = $this->customer->getcustomers(['t1.user_id' => $user['id']], 'single');
+                $firm_info = $this->customer->getfirms(['t1.id' => $firm_id], 'single');
+
+                $subtotal = isset($service['rate']) ? (float)$service['rate'] : 0.0;
+                $gst_enabled = !empty($customer) && !empty($customer['gst_enabled']) && $customer['gst_enabled'] == 1;
+                $gst_rate = $gst_enabled ? 18.0 : 0.0;
+                $gst_amount = $gst_enabled ? round(($subtotal * $gst_rate) / 100, 2) : 0.0;
+                $total = $subtotal + $gst_amount;
+
+                // Determine a sensible type/period for renewal billing
+                $types = !empty($service['type']) ? explode(',', $service['type']) : [];
+                $primary_type = !empty($types[0]) ? trim($types[0]) : 'Yearly';
+
+                $invoice_data = [
+                    'user_id'        => $user['id'],
+                    'firm_id'        => $firm_id,
+                    'year'           => $year,
+                    'invoice_date'   => date('Y-m-d'),
+                    'billing_name'   => !empty($customer['name']) ? $customer['name'] : $user['name'],
+                    'billing_email'  => !empty($customer['email']) ? $customer['email'] : (isset($user['email']) ? $user['email'] : ''),
+                    'billing_mobile' => !empty($customer['mobile']) ? $customer['mobile'] : (isset($user['mobile']) ? $user['mobile'] : ''),
+                    'firm_name'      => !empty($firm_info['name']) ? $firm_info['name'] : '',
+                    'firm_gstin'     => !empty($firm_info['gstin']) ? $firm_info['gstin'] : '',
+                    'firm_pan'       => !empty($firm_info['pan']) ? $firm_info['pan'] : '',
+                    'service_name'   => $service['name'] . ' (Renewal)',
+                    'type'           => $primary_type,
+                    'period_value'   => $year,
+                    'subtotal'       => $subtotal,
+                    'gst_rate'       => $gst_rate,
+                    'gst_amount'     => $gst_amount,
+                    'total_amount'   => $total,
+                ];
+
+                if (isset($this->invoice) && method_exists($this->invoice, 'create_custom_invoice')) {
+                    $invoice_result = $this->invoice->create_custom_invoice($invoice_data);
+                    if (empty($invoice_result['status']) || $invoice_result['status'] !== true) {
+                        log_message('error', 'Renewal invoice creation failed for user ' . $user['id'] . ', service ' . $service_id . ': ' . $invoice_result['message']);
+                    }
+                }
+            } catch (Exception $e) {
+                log_message('error', 'Renewal invoice unexpected error: ' . $e->getMessage());
+            }
+
+            // Send notification to admin that user has renewed a service in package
+            $notifydata = array(
+                "type"    => "Service Renewed",
+                "user_id" => $user['id'],
+                // No specific order_id here, this is a package-level renewal
+                "message" => $user['name'] . ' has renewed service "' . $service['name'] . '" for firm ID ' . $firm_id . ' and year ' . $year . '.'
+            );
+            if (isset($this->common) && method_exists($this->common, 'savenotification')) {
+                $this->common->savenotification($notifydata);
+            }
+
+            echo json_encode(array('status' => true, 'message' => 'Service renewed and added to your current package successfully.'));
+        } else {
+            $message = !empty($result['message']) ? $result['message'] : 'Failed to renew service. Please try again.';
+            echo json_encode(array('status' => false, 'message' => $message));
+        }
     }
 
     public function monthlyservices($slug = NULL)
@@ -1092,7 +1312,24 @@ class Services extends CI_Controller
                         $result = $this->service->purchaseservices($data);
                         //print_pre($result);
                         if ($result['status'] == true) {
-                            $this->session->set_flashdata("msg", $result['message']);
+                            // Create invoice for this purchase (parent order)
+                            if (!empty($result['order_id'])) {
+                                $order = $this->service->getpurchases(['t1.id' => $result['order_id']], 'single');
+                                if (!empty($order)) {
+                                    $invoice_result = $this->invoice->create_for_order($order);
+                                    if ($invoice_result['status'] === true) {
+                                        $this->session->set_flashdata("msg", $result['message'] . ' Invoice No: ' . $invoice_result['invoice']['invoice_no']);
+                                    } else {
+                                        // If invoice fails, still keep purchase but log error
+                                        log_message('error', 'Invoice creation failed for order ' . $result['order_id'] . ': ' . $invoice_result['message']);
+                                        $this->session->set_flashdata("msg", $result['message']);
+                                    }
+                                } else {
+                                    $this->session->set_flashdata("msg", $result['message']);
+                                }
+                            } else {
+                                $this->session->set_flashdata("msg", $result['message']);
+                            }
                         } else {
                             $this->session->set_flashdata("err_msg", $result['message']);
                         }

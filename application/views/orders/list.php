@@ -43,7 +43,17 @@
                                                             <?php
                                                                 if($single['status']!=0){
                                                             ?>
-                                                            <a href="<?= base_url("orders/viewdocuments/".md5($single['id'])); ?>" class="btn btn-sm btn-info"><i class="fa fa-eye"></i></a>
+                                                            <a href="<?= base_url("orders/viewdocuments/".md5($single['id'])); ?>" class="btn btn-sm btn-info mb-1"><i class="fa fa-eye"></i></a>
+                                                            <?php
+                                                                // Determine main order id used for invoice (parent row if exists)
+                                                                $order_id = !empty($single['parent_id']) ? $single['parent_id'] : $single['id'];
+                                                            ?>
+                                                            <a href="<?= base_url("invoices/viewbyorder/".$order_id); ?>" class="btn btn-sm btn-primary mb-1">
+                                                                <i class="fa fa-file-invoice"></i> Invoice
+                                                            </a>
+                                                            <a href="<?= base_url("invoices/downloadbyorder/".$order_id); ?>" class="btn btn-sm btn-success">
+                                                                <i class="fa fa-download"></i>
+                                                            </a>
                                                             <?php 
                                                                 }
                                                             ?>

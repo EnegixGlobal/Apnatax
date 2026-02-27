@@ -48,7 +48,17 @@
                                                         </td>
                                                     <?php } ?>
                                                     <td>
-                                                        <a href="<?= base_url($single['link']) ?>" class="btn btn-sm btn-primary"><i class="fa fa-eye"></i> View</a>
+                                                        <a href="<?= base_url($single['link']) ?>" class="btn btn-sm btn-primary mb-1"><i class="fa fa-eye"></i> View</a>
+                                                        <?php
+                                                            // Use parent order id when available; fall back to this purchase id.
+                                                            $order_id = !empty($single['parent_id']) ? $single['parent_id'] : $single['id'];
+                                                        ?>
+                                                        <a href="<?= base_url("invoices/viewbyorder/".$order_id); ?>" class="btn btn-sm btn-outline-secondary mb-1">
+                                                            <i class="fa fa-file-invoice"></i> Invoice
+                                                        </a>
+                                                        <a href="<?= base_url("invoices/downloadbyorder/".$order_id); ?>" class="btn btn-sm btn-success">
+                                                            <i class="fa fa-download"></i>
+                                                        </a>
                                                     </td>
                                                 </tr>
                                         <?php

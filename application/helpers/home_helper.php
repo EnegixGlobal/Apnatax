@@ -90,29 +90,87 @@
 
 	if(!function_exists('countpendingservices')) {
   		function countpendingservices() {
-    		$CI = get_instance();
-            $user=getuser();
-            $year=$CI->session->year;
-            $firm_id=$CI->session->firm;
-            $data['user']=$user;
-            
-            // Get service package for this user/firm/year to get package service IDs
-            $service_package = $CI->customer->getservicepackage(['t1.user_id' => $user['id'], 't1.firm_id' => $firm_id, 't1.year' => $year], 'single');
-            
-            $services = array();
+    		$CI   = get_instance();
+            $user = getuser();
+            $year = $CI->session->year;
+            $firm_id = $CI->session->firm;
+
+            if (empty($user['id']) || empty($year) || empty($firm_id)) {
+                return 0;
+            }
+
+            $pending_count  = 0;
+            $renewal_ids    = array();
+            $current_ids    = array();
+
+            // Get current year service package (to know active services)
+            $service_package = $CI->customer->getservicepackage(
+                ['t1.user_id' => $user['id'], 't1.firm_id' => $firm_id, 't1.year' => $year],
+                'single'
+            );
+
             if (!empty($service_package) && !empty($service_package['service_ids'])) {
-                // Get service IDs from the package
-                $package_service_ids = explode(',', $service_package['service_ids']);
-                if (!empty($package_service_ids)) {
-                    // Filter to only count pending services that are part of the package
-                    $service_ids_str = implode(',', array_map('intval', $package_service_ids));
+                $current_ids_raw = explode(',', $service_package['service_ids']);
+                $current_ids = array_filter(array_map('trim', $current_ids_raw));
+
+                if (!empty($current_ids)) {
+                    // Count real pending purchases (old behaviour)
+                    $service_ids_str = implode(',', array_map('intval', $current_ids));
                     $where = "t1.user_id='$user[id]' and t1.firm_id='$firm_id' and t1.year='$year' and t1.status='0' and t1.service_id IN ($service_ids_str)";
                     $CI->db->group_by('t1.service_id');
                     $services = $CI->service->getpurchasedservices($where);
+                    $pending_count = !empty($services) ? count($services) : 0;
                 }
             }
-            
-            return !empty($services)?count($services):0;
+
+            /**
+             * Renewal candidates (same as pendingservices page logic):
+             * - Services that were in any expired package (previous years)
+             * - But are NOT present in the current year's package
+             * These should also be reflected in the dashboard count.
+             */
+            $prefix = $CI->db->dbprefix;
+            $table  = $prefix . 'service_packages';
+
+            $user_id_escaped = $CI->db->escape($user['id']);
+            $firm_id_escaped = $CI->db->escape($firm_id);
+            $year_escaped    = $CI->db->escape($year);
+
+            $expired_sql = "
+                SELECT *
+                FROM {$table}
+                WHERE user_id = {$user_id_escaped}
+                  AND firm_id = {$firm_id_escaped}
+                  AND year != {$year_escaped}
+            ";
+            $expired_packages = $CI->db->query($expired_sql)->result_array();
+
+            if (!empty($expired_packages)) {
+                foreach ($expired_packages as $expired_package) {
+                    if (empty($expired_package['service_ids'])) {
+                        continue;
+                    }
+                    $expired_ids = array_filter(array_map('trim', explode(',', $expired_package['service_ids'])));
+                    foreach ($expired_ids as $sid) {
+                        if ($sid === '') {
+                            continue;
+                        }
+                        // Skip if already in current year's package
+                        if (in_array($sid, $current_ids, true)) {
+                            continue;
+                        }
+                        // Avoid duplicates across multiple expired packages
+                        if (in_array($sid, $renewal_ids, true)) {
+                            continue;
+                        }
+                        $renewal_ids[] = $sid;
+                    }
+                }
+            }
+
+            $renewal_count = count($renewal_ids);
+
+            return $pending_count + $renewal_count;
 		}  
 	}
 
