@@ -566,9 +566,60 @@ class Profile extends RestController
                         );
                         $result = $this->customer->createpackage($data);
                         if ($result['status'] === true) {
+                            // Generate invoice for service package creation
+                            $invoice_no = '';
+                            $invoice_id = 0;
+                            try {
+                                // Calculate total from service rates
+                                $subtotal = 0;
+                                $service_names = [];
+                                foreach ($services as $svc) {
+                                    if (!empty($svc['rate']) && is_numeric($svc['rate'])) {
+                                        $subtotal += floatval($svc['rate']);
+                                    }
+                                    $service_names[] = $svc['name'];
+                                }
+                                // Only generate invoice if there is an amount
+                                if ($subtotal > 0) {
+                                    $this->load->model('Customer_model', 'customer_inv');
+                                    $customer = $this->customer->getcustomers(['t1.user_id' => $user['id']], 'single');
+                                    $gst_enabled = !empty($customer) && !empty($customer['gst_enabled']) && $customer['gst_enabled'] == 1;
+                                    $gst_amount  = $gst_enabled ? round(($subtotal * 18) / 100, 2) : 0;
+                                    $total_amount = $subtotal + $gst_amount;
+
+                                    $this->load->model('Invoice_model', 'invoice_model');
+                                    $inv_data = [
+                                        'user_id'        => $user['id'],
+                                        'firm_id'        => $firm_id,
+                                        'year'           => $year,
+                                        'invoice_date'   => date('Y-m-d'),
+                                        'billing_name'   => $user['name'],
+                                        'billing_email'  => !empty($user['email']) ? $user['email'] : '',
+                                        'billing_mobile' => !empty($user['mobile']) ? $user['mobile'] : '',
+                                        'firm_name'      => !empty($firm['name']) ? $firm['name'] : '',
+                                        'firm_gstin'     => !empty($firm['gstin']) ? $firm['gstin'] : '',
+                                        'service_name'   => implode(', ', $service_names),
+                                        'type'           => 'Yearly',
+                                        'period'         => $year,
+                                        'subtotal'       => $subtotal,
+                                        'gst_rate'       => $gst_enabled ? 18 : 0,
+                                        'gst_amount'     => $gst_amount,
+                                        'total_amount'   => $total_amount,
+                                    ];
+                                    $inv_result = $this->invoice_model->create_custom_invoice($inv_data);
+                                    if ($inv_result['status'] && !empty($inv_result['invoice'])) {
+                                        $invoice_no = $inv_result['invoice']['invoice_no'];
+                                        $invoice_id = (int)$inv_result['invoice']['id'];
+                                    }
+                                }
+                            } catch (Exception $e) {
+                                // Invoice generation failure should not block package save
+                            }
                             $this->response([
-                                'status' => true,
-                                'message' => $result['message']
+                                'status'     => true,
+                                'message'    => $result['message'],
+                                'invoice_no' => $invoice_no,
+                                'invoice_id' => $invoice_id,
                             ], RestController::HTTP_OK);
                         } else {
                             $this->response([

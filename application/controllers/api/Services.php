@@ -304,14 +304,30 @@ class Services extends RestController
                                 $data['name'] = $user['name'];
                                 //print_pre($data,true);
                                 $result = $this->service->purchaseservices($data);
+                                // Generate invoice for the purchase
+                                $invoice_no = '';
+                                $invoice_id = 0;
+                                if ($result['status'] == true && !empty($result['order_id'])) {
+                                    $this->load->model('Invoice_model', 'invoice_model');
+                                    $order = $this->service->getpurchases(['t1.id' => $result['order_id']], 'single');
+                                    if (!empty($order)) {
+                                        $inv_result = $this->invoice_model->create_for_order($order);
+                                        if ($inv_result['status'] && !empty($inv_result['invoice'])) {
+                                            $invoice_no = $inv_result['invoice']['invoice_no'];
+                                            $invoice_id = (int)$inv_result['invoice']['id'];
+                                        }
+                                    }
+                                }
                                 if ($result['status'] == true) {
                                     $this->response([
-                                        'status' => true,
-                                        'message' => $result['message']
+                                        'status'     => true,
+                                        'message'    => $result['message'],
+                                        'invoice_no' => $invoice_no,
+                                        'invoice_id' => $invoice_id,
                                     ], RestController::HTTP_OK);
                                 } else {
                                     $this->response([
-                                        'status' => true,
+                                        'status'  => true,
                                         'message' => $result['message']
                                     ], RestController::HTTP_OK);
                                 }
@@ -481,14 +497,55 @@ class Services extends RestController
                             $data['autodebit'] = 1;
                         }
                         $result = $this->db->insert("customer_packages", $data);
+                        // Generate invoice for package selection
+                        $invoice_no = '';
+                        $invoice_id = 0;
                         if ($result) {
+                            // Build customer/firm info for invoice
+                            $customer = $this->customer->getcustomers(['t1.user_id' => $user['id']], 'single');
+                            $gst_enabled = !empty($customer) && !empty($customer['gst_enabled']) && $customer['gst_enabled'] == 1;
+                            $pkg_amount  = ($type == 'Monthly' && !empty($amount)) ? floatval($amount) : 0.0;
+                            $subtotal    = $pkg_amount;
+                            $gst_amount_pkg = 0;
+                            $total_pkg   = $subtotal;
+                            if ($gst_enabled && $subtotal > 0) {
+                                $gst_amount_pkg = round(($subtotal * 18) / 100, 2);
+                                $total_pkg = $subtotal + $gst_amount_pkg;
+                            }
+                            $this->load->model('Invoice_model', 'invoice_model');
+                            $inv_data = [
+                                'user_id'        => $user['id'],
+                                'firm_id'        => $firm['id'],
+                                'year'           => $year,
+                                'invoice_date'   => date('Y-m-d'),
+                                'billing_name'   => $user['name'],
+                                'billing_email'  => !empty($user['email']) ? $user['email'] : '',
+                                'billing_mobile' => !empty($user['mobile']) ? $user['mobile'] : '',
+                                'firm_name'      => !empty($firm['name']) ? $firm['name'] : '',
+                                'firm_gstin'     => !empty($firm['gstin']) ? $firm['gstin'] : '',
+                                'firm_pan'       => !empty($firm['pan']) ? $firm['pan'] : '',
+                                'service_name'   => $name,
+                                'type'           => !empty($type) ? $type : 'Yearly',
+                                'period_value'   => $year,
+                                'subtotal'       => $subtotal,
+                                'gst_rate'       => $gst_enabled ? 18 : 0,
+                                'gst_amount'     => $gst_amount_pkg,
+                                'total_amount'   => $total_pkg,
+                            ];
+                            $inv_result = $this->invoice_model->create_custom_invoice($inv_data);
+                            if ($inv_result['status'] && !empty($inv_result['invoice'])) {
+                                $invoice_no = $inv_result['invoice']['invoice_no'];
+                                $invoice_id = (int)$inv_result['invoice']['id'];
+                            }
                             $this->response([
-                                'status' => true,
-                                'message' => $message
+                                'status'     => true,
+                                'message'    => $message,
+                                'invoice_no' => $invoice_no,
+                                'invoice_id' => $invoice_id,
                             ], RestController::HTTP_OK);
                         } else {
                             $this->response([
-                                'status' => true,
+                                'status'  => true,
                                 'message' => $message
                             ], RestController::HTTP_OK);
                         }

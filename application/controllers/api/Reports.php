@@ -165,49 +165,263 @@ class Reports extends RestController
         if (!empty($token) && !empty($firm_id) && !empty($year)) {
             $user = $this->account->verify_token($token);
             if (!empty($user) && is_array($user) && $user['role'] == 'customer') {
-                // Get service package for this user/firm/year (same as web)
+
+                // ── 1. Current year service package ────────────────────────
                 $service_package = $this->customer->getservicepackage([
                     't1.user_id' => $user['id'],
                     't1.firm_id' => $firm_id,
-                    't1.year' => $year
+                    't1.year'    => $year
                 ], 'single');
 
-                $services = array();
+                $current_service_ids = array();
                 if (!empty($service_package) && !empty($service_package['service_ids'])) {
-                    $package_service_ids = array_filter(array_map('trim', explode(',', $service_package['service_ids'])));
-                    if (!empty($package_service_ids)) {
-                        $service_ids_str = implode(',', array_map('intval', $package_service_ids));
-                        $user_id_escaped = $this->db->escape($user['id']);
-                        $firm_id_escaped = $this->db->escape($firm_id);
-                        $year_escaped = $this->db->escape($year);
-                        $where = "t1.user_id={$user_id_escaped} AND t1.firm_id={$firm_id_escaped} AND t1.year={$year_escaped} AND t1.status='0' AND t1.service_id IN ($service_ids_str)";
-                        $services = $this->service->getpurchasedservices($where, 'all', true);
+                    $current_service_ids = array_filter(array_map('trim', explode(',', $service_package['service_ids'])));
+                }
+
+                // ── 2. Expired packages (all other years for this user/firm) ─
+                $user_id_escaped  = $this->db->escape($user['id']);
+                $firm_id_escaped  = $this->db->escape($firm_id);
+                $year_escaped     = $this->db->escape($year);
+
+                $expired_packages = $this->db->query(
+                    "SELECT t1.* FROM tf_service_packages t1
+                     WHERE t1.user_id={$user_id_escaped}
+                       AND t1.firm_id={$firm_id_escaped}
+                       AND t1.year!={$year_escaped}"
+                )->result_array();
+
+                // ── 3. Collect ALL service IDs (current + expired) ──────────
+                $all_package_service_ids = $current_service_ids;
+                foreach ($expired_packages as $ep) {
+                    if (!empty($ep['service_ids'])) {
+                        $all_package_service_ids = array_merge(
+                            $all_package_service_ids,
+                            array_filter(array_map('trim', explode(',', $ep['service_ids'])))
+                        );
                     }
+                }
+                $all_package_service_ids = array_unique(array_filter($all_package_service_ids));
+
+                // ── 4. Pending purchases from current year ───────────────────
+                $services = array();
+                if (!empty($all_package_service_ids)) {
+                    $service_ids_str = implode(',', array_map('intval', $all_package_service_ids));
+                    $where = "t1.user_id={$user_id_escaped} AND t1.firm_id={$firm_id_escaped} AND t1.year={$year_escaped} AND t1.status='0' AND t1.service_id IN ($service_ids_str)";
+                    $services = $this->service->getpurchasedservices($where, 'all', true);
+                    if (empty($services)) $services = array();
+
+                    // ── 5. Pending purchases from expired years ──────────────
+                    foreach ($expired_packages as $ep) {
+                        if (empty($ep['service_ids'])) continue;
+                        $exp_ids     = array_filter(array_map('intval', explode(',', $ep['service_ids'])));
+                        $exp_ids_str = implode(',', $exp_ids);
+                        $exp_year    = $this->db->escape($ep['year']);
+                        $where_exp   = "t1.user_id={$user_id_escaped} AND t1.firm_id={$firm_id_escaped} AND t1.year={$exp_year} AND t1.status='0' AND t1.service_id IN ($exp_ids_str)";
+                        $exp_svcs    = $this->service->getpurchasedservices($where_exp, 'all', true);
+                        if (!empty($exp_svcs)) {
+                            foreach ($exp_svcs as &$es) {
+                                $es['expired_package'] = true;
+                                $es['expired_year']    = $ep['year'];
+                            }
+                            unset($es);
+                            $services = array_merge($services, $exp_svcs);
+                        }
+                    }
+                }
+
+                // ── 6. Renewal candidates ────────────────────────────────────
+                // Services in ANY expired package but NOT in the current year package
+                $renewals = array();
+                foreach ($expired_packages as $ep) {
+                    if (empty($ep['service_ids'])) continue;
+                    $ep_ids = array_filter(array_map('trim', explode(',', $ep['service_ids'])));
+                    foreach ($ep_ids as $sid) {
+                        if ($sid === '') continue;
+                        if (in_array($sid, $current_service_ids, true)) continue; // already renewed
+                        if (isset($renewals[$sid])) continue;                     // deduplicate
+
+                        $svc = $this->master->getservices(array('id' => $sid, 'status' => 1), 'single');
+                        if (empty($svc)) continue;
+
+                        $renewals[$sid] = array(
+                            'id'           => 0,
+                            'service_id'   => (int)$sid,
+                            'service_name' => $svc['name'],
+                            'service_slug' => isset($svc['slug']) ? $svc['slug'] : '',
+                            'month'        => '',
+                            'amount'       => $svc['rate'],
+                            'is_renewal'   => 1,
+                            'expired_year' => $ep['year'],
+                        );
+                    }
+                }
+
+                if (!empty($renewals)) {
+                    $services = array_merge($services, array_values($renewals));
                 }
 
                 if (!empty($services)) {
                     $this->response([
-                        'status' => true,
+                        'status'   => true,
                         'services' => $services
                     ], RestController::HTTP_OK);
                 } else {
                     $this->response([
-                        'status' => false,
+                        'status'  => false,
                         'message' => "No Pending Services!"
                     ], RestController::HTTP_OK);
                 }
             } else {
                 $this->response([
-                    'status' => false,
+                    'status'  => false,
                     'message' => "User Not Logged In!"
                 ], RestController::HTTP_OK);
             }
         } else {
             $this->response([
-                'status' => false,
+                'status'  => false,
                 'message' => "Please provide token, firm_id and year!"
             ], RestController::HTTP_OK);
         }
+    }
+
+    public function renewservice_post()
+    {
+        $token      = $this->post('token');
+        $firm_id    = $this->post('firm_id');
+        $year       = $this->post('year');
+        $service_id = $this->post('service_id');
+
+        if (empty($token) || empty($firm_id) || empty($year) || empty($service_id)) {
+            $this->response([
+                'status'  => false,
+                'message' => "Please provide token, firm_id, year and service_id!"
+            ], RestController::HTTP_OK);
+            return;
+        }
+
+        $user = $this->account->verify_token($token);
+        if (empty($user) || !is_array($user) || $user['role'] != 'customer') {
+            $this->response([
+                'status'  => false,
+                'message' => "User Not Logged In!"
+            ], RestController::HTTP_OK);
+            return;
+        }
+
+        if (!is_numeric($service_id)) {
+            $this->response(['status' => false, 'message' => 'Invalid service selected.'], RestController::HTTP_OK);
+            return;
+        }
+
+        // Verify service exists and is active
+        $service = $this->master->getservices(array('id' => $service_id, 'status' => 1), 'single');
+        if (empty($service)) {
+            $this->response(['status' => false, 'message' => 'Service not found or inactive.'], RestController::HTTP_OK);
+            return;
+        }
+
+        // Verify service was in at least one expired package for this user/firm
+        $user_id_escaped  = $this->db->escape($user['id']);
+        $firm_id_escaped  = $this->db->escape($firm_id);
+        $year_escaped     = $this->db->escape($year);
+        $service_id_int   = (int)$service_id;
+
+        $expired_check = $this->db->query(
+            "SELECT id FROM tf_service_packages
+             WHERE user_id={$user_id_escaped} AND firm_id={$firm_id_escaped}
+               AND year!={$year_escaped}
+               AND FIND_IN_SET('{$service_id_int}', REPLACE(service_ids,' ','')) > 0
+             LIMIT 1"
+        )->row_array();
+
+        if (empty($expired_check)) {
+            $this->response(['status' => false, 'message' => 'This service is not eligible for renewal.'], RestController::HTTP_OK);
+            return;
+        }
+
+        // Check if service is already in current year's package
+        $current_package = $this->customer->getservicepackage([
+            't1.user_id' => $user['id'],
+            't1.firm_id' => $firm_id,
+            't1.year'    => $year
+        ], 'single');
+
+        if (!empty($current_package)) {
+            $current_ids = array_filter(array_map('trim', explode(',', $current_package['service_ids'] ?? '')));
+            if (in_array((string)$service_id_int, $current_ids, true)) {
+                $this->response(['status' => false, 'message' => 'Service is already in your current package.'], RestController::HTTP_OK);
+                return;
+            }
+            // Append to existing package
+            $current_ids[] = (string)$service_id_int;
+            $new_service_ids = implode(',', array_unique(array_filter($current_ids)));
+            $this->db->where('id', $current_package['id']);
+            $this->db->update('tf_service_packages', ['service_ids' => $new_service_ids, 'updated_on' => date('Y-m-d H:i:s')]);
+        } else {
+            // Create new service package for current year
+            $this->db->insert('tf_service_packages', [
+                'user_id'     => $user['id'],
+                'firm_id'     => $firm_id,
+                'year'        => $year,
+                'service_ids' => (string)$service_id_int,
+                'added_on'    => date('Y-m-d H:i:s'),
+            ]);
+        }
+
+        // Save notification for admin
+        $notify_data = array(
+            'user_id' => $user['id'],
+            'type'    => 'Service Renewed',
+            'message' => $user['name'] . ' has renewed service "' . $service['name'] . '" for firm ID ' . $firm_id . ' and year ' . $year . '.',
+        );
+        $this->common->savenotification($notify_data);
+
+        // Generate invoice for renewal
+        $invoice_no = '';
+        $invoice_id = 0;
+        $this->load->model('Invoice_model', 'invoice_model');
+        $firm_row = $this->customer->getfirms(['t1.user_id' => $user['id'], 't1.id' => $firm_id], 'single');
+        $customer = $this->customer->getcustomers(['t1.user_id' => $user['id']], 'single');
+        $gst_enabled = !empty($customer) && !empty($customer['gst_enabled']) && $customer['gst_enabled'] == 1;
+        $subtotal    = !empty($service['rate']) ? floatval($service['rate']) : 0.0;
+        $gst_amount  = 0;
+        $total       = $subtotal;
+        if ($gst_enabled && $subtotal > 0) {
+            $gst_amount = round(($subtotal * 18) / 100, 2);
+            $total = $subtotal + $gst_amount;
+        }
+        $inv_data = [
+            'user_id'        => $user['id'],
+            'firm_id'        => $firm_id,
+            'year'           => $year,
+            'invoice_date'   => date('Y-m-d'),
+            'billing_name'   => $user['name'],
+            'billing_email'  => !empty($user['email']) ? $user['email'] : '',
+            'billing_mobile' => !empty($user['mobile']) ? $user['mobile'] : '',
+            'firm_name'      => !empty($firm_row['name']) ? $firm_row['name'] : '',
+            'firm_gstin'     => !empty($firm_row['gstin']) ? $firm_row['gstin'] : '',
+            'firm_pan'       => !empty($firm_row['pan']) ? $firm_row['pan'] : '',
+            'service_name'   => $service['name'],
+            'type'           => 'Renewal',
+            'period_value'   => $year,
+            'subtotal'       => $subtotal,
+            'gst_rate'       => $gst_enabled ? 18 : 0,
+            'gst_amount'     => $gst_amount,
+            'total_amount'   => $total,
+        ];
+        $inv_result = $this->invoice_model->create_custom_invoice($inv_data);
+        if ($inv_result['status'] && !empty($inv_result['invoice'])) {
+            $invoice_no = $inv_result['invoice']['invoice_no'];
+            $invoice_id = (int)$inv_result['invoice']['id'];
+        }
+
+        $this->response([
+            'status'     => true,
+            'message'    => '"' . $service['name'] . '" renewed successfully for year ' . $year . '!',
+            'invoice_no' => $invoice_no,
+            'invoice_id' => $invoice_id,
+        ], RestController::HTTP_OK);
     }
 
     public function getmonthlyservices_post()
