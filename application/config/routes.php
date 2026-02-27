@@ -139,6 +139,7 @@ $route['api/getotherfeereport'] = 'api/reports/getotherfeereport';
 
 $route['api/getpurchasedservices'] = 'api/reports/getpurchasedservices';
 $route['api/getpendingservices'] = 'api/reports/getpendingservices';
+$route['api/renewservice'] = 'api/reports/renewservice';
 $route['api/getworkreport'] = 'api/reports/getworkreport';
 $route['api/getworkreports'] = 'api/reports/getworkreports';
 $route['api/getmonthlyservices'] = 'api/reports/getmonthlyservices';
@@ -151,5 +152,8 @@ $route['api/getcertificates'] = 'api/profile/getcertificates';
 $route['api/getolddata'] = 'api/profile/getolddata';
 
 $route['api/initiatepayment'] = 'api/wallet/initiatepayment';
+
+$route['api/getinvoices'] = 'api/invoices/getinvoices';
+$route['api/getinvoicedetails'] = 'api/invoices/getinvoicedetails';
 
 /*------------------------------APIs-----------------------------*/
