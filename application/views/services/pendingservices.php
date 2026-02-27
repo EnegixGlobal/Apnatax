@@ -23,7 +23,21 @@
                                         <td><?= $single['service_name']; ?></td>
                                         <td><?= $single['month']; ?></td>
                                         <td><?= $single['amount']; ?></td>
-                                        <td><a href="#" target="_blank" class="btn btn-sm btn-primary">Pay Now</a></td>
+                                        <td>
+                                            <?php if (!empty($single['is_renewal'])) { ?>
+                                                <button type="button"
+                                                        class="btn btn-sm btn-primary renew-btn"
+                                                        data-service-id="<?= $single['service_id']; ?>">
+                                                    Renew
+                                                </button>
+                                            <?php } else { ?>
+                                                <a href="<?= base_url('services/openform/' . $single['service_slug'] . '/' . $single['id']); ?>"
+                                                   target="_blank"
+                                                   class="btn btn-sm btn-primary">
+                                                    Pay Now
+                                                </a>
+                                            <?php } ?>
+                                        </td>
                                     </tr>
                                     <?php
                                         }
@@ -39,7 +53,39 @@
                     <script>
                         $(document).ready(function(e) {
                             $('#datatable').dataTable();
-                            $.get( "<?= base_url('franchise/franchisestatus'); ?>", function( data ) {
+
+                            // Handle renewal button click
+                            $('table').on('click', '.renew-btn', function() {
+                                var serviceId = $(this).data('service-id');
+                                if (!serviceId) {
+                                    alert('Invalid service selected for renewal.');
+                                    return false;
+                                }
+                                if (!confirm('Are you sure you want to renew this service for the current year?')) {
+                                    return false;
+                                }
+
+                                $.ajax({
+                                    type: "post",
+                                    url: "<?= base_url('services/renewservice'); ?>",
+                                    data: { service_id: serviceId },
+                                    success: function(response) {
+                                        try {
+                                            var data = JSON.parse(response);
+                                            if (data.status) {
+                                                alert(data.message);
+                                                window.location.reload();
+                                            } else {
+                                                alert(data.message || 'Unable to renew service.');
+                                            }
+                                        } catch (e) {
+                                            alert('Unexpected response from server while renewing service.');
+                                        }
+                                    },
+                                    error: function() {
+                                        alert('Failed to renew service. Please try again.');
+                                    }
+                                });
                             });
                         });
 

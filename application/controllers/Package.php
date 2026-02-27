@@ -13,6 +13,8 @@ class Package extends CI_Controller
         if ($this->session->role != 'customer') {
             redirect('/');
         }
+        // Load invoice model for package-level billing
+        $this->load->model('Invoice_model', 'invoice');
     }
 
     public function index()
@@ -115,7 +117,59 @@ class Package extends CI_Controller
                     );
                     $result = $this->customer->createpackage($data);
                     if ($result['status'] === true) {
-                        $this->session->set_flashdata('msg', $result['message']);
+                        // Create a bill/invoice for this package configuration
+                        try {
+                            // Sum up rates of selected services as package subtotal
+                            $subtotal = 0.0;
+                            if (!empty($services)) {
+                                foreach ($services as $svc) {
+                                    $rate = isset($svc['rate']) ? (float)$svc['rate'] : 0.0;
+                                    $subtotal += $rate;
+                                }
+                            }
+
+                            // Fetch customer & firm info for billing header
+                            $customer = $this->customer->getcustomers(['t1.user_id' => $user['id']], 'single');
+                            $firm_info = $this->customer->getfirms(['t1.id' => $firm_id], 'single');
+
+                            $gst_enabled = !empty($customer) && !empty($customer['gst_enabled']) && $customer['gst_enabled'] == 1;
+                            $gst_rate = $gst_enabled ? 18.0 : 0.0;
+                            $gst_amount = $gst_enabled ? round(($subtotal * $gst_rate) / 100, 2) : 0.0;
+                            $total = $subtotal + $gst_amount;
+
+                            $invoice_data = [
+                                'user_id'        => $user['id'],
+                                'firm_id'        => $firm_id,
+                                'year'           => $year,
+                                'invoice_date'   => date('Y-m-d'),
+                                'billing_name'   => !empty($customer['name']) ? $customer['name'] : $user['name'],
+                                'billing_email'  => !empty($customer['email']) ? $customer['email'] : (isset($user['email']) ? $user['email'] : ''),
+                                'billing_mobile' => !empty($customer['mobile']) ? $customer['mobile'] : (isset($user['mobile']) ? $user['mobile'] : ''),
+                                'firm_name'      => !empty($firm_info['name']) ? $firm_info['name'] : '',
+                                'firm_gstin'     => !empty($firm_info['gstin']) ? $firm_info['gstin'] : '',
+                                'firm_pan'       => !empty($firm_info['pan']) ? $firm_info['pan'] : '',
+                                'service_name'   => 'Service Package (' . $year . ')',
+                                'type'           => 'Package',
+                                'period_value'   => $year,
+                                'subtotal'       => $subtotal,
+                                'gst_rate'       => $gst_rate,
+                                'gst_amount'     => $gst_amount,
+                                'total_amount'   => $total,
+                            ];
+
+                            $invoice_result = $this->invoice->create_custom_invoice($invoice_data);
+                            if (!empty($invoice_result['status']) && $invoice_result['status'] === true) {
+                                $this->session->set_flashdata('msg', $result['message'] . ' Invoice No: ' . $invoice_result['invoice']['invoice_no']);
+                            } else {
+                                // If invoice fails, still keep package but log error
+                                log_message('error', 'Package invoice creation failed for user ' . $user['id'] . ': ' . $invoice_result['message']);
+                                $this->session->set_flashdata('msg', $result['message']);
+                            }
+                        } catch (Exception $e) {
+                            // On any unexpected error, log and proceed with original message
+                            log_message('error', 'Package invoice unexpected error: ' . $e->getMessage());
+                            $this->session->set_flashdata('msg', $result['message']);
+                        }
                     } else {
                         $this->session->set_flashdata('err_msg', $result['message']);
                     }

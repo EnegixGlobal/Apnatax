@@ -61,6 +61,7 @@
                             <li><a href="<?= base_url('orders/monthlyturnover/'); ?>" class="slide-item <?= activate_menu('orders/monthlyturnover'); ?>"> Add Turnover</a></li>
                             <li><a href="<?= base_url('orders/turnoversheet/'); ?>" class="slide-item <?= activate_menu('orders/turnoversheet'); ?>"> Turnover Sheet</a></li>
                             <li><a href="<?= base_url('reports/assignmentreports/'); ?>" class="slide-item <?= activate_menu('reports/assignmentreports'); ?>"> Assignment Reports</a></li>
+                            <li><a href="<?= base_url('invoices/'); ?>" class="slide-item <?= activate_menu('invoices'); ?>"> Invoices</a></li>
                         </ul>
                     </li>
                     <li class="slide <?= activate_dropdown(['employees', 'wallet']) ?>">
@@ -121,6 +122,10 @@
                         );
                         ?>
                         <a class="side-menu__item <?= activate_menu($active); ?>" data-bs-toggle="slide" href="<?= base_url('services/purchasedservices/'); ?>"><i class="side-menu__icon fa fa-list"></i><span class="side-menu__label">Purchased Services</span></a>
+                    </li>
+                    <li class="slide">
+                        <!-- Using fa-file-text-o for a simple document icon -->
+                        <a class="side-menu__item <?= activate_menu('invoices'); ?>" data-bs-toggle="slide" href="<?= base_url('invoices/'); ?>"><i class="side-menu__icon fa fa-file-text-o"></i><span class="side-menu__label">My Bills / Invoices</span></a>
                     </li>
                     <li class="slide">
                         <a class="side-menu__item <?= activate_menu('home/workreports'); ?>" data-bs-toggle="slide" href="<?= base_url('home/workreports/'); ?>"><i class="side-menu__icon fa fa-file-text"></i><span class="side-menu__label">Work Reports</span></a>

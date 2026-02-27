@@ -441,6 +441,19 @@ class Masterkey extends CI_Controller
         echo json_encode($package);
     }
 
+    public function deleteservice($id = NULL)
+    {
+        if ($id !== NULL) {
+            $result = $this->master->deleteservice($id);
+            if ($result['status'] === true) {
+                $this->session->set_flashdata("msg", $result['message']);
+            } else {
+                $this->session->set_flashdata("err_msg", $result['message']);
+            }
+        }
+        redirect('masterkey/');
+    }
+
     public function deletepackage($id = NULL)
     {
         if ($id !== NULL) {

@@ -34,6 +34,17 @@ class Master_model extends CI_Model{
         return $array;
     }
     
+    public function deleteservice($id){
+        $where = array("id" => $id);
+        if($this->db->delete("services",$where)){
+            return array("status"=>true,"message"=>"Service Deleted Successfully!");
+        }
+        else{
+            $error=$this->db->error();
+            return array("status"=>false,"message"=>$error['message']);
+        }
+    }
+    
     public function updateservice($data){
         $id=$data['id'];
         unset($data['id']);
