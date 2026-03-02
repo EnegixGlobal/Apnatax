@@ -90,11 +90,39 @@ class Customers extends CI_Controller
         }
         $data['customer'] = $customer;
         $data['title'] = "Customer KYC Details";
-        $kyc = $this->account->getkyc(['t1.user_id' => $customer['user_id']], 'single');
-        $data['kyc'] = $kyc;
-        $data['form'] = 'update';
 
-        //$this->debugger->printdata($kyc,true,true);
+        // Fetch all KYC records for this user across all firms
+        $all_kyc_raw = $this->account->getkyc(['t1.user_id' => $customer['user_id']], 'all');
+
+        // Fetch all active firms for this user so we can attach firm names
+        $firms = $this->customer->getfirms(['t1.user_id' => $customer['user_id'], 't1.status' => 1]);
+        $firm_map = array();
+        if (!empty($firms)) {
+            foreach ($firms as $firm) {
+                $firm_map[$firm['id']] = $firm['name'];
+            }
+        }
+
+        // Attach firm_name to each KYC record
+        $all_kyc = array();
+        if (!empty($all_kyc_raw)) {
+            foreach ($all_kyc_raw as $kyc_row) {
+                if (!empty($kyc_row['firm_id']) && isset($firm_map[$kyc_row['firm_id']])) {
+                    $kyc_row['firm_name'] = $firm_map[$kyc_row['firm_id']];
+                } elseif (!empty($kyc_row['firm_id'])) {
+                    $kyc_row['firm_name'] = 'Firm #' . $kyc_row['firm_id'];
+                } else {
+                    $kyc_row['firm_name'] = 'General';
+                }
+                $all_kyc[] = $kyc_row;
+            }
+        }
+
+        $data['all_kyc']  = $all_kyc;
+        // Keep $kyc pointing to the first record for the certificates section
+        $data['kyc']      = !empty($all_kyc) ? $all_kyc[0] : array();
+        $data['form']     = 'update';
+
         $this->template->load('customer', 'kycdetails', $data);
     }
 
@@ -379,6 +407,51 @@ class Customers extends CI_Controller
         $where = array('t1.status' => 1, 't1.request' => 1);
         $data['customers'] = $this->customer->getfirms($where);
         $this->template->load('customer', 'firmdeleterequests', $data);
+    }
+
+    public function firmeditrequests()
+    {
+        $data['title'] = "Firm Edit Requests";
+        $data['breadcrumb'] = array();
+        $data['datatable'] = true;
+        $where = array('t1.status' => 1, 't1.edit_request' => 1);
+        $data['customers'] = $this->customer->getfirms($where);
+        $this->template->load('customer', 'firmeditrequests', $data);
+    }
+
+    public function updatefirmeditstatus()
+    {
+        $id     = $this->input->post('id');
+        $status = $this->input->post('status');
+        $firm   = $this->customer->getfirms(["md5(concat('firm-id-',t1.id))" => $id, 't1.edit_request' => 1, 't1.status' => 1], 'single');
+        if (!empty($firm)) {
+            if ($status == 1) {
+                // Approve: apply proposed changes to the firm
+                $edit_data = !empty($firm['edit_request_data']) ? json_decode($firm['edit_request_data'], true) : array();
+                $update = array('edit_request' => 0, 'edit_request_data' => NULL);
+                if (!empty($edit_data['name'])) {
+                    $update['name'] = $edit_data['name'];
+                }
+                if (!empty($edit_data['gstin'])) {
+                    $update['gstin'] = $edit_data['gstin'];
+                }
+                logupdateoperations('firms', $update, ['id' => $firm['id']]);
+                $result = $this->db->update('firms', $update, ['id' => $firm['id']]);
+                $message = "Firm Edit Request Approved Successfully!";
+            } else {
+                // Reject: clear the request (edit_request=2 allows customer to re-request)
+                $update = array('edit_request' => 2, 'edit_request_data' => NULL);
+                logupdateoperations('firms', $update, ['id' => $firm['id']]);
+                $result = $this->db->update('firms', $update, ['id' => $firm['id']]);
+                $message = "Firm Edit Request Rejected!";
+            }
+            if ($result) {
+                $this->session->set_flashdata("msg", $message);
+            } else {
+                $error = $this->db->error();
+                $this->session->set_flashdata("err_msg", $error['message']);
+            }
+        }
     }
 
     public function packagedeleterequests()

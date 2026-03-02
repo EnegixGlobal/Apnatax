@@ -407,14 +407,31 @@ class Account_model extends CI_Model{
     }
     
     public function savekyc($data){
-        if($this->db->get_where('kyc',['user_id'=>$data['user_id']])->num_rows()==0){
+        // Build where clause for checking existing KYC
+        $this->db->where('user_id', $data['user_id']);
+        // If firm_id is provided, check for firm-specific KYC, otherwise check for user-level KYC
+        if (!empty($data['firm_id'])) {
+            $this->db->where('firm_id', $data['firm_id']);
+        } else {
+            $this->db->where('firm_id IS NULL', null, false);
+        }
+        
+        $existing = $this->db->get('kyc');
+        if($existing->num_rows()==0){
             $data['added_on']=$data['updated_on']=date('Y-m-d H:i:s');
             $result=$this->db->insert('kyc',$data);
             $msg="KYC Saved Successfully!";
         }
         else{
             $data['updated_on']=date('Y-m-d H:i:s');
-            $result=$this->db->update('kyc',$data,['user_id'=>$data['user_id']]);
+            // Build update where clause
+            $this->db->where('user_id', $data['user_id']);
+            if (!empty($data['firm_id'])) {
+                $this->db->where('firm_id', $data['firm_id']);
+            } else {
+                $this->db->where('firm_id IS NULL', null, false);
+            }
+            $result=$this->db->update('kyc',$data);
             $msg="KYC Updated Successfully!";
         }
         if($result){
@@ -426,19 +443,40 @@ class Account_model extends CI_Model{
         }
     }
     
-    public function getkyc($where){
+    public function getkyc($where, $type = 'single'){
         $columns="t1.pan,case when t1.pan_image='' then '' else concat('".file_url()."',t1.pan_image) end as pan_image,";
         $columns.="t1.aadhar,case when t1.aadhar_image='' then '' else concat('".file_url()."',t1.aadhar_image) end as aadhar_image,";
         $columns.="case when t1.aadhar_back='' then '' else concat('".file_url()."',t1.aadhar_back) end as aadhar_back,";
         $columns.="case when t1.tds_certificate='' then '' else concat('".file_url()."',t1.tds_certificate) end as tds_certificate,";
         $columns.="case when t1.gst_certificate='' then '' else concat('".file_url()."',t1.gst_certificate) end as gst_certificate,";
         $columns.="case when t1.audit_report='' then '' else concat('".file_url()."',t1.audit_report) end as audit_report,";
-        $columns.="case when t1.income_tax_certificate='' then '' else concat('".file_url()."',t1.income_tax_certificate) end as income_tax_certificate,t1.status";
+        $columns.="case when t1.income_tax_certificate='' then '' else concat('".file_url()."',t1.income_tax_certificate) end as income_tax_certificate,t1.status,t1.firm_id";
         $this->db->select($columns);
-        $this->db->where($where);
+        
+        // Handle where clause - support both array and string formats
+        if (is_array($where)) {
+            foreach ($where as $key => $value) {
+                if (strpos($key, ' IS NULL') !== false) {
+                    // Handle IS NULL condition
+                    $field = str_replace(' IS NULL', '', $key);
+                    $field = str_replace('t1.', '', $field);
+                    $this->db->where($field . ' IS NULL', null, false);
+                } else {
+                    $this->db->where($key, $value);
+                }
+            }
+        } else {
+            $this->db->where($where);
+        }
+        
         $this->db->from('kyc t1');
         $query=$this->db->get();
-        $array=$query->unbuffered_row('array');
+        
+        if ($type == 'single') {
+            $array=$query->unbuffered_row('array');
+        } else {
+            $array=$query->result_array();
+        }
         return $array;
     }
     

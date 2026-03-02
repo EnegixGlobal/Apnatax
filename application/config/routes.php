@@ -155,5 +155,6 @@ $route['api/initiatepayment'] = 'api/wallet/initiatepayment';
 
 $route['api/getinvoices'] = 'api/invoices/getinvoices';
 $route['api/getinvoicedetails'] = 'api/invoices/getinvoicedetails';
+$route['api/downloadinvoice'] = 'api/invoices/downloadinvoice';
 
 /*------------------------------APIs-----------------------------*/

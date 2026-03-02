@@ -89,12 +89,41 @@ class Invoices extends CI_Controller
             }
         }
 
+        // Get customer state for GST calculation
+        $customer_state_id = null;
+        if (!empty($invoice['user_id'])) {
+            $customer = $this->customer->getcustomers(['t1.user_id' => $invoice['user_id']], 'single');
+            if (!empty($customer) && !empty($customer['parent_id'])) {
+                $customer_state_id = $customer['parent_id'];
+            }
+        }
+
+        // Get admin/company state and GSTIN (from admin user address and user record)
+        $admin_state_id = null;
+        $admin_gstin = null;
+        // Get admin user (assuming role is 'admin' or 'superadmin')
+        $admin_user = $this->db->select('id, gstin')->where_in('role', ['admin', 'superadmin'])->limit(1)->get('users')->row_array();
+        if (!empty($admin_user)) {
+            // Get admin GSTIN
+            if (!empty($admin_user['gstin'])) {
+                $admin_gstin = $admin_user['gstin'];
+            }
+            // Get admin address for state
+            $admin_address = $this->customer->getaddresses(['t1.user_id' => $admin_user['id']], 'single');
+            if (!empty($admin_address) && !empty($admin_address['parent_id'])) {
+                $admin_state_id = $admin_address['parent_id'];
+            }
+        }
+
         $data = [
             'title'    => 'Invoice #' . $invoice['invoice_no'],
             'breadcrumb' => array('invoices' => 'Invoices', 'active' => $invoice['invoice_no']),
             'invoice'  => $invoice,
             'order'    => $order,
             'package'  => $package,
+            'customer_state_id' => $customer_state_id,
+            'admin_state_id' => $admin_state_id,
+            'admin_gstin' => $admin_gstin,
         ];
 
         $this->load->view('invoices/view', $data);
@@ -155,12 +184,41 @@ class Invoices extends CI_Controller
             }
         }
 
+        // Get customer state for GST calculation
+        $customer_state_id = null;
+        if (!empty($invoice['user_id'])) {
+            $customer = $this->customer->getcustomers(['t1.user_id' => $invoice['user_id']], 'single');
+            if (!empty($customer) && !empty($customer['parent_id'])) {
+                $customer_state_id = $customer['parent_id'];
+            }
+        }
+
+        // Get admin/company state and GSTIN (from admin user address and user record)
+        $admin_state_id = null;
+        $admin_gstin = null;
+        // Get admin user (assuming role is 'admin' or 'superadmin')
+        $admin_user = $this->db->select('id, gstin')->where_in('role', ['admin', 'superadmin'])->limit(1)->get('users')->row_array();
+        if (!empty($admin_user)) {
+            // Get admin GSTIN
+            if (!empty($admin_user['gstin'])) {
+                $admin_gstin = $admin_user['gstin'];
+            }
+            // Get admin address for state
+            $admin_address = $this->customer->getaddresses(['t1.user_id' => $admin_user['id']], 'single');
+            if (!empty($admin_address) && !empty($admin_address['parent_id'])) {
+                $admin_state_id = $admin_address['parent_id'];
+            }
+        }
+
         $data = [
             'title'    => 'Invoice #' . $invoice['invoice_no'],
             'breadcrumb' => array(),
             'invoice'  => $invoice,
             'order'    => $order,
             'package'  => $package,
+            'customer_state_id' => $customer_state_id,
+            'admin_state_id' => $admin_state_id,
+            'admin_gstin' => $admin_gstin,
         ];
 
         // Render HTML from the same invoice view

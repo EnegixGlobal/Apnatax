@@ -18,7 +18,7 @@ class Firms extends CI_Controller {
         $user=getuser();
         $data['user']=$user;
         $data['datatable']=true;
-        $where=array("t1.user_id"=>$user['id'],'t1.status'=>1,'t1.request!='=>1);
+        $where=array("t1.user_id"=>$user['id'],'t1.status'=>1,'t1.request!='=>1,'t1.edit_request!='=>1);
         $data['firms']=$this->customer->getfirms($where);
         //print_pre($data,true);
         $this->template->load('firms','firms',$data);
@@ -81,6 +81,42 @@ class Firms extends CI_Controller {
                 }
             }
         }
+    }
+    
+    public function requestedit(){
+        $id=$this->input->post('id');
+        $name=$this->input->post('name');
+        $gstin=$this->input->post('gstin');
+        $user=getuser();
+        $where=array("t1.user_id"=>$user['id'],'t1.id'=>$id);
+        $firm=$this->customer->getfirms($where,'single');
+        if(!empty($firm)){
+            if($firm['edit_request']==0 || $firm['edit_request']==2){
+                // Prepare proposed changes
+                $edit_data=array(
+                    'name'=>$name,
+                    'gstin'=>$gstin
+                );
+                // Store current values for comparison
+                $edit_data['current_name']=$firm['name'];
+                $edit_data['current_gstin']=$firm['gstin'];
+                
+                if($this->db->update('firms',[
+                    'edit_request'=>1,
+                    'edit_request_data'=>json_encode($edit_data)
+                ],['id'=>$firm['id']])){
+                    $this->session->set_flashdata("msg","Firm Edit Request Saved! Admin will review and approve.");
+                }
+                else{
+                    $error=$this->db->error();
+                    $this->session->set_flashdata("err_msg",$error['message']);
+                }
+            }
+            else{
+                $this->session->set_flashdata("err_msg","Edit Request already pending!");
+            }
+        }
+        redirect($_SERVER['HTTP_REFERER']);
     }
     
 }

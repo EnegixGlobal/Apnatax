@@ -114,10 +114,20 @@ class Customer_model extends CI_Model
         $this->db->where($where);
         $this->db->from('addresses t1');
         $query = $this->db->get();
+        
+        // Check if query was successful
+        if ($query === false) {
+            return ($type == 'all') ? array() : array();
+        }
+        
         if ($type == 'all') {
             $array = $query->result_array();
         } else {
-            $array = $query->unbuffered_row('array');
+            if ($query->num_rows() > 0) {
+                $array = $query->unbuffered_row('array');
+            } else {
+                $array = array();
+            }
         }
         return $array;
     }
@@ -215,11 +225,13 @@ class Customer_model extends CI_Model
 
     public function customerwithfirm($where = array(), $type = "all")
     {
-        $where2 = "t1.user_id in (SELECT user_id from " . TP . "customer_packages where status='1' )";
+        // Filter at the firm level: only include firms that have an active package (any year)
+        $prefix  = $this->db->dbprefix;
         $columns = "t1.id as firm_id,t1.user_id,t1.name as firm_name,t2.name as customer_name";
         $this->db->select($columns);
         $this->db->where($where);
-        $this->db->where($where2);
+        // Use FALSE to prevent CI from escaping the raw EXISTS subquery
+        $this->db->where("EXISTS (SELECT 1 FROM {$prefix}customer_packages cp WHERE cp.user_id = t1.user_id AND cp.firm_id = t1.id AND cp.status = '1')", NULL, FALSE);
         $this->db->from('firms t1');
         $this->db->join('customers t2', 't1.user_id=t2.user_id');
         $query = $this->db->get();

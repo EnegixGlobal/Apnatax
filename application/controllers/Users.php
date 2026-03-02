@@ -174,9 +174,25 @@ class Users extends CI_Controller {
             redirect('home/');
         }
         
+        // Get address for admin user
+        $address = $this->customer->getaddresses(['t1.user_id' => $user['id']], 'single');
+        if (empty($address)) {
+            $address = array();
+        }
+        
         $data['title'] = "My Profile";
         $data['breadcrumb'] = array("active" => "My Profile");
         $data['admin'] = $admin_user;
+        $data['address'] = $address;
+        $data['states'] = state_dropdown();
+        
+        // Get districts if address exists
+        if (!empty($address) && !empty($address['parent_id'])) {
+            $data['districts'] = district_dropdown($address['parent_id']);
+        } else {
+            $data['districts'] = district_dropdown();
+        }
+        
         $this->template->load('users', 'myprofile', $data);
     }
     
@@ -188,6 +204,30 @@ class Users extends CI_Controller {
         
         if ($this->input->post('updateprofile') !== NULL) {
             $user = getuser();
+            $data = array();
+            $has_updates = false;
+            
+            // Handle profile fields update (name, email, mobile, gstin)
+            $name = $this->input->post('name');
+            $email = $this->input->post('email');
+            $mobile = $this->input->post('mobile');
+            $gstin = $this->input->post('gstin');
+            
+            if (!empty($name)) {
+                $data['name'] = $name;
+                $has_updates = true;
+            }
+            if (!empty($email)) {
+                $data['email'] = $email;
+                $has_updates = true;
+            }
+            if (!empty($mobile)) {
+                $data['mobile'] = $mobile;
+                $has_updates = true;
+            }
+            // GSTIN can be empty, so always update it
+            $data['gstin'] = !empty($gstin) ? strtoupper(trim($gstin)) : '';
+            $has_updates = true;
             
             // Handle photo upload
             if (!empty($_FILES['photo']) && isset($_FILES['photo']['tmp_name']) && !empty($_FILES['photo']['tmp_name'])) {
@@ -208,19 +248,72 @@ class Users extends CI_Controller {
                         }
                     }
                     
-                    $photo_data = array('photo' => $path);
-                    $where = array('id' => $user['id']);
-                    $photo_result = $this->account->updatephoto($photo_data, $where);
-                    if ($photo_result['status'] === true) {
-                        $this->session->set_flashdata("msg", "Profile Photo Updated Successfully!");
-                    } else {
-                        $this->session->set_flashdata("err_msg", "Photo upload failed: " . $photo_result['message']);
-                    }
+                    $data['photo'] = $path;
+                    $has_updates = true;
                 } else {
                     $this->session->set_flashdata("err_msg", "Photo upload failed: " . $upload['msg']);
                 }
-            } else {
-                $this->session->set_flashdata("err_msg", "Please select a photo to upload!");
+            }
+            
+            // Update user profile if there are changes
+            if ($has_updates) {
+                $where = array('id' => $user['id']);
+                $result = $this->account->updateuser($data, $where);
+                if ($result['status'] === true) {
+                    $this->session->set_flashdata("msg", "Profile Updated Successfully!");
+                } else {
+                    $this->session->set_flashdata("err_msg", $result['message']);
+                }
+            }
+            
+            // Handle address update
+            $address = $this->input->post('address');
+            $state_id = $this->input->post('parent_id');
+            $district_id = $this->input->post('area_id');
+            $pincode = $this->input->post('pincode');
+            
+            if (!empty($address) && !empty($state_id) && !empty($district_id) && !empty($pincode)) {
+                $address_data = array(
+                    "user_id" => $user['id'],
+                    "address" => $address,
+                    "parent_id" => $state_id,
+                    "area_id" => $district_id,
+                    "pincode" => $pincode
+                );
+                
+                // Validate state and district
+                $getstate = $this->db->get_where("area", array("id" => $address_data['parent_id'], 'type' => 'State'));
+                $getdistrict = $this->db->get_where("area", array("id" => $address_data['area_id'], "parent_id" => $address_data['parent_id'], 'type' => 'District'));
+                
+                if ($getdistrict->num_rows() == 1 && $getstate->num_rows() == 1) {
+                    $address_data['state'] = $getstate->unbuffered_row()->name;
+                    $address_data['district'] = $getdistrict->unbuffered_row()->name;
+                    
+                    // Check if address already exists
+                    $existing_address = $this->customer->getaddresses(['t1.user_id' => $user['id']], 'single');
+                    
+                    if (!empty($existing_address)) {
+                        // Update existing address
+                        $address_data['updated_on'] = date('Y-m-d H:i:s');
+                        $where_address = array('user_id' => $user['id']);
+                        if ($this->db->update("addresses", $address_data, $where_address)) {
+                            $this->session->set_flashdata("msg", "Address Updated Successfully!");
+                        } else {
+                            $error = $this->db->error();
+                            $this->session->set_flashdata("err_msg", "Address update failed: " . $error['message']);
+                        }
+                    } else {
+                        // Insert new address
+                        $result = $this->customer->saveaddress($address_data);
+                        if ($result['status'] === true) {
+                            $this->session->set_flashdata("msg", "Address Saved Successfully!");
+                        } else {
+                            $this->session->set_flashdata("err_msg", $result['message']);
+                        }
+                    }
+                } else {
+                    $this->session->set_flashdata("err_msg", "Invalid State or District selected!");
+                }
             }
         }
         redirect('users/myprofile/');

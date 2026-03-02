@@ -51,6 +51,21 @@ class Invoice_model extends CI_Model
         $firm_name       = !empty($order['firm_name']) ? $order['firm_name'] : '';
         $firm_gstin      = !empty($order['firm_gstin']) ? $order['firm_gstin'] : '';
         $firm_pan        = !empty($order['firm_pan']) ? $order['firm_pan'] : '';
+        
+        // If firm information is not available from order, try to get it from user's active firm
+        if (empty($firm_name) && !empty($order['user_id'])) {
+            $this->load->model('Customer_model', 'customer');
+            $firm = $this->customer->getfirms([
+                't1.user_id' => $order['user_id'],
+                't1.status' => 1,
+                't1.request' => 0
+            ], 'single');
+            if (!empty($firm)) {
+                $firm_name = !empty($firm['name']) ? $firm['name'] : '';
+                $firm_gstin = !empty($firm['gstin']) ? $firm['gstin'] : '';
+                $firm_pan = !empty($firm['pan']) ? $firm['pan'] : '';
+            }
+        }
 
         $invoice_data = [
             'order_id'        => $order_id,
@@ -131,14 +146,58 @@ class Invoice_model extends CI_Model
      */
     public function list_invoices($filters = [])
     {
-        $this->db->select('*');
+        // Select all invoice columns, and join with firms table to get firm_name if missing
+        // Use COALESCE to prefer firm_name from invoices table, fallback to firms table
+        $this->db->select('t1.*, COALESCE(t1.firm_name, t2.name, t4.name) as firm_name');
+        $this->db->from('invoices t1');
+        // Join with purchases to get firm_id if invoices doesn't have it
+        $this->db->join('purchases t3', 't1.order_id=t3.id', 'left');
+        // Join firms using firm_id from invoices
+        $this->db->join('firms t2', 't1.firm_id=t2.id', 'left');
+        // Also join firms using firm_id from purchases (as fallback)
+        $this->db->join('firms t4', 't3.firm_id=t4.id', 'left');
         if (!empty($filters)) {
-            $this->db->where($filters);
+            // Apply filters to main table (t1)
+            foreach ($filters as $key => $value) {
+                $this->db->where('t1.' . $key, $value);
+            }
         }
-        $this->db->from('invoices');
-        $this->db->order_by('id', 'DESC');
+        $this->db->order_by('t1.id', 'DESC');
         $query = $this->db->get();
-        return $query->result_array();
+        
+        if ($query === false) {
+            // Fallback to simple query if join fails
+            $this->db->reset_query();
+            $this->db->select('*');
+            if (!empty($filters)) {
+                $this->db->where($filters);
+            }
+            $this->db->from('invoices');
+            $this->db->order_by('id', 'DESC');
+            $query = $this->db->get();
+        }
+        
+        $results = $query->result_array();
+        
+        // Post-process: if firm_name is still empty, try to get it from purchases->firms
+        foreach ($results as &$invoice) {
+            if (empty($invoice['firm_name']) && !empty($invoice['order_id'])) {
+                // Get firm from purchase
+                $this->db->select('t2.name as firm_name');
+                $this->db->from('purchases t1');
+                $this->db->join('firms t2', 't1.firm_id=t2.id', 'left');
+                $this->db->where('t1.id', $invoice['order_id']);
+                $firm_query = $this->db->get();
+                if ($firm_query && $firm_query->num_rows() > 0) {
+                    $firm_row = $firm_query->row_array();
+                    if (!empty($firm_row['firm_name'])) {
+                        $invoice['firm_name'] = $firm_row['firm_name'];
+                    }
+                }
+            }
+        }
+        
+        return $results;
     }
 
     /**
