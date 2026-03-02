@@ -17,7 +17,7 @@ class Customers extends CI_Controller
         $data['breadcrumb'] = array();
         $data['datatable'] = true;
         $where = array();
-        if ($this->session->role != 'admin') {
+        if ($this->session->role != 'admin' && $this->session->role != 'ca') {
             $where['md5(t1.added_by)'] = $this->session->user;
         }
         $data['customers'] = $this->customer->getcustomers($where);
