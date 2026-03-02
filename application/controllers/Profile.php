@@ -42,7 +42,21 @@ class Profile extends CI_Controller
         $data['title'] = "KYC";
         $user = getuser();
         $customer = $this->customer->getcustomers(['t1.user_id' => $user['id']], 'single');
-        $data['kyc'] = $this->account->getkyc(['t1.user_id' => $user['id']], 'single');
+        
+        // Get firm_id from session if available
+        $firm_id = !empty($this->session->firm) ? (int)$this->session->firm : null;
+        
+        // Build where clause - if firm_id provided, get firm-specific KYC, otherwise user-level
+        $where = ['t1.user_id' => $user['id']];
+        if (!empty($firm_id)) {
+            $where['t1.firm_id'] = $firm_id;
+        } else {
+            // Get user-level KYC (where firm_id is NULL)
+            $where['t1.firm_id IS NULL'] = null;
+        }
+        
+        $data['kyc'] = $this->account->getkyc($where, 'single');
+        $data['firm_id'] = $firm_id; // Pass firm_id to view for form submission
         $this->template->load('profile', 'kyc', $data);
     }
 
@@ -51,7 +65,20 @@ class Profile extends CI_Controller
         $data['title'] = "Certificates";
         $user = getuser();
         $customer = $this->customer->getcustomers(['t1.user_id' => $user['id']], 'single');
-        $data['kyc'] = $this->account->getkyc(['t1.user_id' => $user['id']], 'single');
+        
+        // Get firm_id from session if available
+        $firm_id = !empty($this->session->firm) ? (int)$this->session->firm : null;
+        
+        // Build where clause - if firm_id provided, get firm-specific KYC, otherwise user-level
+        $where = ['t1.user_id' => $user['id']];
+        if (!empty($firm_id)) {
+            $where['t1.firm_id'] = $firm_id;
+        } else {
+            // Get user-level KYC (where firm_id is NULL)
+            $where['t1.firm_id IS NULL'] = null;
+        }
+        
+        $data['kyc'] = $this->account->getkyc($where, 'single');
         $this->template->load('profile', 'certificates', $data);
     }
 
@@ -216,40 +243,73 @@ class Profile extends CI_Controller
         if ($this->input->post('updatekyc') !== NULL) {
             $data = $this->input->post();
             $user = getuser();
-            //print_pre($data,true);
+            $firm_id = !empty($data['firm_id']) ? (int)$data['firm_id'] : null;
+            
+            // Validate PAN (required)
             $checkpan = preg_match('/^[A-Z]{5}\d{4}[A-Z]$/', $data['pan']);
-            $checkaadhar = preg_match('/[0-9]{12}$/', $data['aadhar']);
-            if ($checkaadhar && $checkpan) {
-                $data = array("user_id" => $user['id'], "pan" => $data['pan'], "aadhar" => $data['aadhar']);
+            if (!$checkpan) {
+                $this->session->set_flashdata("err_msg", "Enter Valid PAN!");
+                redirect($_SERVER['HTTP_REFERER']);
+                return;
+            }
+            
+            // Aadhar is now optional - validate only if provided
+            $aadhar = !empty($data['aadhar']) ? $data['aadhar'] : '';
+            $checkaadhar = empty($aadhar) ? true : preg_match('/[0-9]{12}$/', $aadhar);
+            
+            if ($checkaadhar) {
+                $kyc_data = array(
+                    "user_id" => $user['id'],
+                    "pan" => $data['pan']
+                );
+                
+                // Add firm_id if provided
+                if (!empty($firm_id)) {
+                    $kyc_data['firm_id'] = $firm_id;
+                }
+                
+                // Add aadhar only if provided
+                if (!empty($aadhar)) {
+                    $kyc_data['aadhar'] = $aadhar;
+                }
+                
                 $status = true;
                 $message = array();
                 $upload_path = './assets/images/profile/kyc/';
                 $allowed_types = 'gif|jpg|jpeg|png|svg';
-                $upload = upload_file('pan_image', $upload_path, $allowed_types, generate_slug($user['name'] . '-pan'));
+                
+                // PAN image (required)
+                $upload = upload_file('pan_image', $upload_path, $allowed_types, generate_slug($user['name'] . '-pan-' . ($firm_id ? $firm_id : 'user')));
                 if ($upload['status'] === true) {
-                    $data['pan_image'] = $upload['path'];
+                    $kyc_data['pan_image'] = $upload['path'];
                 } else {
                     $status = false;
                     $message[] = "PAN- " . trim($upload['msg']);
                 }
-                $upload = upload_file('aadhar_image', $upload_path, $allowed_types, generate_slug($user['name'] . '-aadhar'));
-                if ($upload['status'] === true) {
-                    $data['aadhar_image'] = $upload['path'];
-                } else {
-                    $status = false;
-                    $message[] = "Aadhar Front- " . trim($upload['msg']);
+                
+                // Aadhar images (optional - only upload if provided)
+                if (!empty($_FILES['aadhar_image']['name'])) {
+                    $upload = upload_file('aadhar_image', $upload_path, $allowed_types, generate_slug($user['name'] . '-aadhar-' . ($firm_id ? $firm_id : 'user')));
+                    if ($upload['status'] === true) {
+                        $kyc_data['aadhar_image'] = $upload['path'];
+                    } else {
+                        $status = false;
+                        $message[] = "Aadhar Front- " . trim($upload['msg']);
+                    }
                 }
-
-                $upload = upload_file('aadhar_back', $upload_path, $allowed_types, generate_slug($user['name'] . '-aadhar-back'));
-                if ($upload['status'] === true) {
-                    $data['aadhar_back'] = $upload['path'];
-                } else {
-                    $status = false;
-                    $message[] = "Aadhar Back- " . trim($upload['msg']);
+                
+                if (!empty($_FILES['aadhar_back']['name'])) {
+                    $upload = upload_file('aadhar_back', $upload_path, $allowed_types, generate_slug($user['name'] . '-aadhar-back-' . ($firm_id ? $firm_id : 'user')));
+                    if ($upload['status'] === true) {
+                        $kyc_data['aadhar_back'] = $upload['path'];
+                    } else {
+                        $status = false;
+                        $message[] = "Aadhar Back- " . trim($upload['msg']);
+                    }
                 }
 
                 if ($status) {
-                    $result = $this->account->savekyc($data);
+                    $result = $this->account->savekyc($kyc_data);
                     if ($result['status'] === true) {
                         $this->session->set_flashdata("msg", $result['message']);
                     } else {
@@ -260,14 +320,7 @@ class Profile extends CI_Controller
                     $this->session->set_flashdata("err_msg", $message);
                 }
             } else {
-                if ($checkaadhar && !$checkpan) {
-                    $message = "Enter Valid PAN!";
-                } elseif (!$checkaadhar && $checkpan) {
-                    $message = "Enter Valid Aadhar No!";
-                } else {
-                    $message = "Enter Valid PAN and Aadhar No!";
-                }
-                $this->session->set_flashdata("err_msg", $message);
+                $this->session->set_flashdata("err_msg", "Enter Valid Aadhar No!");
             }
         }
         redirect($_SERVER['HTTP_REFERER']);

@@ -65,17 +65,46 @@ class Service_model extends CI_Model
     public function getpurchases($where = array(), $type = 'all')
     {
         // Include all purchase columns including service_option and service_option_display
+        // Also include firm information for invoice generation
         $columns = "t1.*,t2.name,t2.mobile,t2.email,t3.name as service_name";
+        $columns .= ",t4.name as firm_name,t4.gstin as firm_gstin";
         $this->db->select($columns);
         $this->db->where($where);
         $this->db->from('purchases t1');
         $this->db->join('users t2', 't1.user_id=t2.id');
         $this->db->join('services t3', 't1.service_id=t3.id', 'left');
+        $this->db->join('firms t4', 't1.firm_id=t4.id', 'left');
         $query = $this->db->get();
+
+        // Check if query was successful
+        if ($query === false) {
+            // If query failed, try without firms join (for backward compatibility)
+            $error = $this->db->error();
+            log_message('error', 'getpurchases query failed: ' . json_encode($error));
+
+            $this->db->reset_query();
+            $columns = "t1.*,t2.name,t2.mobile,t2.email,t3.name as service_name";
+            $this->db->select($columns);
+            $this->db->where($where);
+            $this->db->from('purchases t1');
+            $this->db->join('users t2', 't1.user_id=t2.id');
+            $this->db->join('services t3', 't1.service_id=t3.id', 'left');
+            $query = $this->db->get();
+
+            // If still fails, return empty array
+            if ($query === false) {
+                return ($type == 'all') ? array() : array();
+            }
+        }
+
         if ($type == 'all') {
             $array = $query->result_array();
         } else {
-            $array = $query->unbuffered_row('array');
+            if ($query->num_rows() > 0) {
+                $array = $query->unbuffered_row('array');
+            } else {
+                $array = array();
+            }
         }
         return $array;
     }

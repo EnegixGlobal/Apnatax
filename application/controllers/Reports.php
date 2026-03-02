@@ -10,8 +10,8 @@ class Reports extends CI_Controller
         logrequest();
         checklogin();
         //checkcookie();
-        // Allow admin access for admin reports, customer access for customer reports
-        if ($this->session->role != 'customer' && $this->session->role != 'admin' && $this->session->role != 'superadmin') {
+        // Allow admin, employee access for admin reports, customer access for customer reports
+        if ($this->session->role != 'customer' && $this->session->role != 'admin' && $this->session->role != 'superadmin' && $this->session->role != 'employee') {
             redirect('/');
         }
     }
@@ -654,5 +654,217 @@ class Reports extends CI_Controller
         $data['total_records'] = count($assignments);
 
         $this->template->load('reports', 'assignment_reports', $data);
+    }
+
+    /**
+     * Admin/Employee view: Show all customers with pending package renewals
+     * Displays which customers have packages pending to renew
+     */
+    public function pendingpackagerenewals()
+    {
+        // Only allow admin and employee access
+        if ($this->session->role != 'admin' && $this->session->role != 'superadmin' && $this->session->role != 'employee') {
+            redirect('home/');
+            return;
+        }
+
+        $data = ['title' => 'Pending Package Renewals'];
+        $data['breadcrumb'] = array("active" => "Pending Package Renewals");
+        $data['datatable'] = true;
+        $data['alertify'] = true;
+
+        // Get filter parameters
+        $selected_year = $this->input->get('year') ? $this->input->get('year') : NULL;
+        $customer_id = $this->input->get('customer_id') ? $this->input->get('customer_id') : NULL;
+
+        // Get current year (default to current financial year)
+        $current_date = date('Y-m-d');
+        $current_month = date('m');
+        $current_year = date('Y');
+        
+        // Financial year starts from April, so if current month < April, use previous year
+        if ($current_month < 4) {
+            $fy_start_year = $current_year - 1;
+        } else {
+            $fy_start_year = $current_year;
+        }
+        
+        // Default year format: YYYY(YYYY+1) e.g., 20232024
+        $default_year = $fy_start_year . ($fy_start_year + 1);
+        $year = $selected_year ? $selected_year : $default_year;
+
+        // Get all customers (filter by employee if needed)
+        $where_customers = array();
+        if ($this->session->role == 'employee') {
+            // Employees can only see customers they added
+            $where_customers['md5(t1.added_by)'] = $this->session->user;
+        }
+        
+        $all_customers = $this->customer->getcustomers($where_customers);
+        
+        // Get all firms for these customers
+        $customer_user_ids = array();
+        if (!empty($all_customers)) {
+            $customer_user_ids = array_column($all_customers, 'user_id');
+        }
+
+        $pending_renewals = array();
+
+        if (!empty($customer_user_ids)) {
+            // Get all service packages for these customers
+            $packages_where = array();
+            if (!empty($customer_id)) {
+                $packages_where['t1.user_id'] = $customer_id;
+            }
+            
+            $all_packages = $this->customer->getservicepackage($packages_where, 'all');
+            
+            // Group packages by user_id and firm_id
+            $packages_by_customer = array();
+            if (!empty($all_packages)) {
+                foreach ($all_packages as $pkg) {
+                    $key = $pkg['user_id'] . '_' . $pkg['firm_id'];
+                    if (!isset($packages_by_customer[$key])) {
+                        $packages_by_customer[$key] = array();
+                    }
+                    $packages_by_customer[$key][] = $pkg;
+                }
+            }
+
+            // Process each customer-firm combination
+            foreach ($packages_by_customer as $key => $packages) {
+                if (empty($packages)) continue;
+                
+                $first_pkg = $packages[0];
+                $user_id = $first_pkg['user_id'];
+                $firm_id = $first_pkg['firm_id'];
+                $customer_name = $first_pkg['customer_name'];
+                $firm_name = $first_pkg['firm_name'];
+                
+                // Get customer ID from user_id
+                $customer = $this->customer->getcustomers(array('t1.user_id' => $user_id), 'single');
+                $customer_id = !empty($customer) ? $customer['id'] : null;
+
+                // Find current year package
+                $current_package = null;
+                $expired_packages = array();
+                
+                foreach ($packages as $pkg) {
+                    if ($pkg['year'] == $year) {
+                        $current_package = $pkg;
+                    } else {
+                        $expired_packages[] = $pkg;
+                    }
+                }
+
+                // Get current year service IDs
+                $current_service_ids = array();
+                if (!empty($current_package) && !empty($current_package['service_ids'])) {
+                    $current_service_ids = array_filter(array_map('trim', explode(',', $current_package['service_ids'])));
+                }
+
+                // Find renewal candidates (services in expired packages but not in current)
+                $renewal_services = array();
+                $expired_years = array();
+                
+                foreach ($expired_packages as $exp_pkg) {
+                    if (empty($exp_pkg['service_ids'])) continue;
+                    
+                    $exp_service_ids = array_filter(array_map('trim', explode(',', $exp_pkg['service_ids'])));
+                    $exp_year = $exp_pkg['year'];
+                    
+                    foreach ($exp_service_ids as $service_id) {
+                        if (empty($service_id)) continue;
+                        
+                        // If service is not in current package, it's a renewal candidate
+                        if (!in_array($service_id, $current_service_ids, true)) {
+                            if (!isset($renewal_services[$service_id])) {
+                                // Get service details
+                                $service = $this->master->getservices(array('id' => $service_id, 'status' => 1), 'single');
+                                if (!empty($service)) {
+                                    $renewal_services[$service_id] = array(
+                                        'service_id' => $service_id,
+                                        'service_name' => $service['name'],
+                                        'expired_year' => $exp_year
+                                    );
+                                }
+                            }
+                        }
+                    }
+                    
+                    if (!empty($exp_service_ids)) {
+                        $expired_years[] = $exp_year;
+                    }
+                }
+
+                // Also check for pending purchases (status=0)
+                $pending_purchases = array();
+                if (!empty($current_service_ids) || !empty($renewal_services)) {
+                    $all_service_ids = array_merge($current_service_ids, array_keys($renewal_services));
+                    $all_service_ids = array_unique(array_filter($all_service_ids));
+                    
+                    if (!empty($all_service_ids)) {
+                        $user_id_escaped = $this->db->escape($user_id);
+                        $firm_id_escaped = $this->db->escape($firm_id);
+                        $year_escaped = $this->db->escape($year);
+                        $service_ids_str = implode(',', array_map('intval', $all_service_ids));
+                        
+                        $where_pending = "t1.user_id={$user_id_escaped} AND t1.firm_id={$firm_id_escaped} AND t1.year={$year_escaped} AND t1.status='0' AND t1.service_id IN ($service_ids_str)";
+                        $pending_purchases = $this->service->getpurchasedservices($where_pending, 'all', true);
+                    }
+                }
+
+                // Only add to list if there are renewal candidates or pending purchases
+                if (!empty($renewal_services) || !empty($pending_purchases)) {
+                    // Format year display
+                    $year_display = $year;
+                    if (strlen($year_display) == 8 && is_numeric($year_display)) {
+                        $year1 = substr($year_display, 0, 4);
+                        $year2 = substr($year_display, 4, 4);
+                        $year_display = $year1 . '-' . $year2;
+                    }
+
+                    $pending_renewals[] = array(
+                        'user_id' => $user_id,
+                        'customer_id' => $customer_id,
+                        'customer_name' => $customer_name,
+                        'firm_id' => $firm_id,
+                        'firm_name' => !empty($firm_name) ? $firm_name : 'N/A',
+                        'year' => $year,
+                        'year_display' => $year_display,
+                        'renewal_services' => array_values($renewal_services),
+                        'pending_purchases' => $pending_purchases,
+                        'renewal_count' => count($renewal_services),
+                        'pending_count' => count($pending_purchases),
+                        'expired_years' => array_unique($expired_years)
+                    );
+                }
+            }
+        }
+
+        // Get customer dropdown for filter
+        $customer_options = array('' => 'All Customers');
+        if (!empty($all_customers)) {
+            foreach ($all_customers as $cust) {
+                $customer_options[$cust['user_id']] = $cust['name'] . ' (' . $cust['mobile'] . ')';
+            }
+        }
+
+        // Get year options (last 5 years)
+        $year_options = array('' => 'Select Year');
+        $current_fy = $fy_start_year;
+        for ($i = 0; $i < 5; $i++) {
+            $yr = ($current_fy - $i) . ($current_fy - $i + 1);
+            $yr_display = ($current_fy - $i) . '-' . substr(($current_fy - $i + 1), -2);
+            $year_options[$yr] = 'AY ' . $yr_display;
+        }
+
+        $data['pending_renewals'] = $pending_renewals;
+        $data['customers'] = $customer_options;
+        $data['years'] = $year_options;
+        $data['selected_customer'] = $customer_id;
+        $data['selected_year'] = $selected_year ? $selected_year : $year;
+
+        $this->template->load('reports', 'pending_package_renewals', $data);
     }
 }

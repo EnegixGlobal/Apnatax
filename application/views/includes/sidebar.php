@@ -48,6 +48,7 @@
                             <li><a href="<?= base_url('customers/customerpurchases/'); ?>" class="slide-item <?= activate_menu('customers/customerpurchases'); ?>"> Customer Purchases</a></li>
                             <li><a href="<?= base_url('customers/packageswitchrequests/'); ?>" class="slide-item <?= activate_menu('customers/packageswitchrequests'); ?>"> Customer Package Switch Request</a></li>
                             <li><a href="<?= base_url('customers/firmdeleterequests/'); ?>" class="slide-item <?= activate_menu('customers/firmdeleterequests'); ?>"> Firm Delete Request</a></li>
+                            <li><a href="<?= base_url('customers/firmeditrequests/'); ?>" class="slide-item <?= activate_menu('customers/firmeditrequests'); ?>"> Firm Edit Request</a></li>
                             <li><a href="<?= base_url('customers/packagedeleterequests/'); ?>" class="slide-item <?= activate_menu('customers/packagedeleterequests'); ?>"> Package Delete Request</a></li>
                             <li><a href="<?= base_url('customers/customerwisereport/'); ?>" class="slide-item <?= activate_menu('customers/customerwisereport'); ?>"> Customer Wise Report</a></li>
                         </ul>
@@ -91,6 +92,11 @@
                             <li><a href="<?= base_url('reports/servicecustomers/'); ?>" class="slide-item <?= activate_menu('reports/servicecustomers'); ?>"> Service Customers</a></li>
                         </ul>
                     </li>
+                    <?php if ($this->session->role == 'superadmin' || $this->session->role == 'admin' || $this->session->role == 'employee') { ?>
+                    <li class="slide">
+                        <a class="side-menu__item <?= activate_menu('reports/pendingpackagerenewals'); ?>" data-bs-toggle="slide" href="<?= base_url('reports/pendingpackagerenewals/'); ?>"><i class="side-menu__icon fa fa-refresh"></i><span class="side-menu__label">Pending Package Renewals</span></a>
+                    </li>
+                    <?php } ?>
                     <li class="slide">
                         <a class="side-menu__item <?= activate_menu('chat'); ?>" data-bs-toggle="slide" href="<?= base_url('chat/'); ?>"><i class="side-menu__icon fa fa-comments"></i><span class="side-menu__label">Chat</span></a>
                     </li>

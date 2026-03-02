@@ -34,6 +34,25 @@ class Pdf
 
         $dompdf->stream($filename . '.pdf', ['Attachment' => 1]);
     }
+
+    /**
+     * Generate a PDF and return its binary content (for API download endpoints).
+     *
+     * @param string $html
+     * @param string $paper
+     * @param string $orientation
+     * @return string Raw PDF binary
+     */
+    public function generateBinary($html, $paper = 'A4', $orientation = 'portrait')
+    {
+        $options = new Options();
+        $options->set('isRemoteEnabled', true);
+
+        $dompdf = new Dompdf($options);
+        $dompdf->loadHtml($html);
+        $dompdf->setPaper($paper, $orientation);
+        $dompdf->render();
+
+        return $dompdf->output();
+    }
 }
-
-

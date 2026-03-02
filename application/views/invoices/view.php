@@ -6,10 +6,53 @@ $billing_name = !empty($invoice['billing_name']) ? $invoice['billing_name'] : ''
 $firm_name    = !empty($invoice['firm_name']) ? $invoice['firm_name'] : '';
 $firm_gstin   = !empty($invoice['firm_gstin']) ? $invoice['firm_gstin'] : '';
 $firm_pan     = !empty($invoice['firm_pan']) ? $invoice['firm_pan'] : '';
+
+// If firm_name is missing, try to get it from order
+if (empty($firm_name) && !empty($order['firm_name'])) {
+    $firm_name = $order['firm_name'];
+}
+if (empty($firm_gstin) && !empty($order['firm_gstin'])) {
+    $firm_gstin = $order['firm_gstin'];
+}
+if (empty($firm_pan) && !empty($order['firm_pan'])) {
+    $firm_pan = $order['firm_pan'];
+}
 $subtotal     = isset($invoice['subtotal']) ? (float)$invoice['subtotal'] : 0;
 $gst_rate     = isset($invoice['gst_rate']) ? (float)$invoice['gst_rate'] : 0;
 $gst_amount   = isset($invoice['gst_amount']) ? (float)$invoice['gst_amount'] : 0;
 $total        = isset($invoice['total_amount']) ? (float)$invoice['total_amount'] : $subtotal + $gst_amount;
+
+// Calculate SGST/CGST or IGST based on state match
+$customer_state_id = isset($customer_state_id) ? $customer_state_id : null;
+$admin_state_id = isset($admin_state_id) ? $admin_state_id : null;
+
+$sgst_amount = 0;
+$cgst_amount = 0;
+$igst_amount = 0;
+$states_match = false;
+
+if ($gst_amount > 0 && !empty($customer_state_id) && !empty($admin_state_id)) {
+    $states_match = ($customer_state_id == $admin_state_id);
+
+    if ($states_match) {
+        // Same state: SGST 9% + CGST 9% = 18%
+        $sgst_amount = round(($subtotal * 9) / 100, 2);
+        $cgst_amount = round(($subtotal * 9) / 100, 2);
+        // Adjust for rounding differences
+        $total_gst = $sgst_amount + $cgst_amount;
+        if (abs($total_gst - $gst_amount) > 0.01) {
+            $diff = $gst_amount - $total_gst;
+            $sgst_amount += round($diff / 2, 2);
+            $cgst_amount = $gst_amount - $sgst_amount;
+        }
+    } else {
+        // Different states: IGST 18%
+        $igst_amount = $gst_amount;
+    }
+} else {
+    // Fallback: if states not available, use IGST
+    $igst_amount = $gst_amount;
+}
 
 // Package services (for package invoices)
 $package_services = array();
@@ -22,15 +65,33 @@ function amount_in_words($number)
     // Very small helper for INR amount in words (rounded to integer)
     $no = round($number);
     $words = array(
-        '0' => 'Zero', '1' => 'One', '2' => 'Two',
-        '3' => 'Three', '4' => 'Four', '5' => 'Five',
-        '6' => 'Six', '7' => 'Seven', '8' => 'Eight',
-        '9' => 'Nine', '10' => 'Ten', '11' => 'Eleven',
-        '12' => 'Twelve', '13' => 'Thirteen', '14' => 'Fourteen',
-        '15' => 'Fifteen', '16' => 'Sixteen', '17' => 'Seventeen',
-        '18' => 'Eighteen', '19' => 'Nineteen', '20' => 'Twenty',
-        '30' => 'Thirty', '40' => 'Forty', '50' => 'Fifty',
-        '60' => 'Sixty', '70' => 'Seventy', '80' => 'Eighty',
+        '0' => 'Zero',
+        '1' => 'One',
+        '2' => 'Two',
+        '3' => 'Three',
+        '4' => 'Four',
+        '5' => 'Five',
+        '6' => 'Six',
+        '7' => 'Seven',
+        '8' => 'Eight',
+        '9' => 'Nine',
+        '10' => 'Ten',
+        '11' => 'Eleven',
+        '12' => 'Twelve',
+        '13' => 'Thirteen',
+        '14' => 'Fourteen',
+        '15' => 'Fifteen',
+        '16' => 'Sixteen',
+        '17' => 'Seventeen',
+        '18' => 'Eighteen',
+        '19' => 'Nineteen',
+        '20' => 'Twenty',
+        '30' => 'Thirty',
+        '40' => 'Forty',
+        '50' => 'Fifty',
+        '60' => 'Sixty',
+        '70' => 'Seventy',
+        '80' => 'Eighty',
         '90' => 'Ninety'
     );
     $digits = array('', 'Hundred', 'Thousand', 'Lakh', 'Crore');
@@ -125,6 +186,16 @@ $amount_words = amount_in_words($total);
             margin-top: 12px;
         }
 
+        .invoice-logo {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+
+        .invoice-logo img {
+            max-width: 150px;
+            height: auto;
+        }
+
         @media print {
             .no-print {
                 display: none;
@@ -143,24 +214,53 @@ $amount_words = amount_in_words($total);
             <button onclick="window.print();">Print</button>
         </div>
 
+        <div class="invoice-logo">
+            <?php
+            // Get absolute URL for logo (needed for PDF generation with Dompdf)
+            $logo_path = FCPATH . 'assets/images/logo.png';
+            if (file_exists($logo_path)) {
+                // Use file_url helper which returns proper URL, then make it absolute for PDF
+                $logo_url = file_url('assets/images/logo.png');
+                // For PDF generation, ensure absolute URL
+                if (strpos($logo_url, 'http') !== 0) {
+                    // If relative URL, make it absolute
+                    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://';
+                    $host = isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : 'localhost';
+                    $logo_url = $protocol . $host . '/' . ltrim($logo_url, '/');
+                }
+                echo '<img src="' . htmlspecialchars($logo_url) . '" alt="ApnoTax Logo" />';
+            }
+            ?>
+        </div>
+
         <h2>TAX INVOICE</h2>
 
         <table class="no-border">
             <tr>
                 <td><strong>Invoice No:</strong> <?php echo htmlspecialchars($invoice_no); ?></td>
-                <td class="text-right"><strong>Date:</strong> <?php echo $invoice_date; ?></td>
+                <td class="text-right">
+                    <?php
+                    // Show only admin GSTIN above date
+                    $admin_gstin = isset($admin_gstin) ? $admin_gstin : '';
+                    if (!empty($admin_gstin)) : ?>
+                        <strong>GSTIN:</strong> <?php echo htmlspecialchars($admin_gstin); ?><br>
+                    <?php endif; ?>
+                    <strong>Date:</strong> <?php echo $invoice_date; ?>
+                </td>
             </tr>
         </table>
 
         <table class="mt-2">
             <tr>
                 <td>
-                    <strong><?php echo htmlspecialchars($firm_name); ?></strong><br>
-                    <?php if ($firm_gstin) : ?>
-                        GSTIN: <?php echo htmlspecialchars($firm_gstin); ?><br>
-                    <?php endif; ?>
-                    <?php if ($firm_pan) : ?>
-                        PAN: <?php echo htmlspecialchars($firm_pan); ?><br>
+                    <?php if (!empty($firm_name)) : ?>
+                        <strong><?php echo htmlspecialchars($firm_name); ?></strong><br>
+                        <?php if ($firm_gstin) : ?>
+                            GSTIN: <?php echo htmlspecialchars($firm_gstin); ?><br>
+                        <?php endif; ?>
+                        <?php if ($firm_pan) : ?>
+                            PAN: <?php echo htmlspecialchars($firm_pan); ?><br>
+                        <?php endif; ?>
                     <?php endif; ?>
                 </td>
                 <td>
@@ -242,10 +342,26 @@ $amount_words = amount_in_words($total);
                 <td class="text-right"><strong>Subtotal:</strong></td>
                 <td class="text-right" style="width:120px;"><?php echo number_format($subtotal, 2); ?></td>
             </tr>
-            <tr>
-                <td class="text-right"><strong>GST @ <?php echo $gst_rate; ?>%:</strong></td>
-                <td class="text-right"><?php echo number_format($gst_amount, 2); ?></td>
-            </tr>
+            <?php if ($states_match && ($sgst_amount > 0 || $cgst_amount > 0)) : ?>
+                <tr>
+                    <td class="text-right"><strong>SGST @ 9%:</strong></td>
+                    <td class="text-right"><?php echo number_format($sgst_amount, 2); ?></td>
+                </tr>
+                <tr>
+                    <td class="text-right"><strong>CGST @ 9%:</strong></td>
+                    <td class="text-right"><?php echo number_format($cgst_amount, 2); ?></td>
+                </tr>
+            <?php elseif ($igst_amount > 0) : ?>
+                <tr>
+                    <td class="text-right"><strong>IGST @ <?php echo $gst_rate; ?>%:</strong></td>
+                    <td class="text-right"><?php echo number_format($igst_amount, 2); ?></td>
+                </tr>
+            <?php else : ?>
+                <tr>
+                    <td class="text-right"><strong>GST @ <?php echo $gst_rate; ?>%:</strong></td>
+                    <td class="text-right"><?php echo number_format($gst_amount, 2); ?></td>
+                </tr>
+            <?php endif; ?>
             <tr>
                 <td class="text-right"><strong>Grand Total:</strong></td>
                 <td class="text-right"><strong><?php echo number_format($total, 2); ?></strong></td>
@@ -278,5 +394,3 @@ $amount_words = amount_in_words($total);
 </body>
 
 </html>
-
-

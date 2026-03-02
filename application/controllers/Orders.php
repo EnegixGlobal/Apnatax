@@ -296,7 +296,7 @@ class Orders extends CI_Controller
             // Fallback to status=0 for backward compatibility
             $getassessment = $this->db->get_where('assessments', ['order_id' => $order['id'], 'status' => 0]);
         }
-        
+
         if ($getassessment->num_rows() == 0) {
             $this->session->set_flashdata('err_msg', 'Assessment not found!');
             redirect('orders/viewdocuments/' . md5($order['id']));
@@ -304,7 +304,7 @@ class Orders extends CI_Controller
         }
 
         $assessment = $getassessment->unbuffered_row('array');
-        
+
         // Check if assignment is already done
         $assignment_done = isset($assessment['assignment_done']) ? $assessment['assignment_done'] : 0;
         if ($assignment_done == 1) {
@@ -538,9 +538,10 @@ class Orders extends CI_Controller
         } elseif ($this->input->post('savemonthlyturnover') !== NULL) {
             $user = getuser();
             $data = $this->input->post();
+            $selectedYear = $data['year'];   // save before $data gets overwritten in the loop
             $allfirms = $data['firm_id'];
             $turnovers = $data['turnover'];
-            $years = getyearmonthvalues($data['year']);
+            $years = getyearmonthvalues($selectedYear);
             if (!empty($allfirms)) {
                 foreach ($allfirms as $user_id => $firm_ids) {
                     $where = array('user_id' => $user_id, 'status' => 1);
@@ -612,6 +613,7 @@ class Orders extends CI_Controller
                     }
                 }
             }
+            $this->session->set_flashdata(['year' => $selectedYear]);
             redirect('orders/monthlyturnover/');
         }
         redirect('orders/monthlyturnover/');

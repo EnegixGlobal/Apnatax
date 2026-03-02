@@ -217,39 +217,80 @@ class Profile extends RestController
         $token = $this->post('token');
         $pan = $this->post('pan');
         $aadhar = $this->post('aadhar');
+        $firm_id = $this->post('firm_id'); // Optional firm_id for per-firm KYC
 
-        if (!empty($token) && !empty($pan) && !empty($aadhar)) {
+        if (!empty($token) && !empty($pan)) {
             $user = $this->account->verify_token($token);
             if (!empty($user) && is_array($user) && $user['role'] == 'customer') {
+                // Validate PAN (required)
                 $checkpan = preg_match('/^[A-Z]{5}\d{4}[A-Z]$/', $pan);
-                $checkaadhar = preg_match('/[0-9]{12}$/', $aadhar);
+                if (!$checkpan) {
+                    $this->response([
+                        'status' => false,
+                        'message' => "Enter Valid PAN!"
+                    ], RestController::HTTP_OK);
+                    return;
+                }
+                
+                // Aadhar is now optional - validate only if provided
+                $checkaadhar = true; // Default to true (optional)
+                if (!empty($aadhar)) {
+                    $checkaadhar = preg_match('/[0-9]{12}$/', $aadhar);
+                    if (!$checkaadhar) {
+                        $this->response([
+                            'status' => false,
+                            'message' => "Enter Valid Aadhar No!"
+                        ], RestController::HTTP_OK);
+                        return;
+                    }
+                }
+                
                 if ($checkaadhar && $checkpan) {
-                    $data = array("user_id" => $user['id'], "pan" => $pan, "aadhar" => $aadhar);
+                    $data = array("user_id" => $user['id'], "pan" => $pan);
+                    
+                    // Add firm_id if provided
+                    if (!empty($firm_id)) {
+                        $data['firm_id'] = (int)$firm_id;
+                    }
+                    
+                    // Add aadhar only if provided
+                    if (!empty($aadhar)) {
+                        $data['aadhar'] = $aadhar;
+                    }
+                    
                     $status = true;
                     $message = array();
                     $upload_path = './assets/images/profile/kyc/';
                     $allowed_types = 'gif|jpg|jpeg|png|svg';
-                    $upload = upload_file('pan_image', $upload_path, $allowed_types, generate_slug($user['name'] . '-pan'));
+                    
+                    // PAN image (required)
+                    $upload = upload_file('pan_image', $upload_path, $allowed_types, generate_slug($user['name'] . '-pan-' . ($firm_id ? $firm_id : 'user')));
                     if ($upload['status'] === true) {
                         $data['pan_image'] = $upload['path'];
                     } else {
                         $status = false;
                         $message[] = "PAN- " . trim($upload['msg']);
                     }
-                    $upload = upload_file('aadhar_image', $upload_path, $allowed_types, generate_slug($user['name'] . '-aadhar'));
-                    if ($upload['status'] === true) {
-                        $data['aadhar_image'] = $upload['path'];
-                    } else {
-                        $status = false;
-                        $message[] = "Aadhar Front- " . trim($upload['msg']);
+                    
+                    // Aadhar images (optional - only upload if provided)
+                    if (!empty($_FILES['aadhar_image']['name'])) {
+                        $upload = upload_file('aadhar_image', $upload_path, $allowed_types, generate_slug($user['name'] . '-aadhar-' . ($firm_id ? $firm_id : 'user')));
+                        if ($upload['status'] === true) {
+                            $data['aadhar_image'] = $upload['path'];
+                        } else {
+                            $status = false;
+                            $message[] = "Aadhar Front- " . trim($upload['msg']);
+                        }
                     }
-
-                    $upload = upload_file('aadhar_back', $upload_path, $allowed_types, generate_slug($user['name'] . '-aadhar-back'));
-                    if ($upload['status'] === true) {
-                        $data['aadhar_back'] = $upload['path'];
-                    } else {
-                        $status = false;
-                        $message[] = "Aadhar Back- " . trim($upload['msg']);
+                    
+                    if (!empty($_FILES['aadhar_back']['name'])) {
+                        $upload = upload_file('aadhar_back', $upload_path, $allowed_types, generate_slug($user['name'] . '-aadhar-back-' . ($firm_id ? $firm_id : 'user')));
+                        if ($upload['status'] === true) {
+                            $data['aadhar_back'] = $upload['path'];
+                        } else {
+                            $status = false;
+                            $message[] = "Aadhar Back- " . trim($upload['msg']);
+                        }
                     }
 
                     if ($status) {
@@ -272,18 +313,6 @@ class Profile extends RestController
                             'message' => $message
                         ], RestController::HTTP_OK);
                     }
-                } else {
-                    if ($checkaadhar && !$checkpan) {
-                        $message = "Enter Valid PAN!";
-                    } elseif (!$checkaadhar && $checkpan) {
-                        $message = "Enter Valid Aadhar No!";
-                    } else {
-                        $message = "Enter Valid PAN and Aadhar No!";
-                    }
-                    $this->response([
-                        'status' => false,
-                        'message' => $message
-                    ], RestController::HTTP_OK);
                 }
             } else {
                 $this->response([
@@ -294,7 +323,7 @@ class Profile extends RestController
         } else {
             $this->response([
                 'status' => false,
-                'message' => "Please provide all Details!"
+                'message' => "Token and PAN are required!"
             ], RestController::HTTP_OK);
         }
     }
@@ -302,10 +331,19 @@ class Profile extends RestController
     public function getkyc_post()
     {
         $token = $this->post('token');
+        $firm_id = $this->post('firm_id'); // Optional firm_id for per-firm KYC
         if (!empty($token)) {
             $user = $this->account->verify_token($token);
             if (!empty($user) && is_array($user) && $user['role'] == 'customer') {
-                $kyc = $this->account->getkyc(['t1.user_id' => $user['id']], 'single');
+                // Build where clause - if firm_id provided, get firm-specific KYC, otherwise user-level
+                $where = ['t1.user_id' => $user['id']];
+                if (!empty($firm_id)) {
+                    $where['t1.firm_id'] = (int)$firm_id;
+                } else {
+                    // Get user-level KYC (where firm_id is NULL)
+                    $where['t1.firm_id IS NULL'] = null;
+                }
+                $kyc = $this->account->getkyc($where, 'single');
                 if (!empty($kyc)) {
                     $this->response([
                         'status' => true,

@@ -9,10 +9,14 @@ if(empty($kyc) || $kyc['status']==0){
                                     <div class="row">
                                         <div class="col-md-6">
                                             <?= form_open_multipart('profile/updatekyc/'); ?>
+                                                <?php if (!empty($firm_id)) : ?>
+                                                    <input type="hidden" name="firm_id" value="<?= $firm_id; ?>">
+                                                <?php endif; ?>
                                                 <div class="form-group">
                                                     <?php 
-                                                        $attributes=array("Placeholder"=>"Aadhar",'pattern'=>'[0-9]{12}$','title'=>"Enter Valid 12-digit Aadhar No");
-                                                        echo create_form_input("text","aadhar","Aadhar",true,$kyc['aadhar']??'',$attributes); 
+                                                        // Aadhar is now optional - remove required attribute
+                                                        $attributes=array("Placeholder"=>"Aadhar (Optional)",'pattern'=>'[0-9]{12}$','title'=>"Enter Valid 12-digit Aadhar No");
+                                                        echo create_form_input("text","aadhar","Aadhar (Optional)",false,$kyc['aadhar']??'',$attributes); 
                                                     ?>
                                                 </div>
                                                 <div class="form-group">
@@ -43,8 +47,9 @@ if(empty($kyc) || $kyc['status']==0){
                                                     <div class="row">
                                                         <div class="col-md-6">
                                                             <?php 
+                                                                // Aadhar back image is now optional
                                                                 $attributes=array("id"=>"aadhar_back","onChange"=>"getPhoto(this,'aadhar_back')","accept"=>"image/*");
-                                                                echo create_form_input("file","aadhar_back","Upload Aadhar Card Back:",true,'',$attributes); 
+                                                                echo create_form_input("file","aadhar_back","Upload Aadhar Card Back (Optional):",false,'',$attributes); 
                                                                 $aadhar_back="";
                                                                 if(!empty($kyc['aadhar_back'])){
                                                                     $aadhar_back="src='".str_replace('//assets/','/assets/',$kyc['aadhar_back'])."'";
