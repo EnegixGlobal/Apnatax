@@ -114,12 +114,12 @@ class Customer_model extends CI_Model
         $this->db->where($where);
         $this->db->from('addresses t1');
         $query = $this->db->get();
-        
+
         // Check if query was successful
         if ($query === false) {
             return ($type == 'all') ? array() : array();
         }
-        
+
         if ($type == 'all') {
             $array = $query->result_array();
         } else {
@@ -196,7 +196,7 @@ class Customer_model extends CI_Model
         $this->db->select($columns);
         $this->db->where($where);
         $this->db->from('firms t1');
-        $this->db->join('customers t2', 't1.user_id=t2.user_id');
+        $this->db->join('customers t2', 't1.user_id=t2.user_id', 'left');
         $query = $this->db->get();
         if ($type == 'all') {
             $array = $query->result_array();
