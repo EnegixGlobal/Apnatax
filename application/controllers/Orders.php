@@ -371,8 +371,10 @@ class Orders extends CI_Controller
     public function getfirms()
     {
         $user_id = $this->input->post('user_id');
-        $where = array('user_id' => $user_id);
-        $query = $this->db->get_where('firms', $where);
+        $where = array('user_id' => $user_id, 'status' => 1, 'request !=' => 1);
+        $this->db->where($where);
+        $this->db->order_by('name', 'ASC');
+        $query = $this->db->get('firms');
         $options = array('' => 'Select Firm');
         if ($query->num_rows() > 0) {
             $firms = $query->result_array();
