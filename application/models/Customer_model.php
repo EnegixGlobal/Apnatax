@@ -227,13 +227,17 @@ class Customer_model extends CI_Model
     {
         // Filter at the firm level: only include firms that have an active package (any year)
         $prefix  = $this->db->dbprefix;
-        $columns = "t1.id as firm_id,t1.user_id,t1.name as firm_name,t2.name as customer_name";
+        // Use COALESCE to get customer name from customers table, or fallback to users table name
+        $columns = "t1.id as firm_id,t1.user_id,t1.name as firm_name,COALESCE(t2.name, t3.name) as customer_name";
         $this->db->select($columns);
         $this->db->where($where);
         // Use FALSE to prevent CI from escaping the raw EXISTS subquery
         $this->db->where("EXISTS (SELECT 1 FROM {$prefix}customer_packages cp WHERE cp.user_id = t1.user_id AND cp.firm_id = t1.id AND cp.status = '1')", NULL, FALSE);
         $this->db->from('firms t1');
-        $this->db->join('customers t2', 't1.user_id=t2.user_id');
+        $this->db->join('customers t2', 't1.user_id=t2.user_id', 'left');
+        $this->db->join('users t3', 't1.user_id=t3.id', 'left');
+        $this->db->order_by('customer_name', 'ASC');
+        $this->db->order_by('t1.name', 'ASC');
         $query = $this->db->get();
         if ($type == 'all') {
             $array = $query->result_array();
