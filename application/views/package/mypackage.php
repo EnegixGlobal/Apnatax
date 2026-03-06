@@ -1,347 +1,1303 @@
 <?php
-if (!empty($package)) {
-    $name = $package['package_id'] == 1 ? 'Accountancy Prime' : 'Accountancy Premium';
-    $packages = $this->master->getpackages(['name' => $name]);
+/* ═══════════════════════════════════════════════════════
+   PHP HELPERS
+   ═══════════════════════════════════════════════════════ */
+
+function pkg_type_meta($type)
+{
+    $map = [
+        'Monthly'   => ['color' => '#4a90d9', 'light' => '#eaf3fd', 'icon' => 'fe fe-refresh-cw',  'label' => 'Monthly'],
+        'Quarterly' => ['color' => '#17a2b8', 'light' => '#e8f7f9', 'icon' => 'fe fe-calendar',    'label' => 'Quarterly'],
+        'Yearly'    => ['color' => '#28a745', 'light' => '#eaf7ee', 'icon' => 'fe fe-award',        'label' => 'Yearly'],
+        'Once'      => ['color' => '#e67e22', 'light' => '#fef4ec', 'icon' => 'fe fe-zap',          'label' => 'One-Time'],
+    ];
+    return isset($map[$type]) ? $map[$type] : ['color' => '#6c757d', 'light' => '#f0f0f0', 'icon' => 'fe fe-package', 'label' => $type];
+}
+
+function pkg_type_badge_inline($type)
+{
+    $meta = pkg_type_meta($type);
+    return '<span class="pkg-type-pill" style="background:' . $meta['light'] . ';color:' . $meta['color'] . ';border:1px solid ' . $meta['color'] . '40">'
+        . '<i class="' . $meta['icon'] . ' me-1" style="font-size:.7rem"></i>'
+        . htmlspecialchars($meta['label'])
+        . '</span>';
+}
+
+function payment_state($pkg)
+{
+    $expiry  = !empty($pkg['expiry_date']) ? strtotime($pkg['expiry_date']) : 0;
+    $expired = $expiry && $expiry <= time();
+    if ($expired) return ['label' => 'Expired – Renew',  'cls' => 'state-overdue', 'icon' => 'fe fe-alert-circle'];
+    return                ['label' => 'Active',            'cls' => 'state-active',  'icon' => 'fe fe-check-circle'];
 }
 ?>
-<div class="card">
+<!-- ══════════════════════════════════════════════════════════════════════
+     PAGE STYLES
+     ══════════════════════════════════════════════════════════════════════ -->
+<style>
+    /* ── design tokens ── */
+    :root {
+        --pkg-radius: 10px;
+        --pkg-shadow: 0 1px 8px rgba(0, 0, 0, .08);
+        --pkg-shadow-hover: 0 4px 20px rgba(0, 0, 0, .13);
+        --pkg-border: #e6e9ec;
+        --transition: .18s ease;
+        --section-gap: 2rem;
+        /* vertical gap between page sections */
+    }
 
-    <div class="card-body">
-        <?php
-        if (!empty($package)) {
-        ?>
-            <div class="row">
-                <div class="col-md-8">
-                    <h3 class="lead"><?= $name ?></h3>
-                    <div class="table-responsive">
-                        <table class="table table-bordered" id="package-table">
-                            <thead>
-                                <tr>
-                                    <th>Turnover</th>
-                                    <th>Rate</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php
-                                if (!empty($packages)) {
-                                    foreach ($packages as $package) {
-                                ?>
-                                        <tr class="<?= generate_slug($package['name']); ?> package">
-                                            <td><?= $package['remarks']; ?></td>
-                                            <td><?= $package['rate']; ?></td>
-                                        </tr>
-                                <?php
-                                    }
-                                }
-                                ?>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        <?php
+    /* ── page wrapper ── */
+    .pkg-page {
+        max-width: 1100px;
+    }
+
+    /* ── section title ── */
+    .pkg-section-title {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: .72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .7px;
+        color: #6c757d;
+        margin: 0 0 14px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid var(--pkg-border);
+    }
+
+    .pkg-section-title i {
+        font-size: .9rem;
+        color: #adb5bd;
+    }
+
+    /* ── type pill ── */
+    .pkg-type-pill {
+        display: inline-flex;
+        align-items: center;
+        font-size: .71rem;
+        font-weight: 600;
+        padding: 3px 9px;
+        border-radius: 20px;
+        letter-spacing: .2px;
+        white-space: nowrap;
+        line-height: 1.5;
+    }
+
+    /* ── state badges ── */
+    .state-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: .71rem;
+        font-weight: 600;
+        padding: 3px 9px;
+        border-radius: 20px;
+        white-space: nowrap;
+    }
+
+    .state-paid {
+        background: #d1f0da;
+        color: #155724;
+    }
+
+    /* state-paid kept for backward compat with account section */
+
+    .state-active {
+        background: #fff3cd;
+        color: #856404;
+    }
+
+    .state-overdue {
+        background: #fde8ea;
+        color: #721c24;
+    }
+
+    /* ── stat chips ── */
+    .stat-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: var(--section-gap);
+    }
+
+    .stat-chip {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        background: #fff;
+        border: 1px solid var(--pkg-border);
+        border-radius: var(--pkg-radius);
+        padding: 12px 18px;
+        min-width: 150px;
+        box-shadow: var(--pkg-shadow);
+        flex: 1 1 150px;
+    }
+
+    .stat-chip .chip-icon {
+        font-size: 1.35rem;
+        line-height: 1;
+    }
+
+    .stat-chip .chip-val {
+        font-size: 1.15rem;
+        font-weight: 700;
+        line-height: 1;
+        color: #2c3e50;
+    }
+
+    .stat-chip .chip-lbl {
+        font-size: .7rem;
+        color: #9aa1aa;
+        margin-top: 3px;
+    }
+
+    /* ── generic card wrapper ── */
+    .pkg-card-wrap {
+        background: #fff;
+        border: 1px solid var(--pkg-border);
+        border-radius: var(--pkg-radius);
+        box-shadow: var(--pkg-shadow);
+        overflow: hidden;
+        transition: box-shadow var(--transition), transform var(--transition);
+    }
+
+    .pkg-card-wrap:hover {
+        box-shadow: var(--pkg-shadow-hover);
+        transform: translateY(-1px);
+    }
+
+    /* ── existing package card ── */
+    .pkg-card {
+        border-radius: var(--pkg-radius);
+        border: 1px solid var(--pkg-border);
+        box-shadow: var(--pkg-shadow);
+        transition: box-shadow var(--transition), transform var(--transition);
+        overflow: hidden;
+        background: #fff;
+    }
+
+    .pkg-card:hover {
+        box-shadow: var(--pkg-shadow-hover);
+        transform: translateY(-1px);
+    }
+
+    .pkg-card.is-overdue {
+        border-left: 4px solid #dc3545;
+    }
+
+    .pkg-card.is-paid {
+        border-left: 4px solid #28a745;
+    }
+
+    .pkg-card.is-active {
+        border-left: 4px solid #ffc107;
+    }
+
+    .pkg-card-header {
+        padding: 14px 18px 12px;
+        border-bottom: 1px solid #f0f2f4;
+        background: #fafbfc;
+    }
+
+    .pkg-card-body {
+        padding: 0;
+    }
+
+    /* ── service list inside card ── */
+    .svc-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+    }
+
+    .svc-list li {
+        display: flex;
+        align-items: center;
+        padding: 9px 18px;
+        border-bottom: 1px solid #f4f5f7;
+        font-size: .865rem;
+        gap: 10px;
+    }
+
+    .svc-list li:last-child {
+        border-bottom: none;
+    }
+
+    .svc-list li .svc-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+
+    .svc-list li .svc-name {
+        flex: 1;
+        font-weight: 500;
+        color: #2c3e50;
+    }
+
+    .svc-list li .svc-for {
+        font-size: .73rem;
+        color: #8d95a0;
+        white-space: nowrap;
+    }
+
+    .svc-list li .svc-date {
+        font-size: .73rem;
+        color: #555;
+        white-space: nowrap;
+    }
+
+    .svc-list li .svc-rate {
+        font-weight: 600;
+        color: #2c3e50;
+        white-space: nowrap;
+        font-size: .875rem;
+    }
+
+    /* ── card info strip ── */
+    .pkg-info-strip {
+        display: flex;
+        flex-wrap: wrap;
+        border-top: 1px solid #f0f2f4;
+    }
+
+    .pkg-info-item {
+        flex: 1 1 33%;
+        padding: 10px 18px;
+        border-right: 1px solid #f0f2f4;
+        font-size: .78rem;
+    }
+
+    .pkg-info-item:last-child {
+        border-right: none;
+    }
+
+    .pkg-info-item .label {
+        color: #9aa1aa;
+        font-size: .68rem;
+        text-transform: uppercase;
+        letter-spacing: .5px;
+        margin-bottom: 3px;
+    }
+
+    .pkg-info-item .value {
+        font-weight: 600;
+        color: #2c3e50;
+    }
+
+    .pkg-info-item .value.danger {
+        color: #dc3545;
+    }
+
+    .pkg-info-item .value.success {
+        color: #28a745;
+    }
+
+    /* ── bill alert strip ── */
+    .pkg-bill-alert {
+        margin: 0;
+        border-radius: 0;
+        padding: 10px 18px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 8px;
+        font-size: .865rem;
+        border: none;
+        border-top: 1px solid rgba(0, 0, 0, .06);
+    }
+
+    /* ── card actions ── */
+    .pkg-actions {
+        padding: 10px 18px;
+        border-top: 1px solid #f0f2f4;
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        gap: 8px;
+        background: #fafbfc;
+    }
+
+    /* ── Account Work card ── */
+    .acct-status-row {
+        display: flex;
+        align-items: stretch;
+        border-left: 5px solid #28a745;
+        background: #fff;
+    }
+
+    .acct-status-body {
+        flex: 1;
+        padding: 16px 20px;
+    }
+
+    .acct-status-icon {
+        display: flex;
+        align-items: center;
+        padding: 0 20px;
+        font-size: 2rem;
+        color: #28a745;
+        opacity: .25;
+    }
+
+    .acct-rate-section {
+        border-top: 1px solid #f0f2f4;
+        padding: 14px 20px 18px;
+    }
+
+    .acct-rate-section .rate-title {
+        font-size: .7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .5px;
+        color: #8d95a0;
+        margin-bottom: 10px;
+    }
+
+    .acct-form-body {
+        padding: 20px 24px 24px;
+    }
+
+    /* ── Create Package panel ── */
+    .create-panel {
+        border-radius: var(--pkg-radius);
+        box-shadow: var(--pkg-shadow);
+        border: 1px solid var(--pkg-border);
+        overflow: hidden;
+        background: #fff;
+    }
+
+    .create-panel .panel-header {
+        background: linear-gradient(135deg, #2c3e50 0%, #3a5068 100%);
+        padding: 18px 24px;
+        color: #fff;
+    }
+
+    .create-panel .panel-header h5 {
+        margin: 0;
+        font-size: .95rem;
+        font-weight: 600;
+    }
+
+    .create-panel .panel-header p {
+        margin: 4px 0 0;
+        font-size: .8rem;
+        opacity: .7;
+    }
+
+    /* type-lock banner */
+    #type-lock-banner {
+        padding: 9px 20px;
+        background: #eaf3fd;
+        border-bottom: 1px solid #c5ddf7;
+        display: none;
+        align-items: center;
+        gap: 10px;
+        font-size: .84rem;
+        color: #1a5fa8;
+    }
+
+    #type-lock-banner i {
+        font-size: .95rem;
+    }
+
+    /* service selector table */
+    #svc-table {
+        margin: 0;
+    }
+
+    #svc-table thead th {
+        background: #f7f8fa;
+        color: #555;
+        font-size: .72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .4px;
+        border-bottom: 2px solid #e6e9ec;
+        padding: 10px 14px;
+        white-space: nowrap;
+    }
+
+    #svc-table tbody td {
+        padding: 10px 14px;
+        vertical-align: middle;
+        font-size: .865rem;
+    }
+
+    #svc-table tbody tr {
+        transition: background var(--transition);
+    }
+
+    #svc-table tbody tr.row-selected {
+        background: #f0fbf2 !important;
+    }
+
+    #svc-table tbody tr.row-disabled {
+        opacity: .4;
+        pointer-events: none;
+    }
+
+    #svc-table tbody tr.row-inpkg {
+        background: #f8f9fa;
+    }
+
+    /* custom checkbox */
+    .svc-check-wrap {
+        display: flex;
+        justify-content: center;
+    }
+
+    .svc-check {
+        width: 1.1rem;
+        height: 1.1rem;
+        cursor: pointer;
+        accent-color: #28a745;
+    }
+
+    /* option select */
+    .opt-select {
+        font-size: .8rem;
+        padding: 4px 8px;
+        border-radius: 6px;
+        border: 1px solid #dee2e6;
+        min-width: 150px;
+        background: #fff;
+    }
+
+    .opt-select:disabled {
+        background: #f8f9fa;
+        cursor: not-allowed;
+    }
+
+    /* rate cell */
+    .rate-cell {
+        font-weight: 600;
+        color: #2c3e50;
+        font-size: .875rem;
+    }
+
+    /* ── inline save bar ── */
+    #pkg-sticky-bar {
+        display: none;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 10px;
+        background: #2c3e50;
+        color: #fff;
+        padding: 13px 20px;
+        border-top: 1px solid rgba(255, 255, 255, .1);
+    }
+
+    #pkg-sticky-bar .bar-left {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        flex-wrap: wrap;
+    }
+
+    #pkg-sticky-bar .bar-total {
+        font-size: 1.05rem;
+        font-weight: 700;
+    }
+
+    #pkg-sticky-bar .bar-count {
+        font-size: .8rem;
+        opacity: .8;
+    }
+
+    #pkg-sticky-bar .bar-type {
+        font-size: .76rem;
+        background: rgba(255, 255, 255, .14);
+        padding: 3px 11px;
+        border-radius: 20px;
+    }
+
+    /* ── empty state ── */
+    .empty-pkg {
+        text-align: center;
+        padding: 48px 24px;
+        color: #bbb;
+    }
+
+    .empty-pkg i {
+        font-size: 2.8rem;
+        display: block;
+        margin-bottom: 12px;
+    }
+
+    .empty-pkg p {
+        font-size: .88rem;
+        margin: 0;
+    }
+
+    /* ── responsive ── */
+    @media (max-width: 576px) {
+        .pkg-info-item {
+            flex: 1 1 50%;
         }
-        ?>
-        <div class="row">
-            <div class="col-12">
-                <?= form_open('package/savepackage'); ?>
-                <table class="table table-bordered" id="service-table">
-                    <thead>
-                        <tr>
-                            <th>Service</th>
-                            <th>Service Options</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php
-                        $required = true;
-                        $service_option_ids_data = array();
-                        if (!empty($service_package) && !empty($service_package['service_option_ids'])) {
-                            $service_option_ids_data = json_decode($service_package['service_option_ids'], true);
-                            if (!is_array($service_option_ids_data)) {
-                                $service_option_ids_data = array();
-                            }
-                        }
-                        if (!empty($service_package)) {
-                            $service_ids = explode(',', $service_package['service_ids']);
-                            foreach ($service_ids as $index => $service_id) {
-                                // Get single selected option (not array) - handle both old array format and new single value format
-                                $selected_option_value = '';
-                                if (!empty($service_option_ids_data[$service_id])) {
-                                    if (is_array($service_option_ids_data[$service_id])) {
-                                        // Old format: array - take first value
-                                        $selected_option_value = !empty($service_option_ids_data[$service_id][0]) ? $service_option_ids_data[$service_id][0] : '';
-                                    } else {
-                                        // New format: single value
-                                        $selected_option_value = $service_option_ids_data[$service_id];
-                                    }
-                                }
-                        ?>
-                                <tr>
-                                    <td>
-                                        <?= create_form_input('select', 'service_id[]', '', $required, $service_id, ['class' => 'service_id'], service_dropdown(['id>' => 1])); ?>
-                                    </td>
-                                    <td class="service-options-cell">
-                                        <div class="service-options-wrapper" style="display: <?= !empty($services_with_options[$service_id]['options']) ? 'block' : 'none'; ?>;">
-                                            <select name="service_option[<?= $index; ?>]" class="form-control service-option-select" style="min-width: 200px;">
-                                                <option value="">Select Option</option>
-                                                <?php
-                                                if (!empty($services_with_options[$service_id]['options'])) {
-                                                    foreach ($services_with_options[$service_id]['options'] as $option) {
-                                                        $selected = ($selected_option_value == $option['id']) ? 'selected' : '';
-                                                        echo '<option value="' . $option['id'] . '" ' . $selected . '>' . $option['display_name'] . '</option>';
-                                                    }
-                                                }
-                                                ?>
-                                            </select>
-                                        </div>
-                                        <div class="no-options-message text-muted" style="display: <?= empty($services_with_options[$service_id]['options']) ? 'block' : 'none'; ?>;">
-                                            <i class="fa fa-info-circle"></i> No options available for this service
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <button type="button" class="btn btn-sm btn-danger del-btn d-none"><i class="fa fa-trash"></i> Delete</button>
-                                    </td>
-                                </tr>
-                            <?php
-                            }
-                            $required = false;
-                        } else {
-                            ?>
-                            <tr>
-                                <td>
-                                    <?= create_form_input('select', 'service_id[]', '', $required, '', ['class' => 'service_id'], service_dropdown(['id>' => 1])); ?>
-                                </td>
-                                <td class="service-options-cell">
-                                    <div class="service-options-wrapper" style="display: none;">
-                                        <select name="service_option[0]" class="form-control service-option-select" style="min-width: 200px;">
-                                            <option value="">Select Option</option>
-                                        </select>
-                                    </div>
-                                    <div class="no-options-message text-muted" style="display: none;">
-                                        <i class="fa fa-info-circle"></i> No options available for this service
-                                    </div>
-                                    <div class="select-service-message text-muted" style="display: block;">
-                                        <i class="fa fa-arrow-left"></i> Please select a service first
-                                    </div>
-                                </td>
-                                <td>
-                                    <button type="button" class="btn btn-sm btn-info add-btn"><i class="fa fa-plus"></i> Add</button>
-                                </td>
-                            </tr>
-                        <?php
-                        }
-                        ?>
-                        <?php
-                        // Always show Add button row, even after saving
-                        if (!empty($service_package)) {
-                            $next_index = count(explode(',', $service_package['service_ids']));
-                        ?>
-                            <tr>
-                                <td>
-                                    <?= create_form_input('select', 'service_id[]', '', false, '', ['class' => 'service_id'], service_dropdown(['id>' => 1])); ?>
-                                </td>
-                                <td class="service-options-cell">
-                                    <div class="service-options-wrapper" style="display: none;">
-                                        <select name="service_option[<?= $next_index; ?>]" class="form-control service-option-select" style="min-width: 200px;">
-                                            <option value="">Select Option</option>
-                                        </select>
-                                    </div>
-                                    <div class="no-options-message text-muted" style="display: none;">
-                                        <i class="fa fa-info-circle"></i> No options available for this service
-                                    </div>
-                                    <div class="select-service-message text-muted" style="display: block;">
-                                        <i class="fa fa-arrow-left"></i> Please select a service first
-                                    </div>
-                                </td>
-                                <td>
-                                    <button type="button" class="btn btn-sm btn-info add-btn"><i class="fa fa-plus"></i> Add</button>
-                                </td>
-                            </tr>
-                        <?php
-                        }
-                        ?>
-                    </tbody>
-                </table>
-                <button type="submit" name="savepackage" class="btn btn-sm btn-success">Save Package</button>
-                <?php
-                // Show delete request button if package exists and no delete request is pending (request=0) or if rejected (request=2)
-                if (!empty($service_package) && ($service_package['request'] == 0 || $service_package['request'] == 2)) {
-                ?>
-                    <button type="button" class="btn btn-sm btn-danger" id="request-delete-btn" style="margin-left: 10px;">
-                        <i class="fa fa-trash"></i> Request Package Deletion
-                    </button>
-                    <?php
-                    if ($service_package['request'] == 2) {
-                    ?>
-                        <span class="badge badge-danger" style="margin-left: 10px; padding: 8px 12px;">
-                            <i class="fa fa-times"></i> Previous Request Was Rejected
-                        </span>
-                    <?php
-                    }
-                } elseif (!empty($service_package) && $service_package['request'] == 1) {
-                    ?>
-                    <span class="badge badge-warning" style="margin-left: 10px; padding: 8px 12px;">
-                        <i class="fa fa-clock-o"></i> Delete Request Pending Admin Approval
-                    </span>
-                <?php
-                }
-                ?>
-                <?= form_close(); ?>
+
+        .stat-chip {
+            min-width: 120px;
+        }
+
+        .acct-form-body {
+            padding: 16px;
+        }
+    }
+</style>
+
+<?php
+/* ════════════════════════════════════════════════════════
+   SECTION 0 – Summary chips
+   ════════════════════════════════════════════════════════ */
+$total_pkg    = !empty($service_packages) ? count($service_packages) : 0;
+$active_pkg   = 0;
+$overdue_pkg  = 0;
+$total_billed = 0;
+if (!empty($service_packages)) {
+    foreach ($service_packages as $_p) {
+        $state = payment_state($_p);
+        if ($state['cls'] === 'state-active')  $active_pkg++;
+        if ($state['cls'] === 'state-overdue') $overdue_pkg++;
+        $total_billed += (float)($_p['bill_amount'] ?? 0);
+    }
+}
+?>
+<div class="pkg-page">
+    <div class="stat-chips">
+        <div class="stat-chip">
+            <span class="chip-icon" style="color:#4a90d9"><i class="fe fe-package"></i></span>
+            <div class="chip-text">
+                <div class="chip-val"><?= $total_pkg ?></div>
+                <div class="chip-lbl">Total Packages</div>
+            </div>
+        </div>
+        <div class="stat-chip">
+            <span class="chip-icon" style="color:#f6c23e"><i class="fe fe-clock"></i></span>
+            <div class="chip-text">
+                <div class="chip-val"><?= $active_pkg ?></div>
+                <div class="chip-lbl">Active</div>
+            </div>
+        </div>
+        <div class="stat-chip">
+            <span class="chip-icon" style="color:#e74a3b"><i class="fe fe-alert-circle"></i></span>
+            <div class="chip-text">
+                <div class="chip-val"><?= $overdue_pkg ?></div>
+                <div class="chip-lbl">Expired</div>
+            </div>
+        </div>
+        <div class="stat-chip">
+            <span class="chip-icon" style="color:#6f42c1"><i class="fe fe-credit-card"></i></span>
+            <div class="chip-text">
+                <div class="chip-val">₹<?= number_format($total_billed, 0) ?></div>
+                <div class="chip-lbl">Total Billed</div>
             </div>
         </div>
     </div>
 
-    <style>
-        .service-options-cell {
-            min-width: 250px;
-        }
+    <?php
+    /* ════════════════════════════════════════════════════════
+   SECTION 0-B – Account Work (Accountancy Package)
+   ════════════════════════════════════════════════════════ */
+    ?>
+    <div class="pkg-section-title">
+        <i class="fe fe-briefcase"></i> Account Work
+    </div>
 
-        .service-options-wrapper {
-            animation: fadeIn 0.3s ease-in;
-        }
+    <div class="pkg-card-wrap mb-4" id="acct-work-card">
 
-        .no-options-message,
-        .select-service-message {
-            padding: 8px;
-            font-style: italic;
-            animation: fadeIn 0.3s ease-in;
-        }
+        <?php if (!empty($package)) :
+            $acct_name = $package['package_id'] == 1 ? 'Accountancy Prime' : 'Accountancy Premium';
+        ?>
+            <!-- ── Already selected ── -->
+            <div class="acct-status-row">
+                <div class="acct-status-body">
+                    <div class="d-flex align-items-center flex-wrap gap-2 mb-2">
+                        <span class="pkg-type-pill" style="background:#eaf7ee;color:#28a745;border:1px solid #28a74540">
+                            <i class="fe fe-briefcase me-1" style="font-size:.68rem"></i>
+                            <?= htmlspecialchars($acct_name) ?>
+                        </span>
+                        <span class="state-pill state-paid">
+                            <i class="fe fe-check-circle"></i> Active
+                        </span>
+                        <span class="pkg-type-pill" style="background:#f0f9f1;color:#3a7d44;border:1px solid #b7e0be">
+                            <i class="fe fe-trending-up me-1" style="font-size:.68rem"></i>Turnover-Based
+                        </span>
+                    </div>
+                    <div class="d-flex flex-wrap gap-3" style="font-size:.82rem;color:#555;">
+                        <span>
+                            <i class="fe fe-calendar me-1 text-muted"></i>
+                            Selected: <strong><?= date('d M Y', strtotime($package['added_on'])) ?></strong>
+                        </span>
+                        <?php if (!empty($package['year'])) : ?>
+                            <span>
+                                <i class="fe fe-file-text me-1 text-muted"></i>
+                                Year: <strong><?= htmlspecialchars($package['year']) ?></strong>
+                            </span>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <div class="acct-status-icon">
+                    <i class="fe fe-briefcase"></i>
+                </div>
+            </div>
 
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
+            <!-- ── Rate chart for selected package ── -->
+            <?php
+            $acct_slug = $package['package_id'] == 1 ? 'accountancy-prime' : 'accountancy-premium';
+            $acct_rows = [];
+            if (!empty($accountancy_packages)) {
+                foreach ($accountancy_packages as $_ap) {
+                    if (generate_slug($_ap['name']) === $acct_slug) $acct_rows[] = $_ap;
+                }
             }
+            ?>
+            <?php if (!empty($acct_rows)) : ?>
+                <div class="acct-rate-section">
+                    <div class="rate-title">
+                        <i class="fe fe-bar-chart-2 me-1"></i><?= htmlspecialchars($acct_name) ?> — Rate Chart
+                    </div>
+                    <div class="table-responsive" style="max-width:460px;">
+                        <table class="table table-bordered table-sm mb-0" style="font-size:.8rem;">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Turnover Slab</th>
+                                    <th>Rate</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($acct_rows as $_r) : ?>
+                                    <tr>
+                                        <td><?= htmlspecialchars($_r['remarks']) ?></td>
+                                        <td><strong class="text-success">₹<?= number_format($_r['rate'], 0) ?></strong></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            <?php endif; ?>
 
-            to {
-                opacity: 1;
-            }
-        }
+        <?php else : ?>
+            <!-- ── Not selected – selection form ── -->
+            <div class="panel-header">
+                <h5><i class="fe fe-briefcase me-2"></i>Select Accountancy Package</h5>
+                <p>Choose your account work plan based on firm turnover.</p>
+            </div>
+            <div class="acct-form-body">
 
-        .service-option-select {
-            border: 1px solid #ced4da;
-            border-radius: 4px;
-            padding: 6px 12px;
-        }
+                <div class="row g-3 align-items-start">
+                    <!-- Left: package dropdown -->
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold" style="font-size:.83rem">Select Package</label>
+                        <select id="acct-pkg-select" class="form-select form-select-sm">
+                            <option value="">— Choose Package —</option>
+                            <option value="accountancy-prime">Accountancy Prime</option>
+                            <option value="accountancy-premium">Accountancy Premium</option>
+                        </select>
+                    </div>
 
-        .service-option-select:focus {
-            border-color: #80bdff;
-            box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
-        }
+                    <!-- Right: rates table (revealed on selection) -->
+                    <div class="col-md-6" id="acct-rates-wrap" style="display:none;">
+                        <label class="form-label fw-semibold" style="font-size:.83rem">Rate Chart</label>
+                        <table class="table table-bordered table-sm mb-0" style="font-size:.8rem;">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Turnover Slab</th>
+                                    <th>Rate</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php if (!empty($accountancy_packages)) :
+                                    foreach ($accountancy_packages as $ap) : ?>
+                                        <tr class="acct-pkg-row <?= generate_slug($ap['name']) ?>" style="display:none;">
+                                            <td><?= htmlspecialchars($ap['remarks']) ?></td>
+                                            <td><strong class="text-success">₹<?= number_format($ap['rate'], 0) ?></strong></td>
+                                        </tr>
+                                <?php endforeach;
+                                endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
 
-        #service-table tbody tr:hover {
-            background-color: #f8f9fa;
-        }
-    </style>
+                <div class="mt-3">
+                    <button type="button" class="btn btn-success btn-sm px-4 fw-semibold" id="acct-confirm-btn">
+                        <i class="fe fe-check me-2"></i>Confirm Selection
+                    </button>
+                </div>
+            </div>
+        <?php endif; ?>
+
+    </div><!-- /#acct-work-card -->
+
+    <!-- Account Work JS (self-contained, no modal) -->
     <script>
-        // Store service options data for JavaScript
-        var servicesWithOptions = <?= json_encode($services_with_options); ?>;
-
-        $(document).ready(function(e) {
-            // Function to update service options dropdown when service is selected
-            // preSelectedValue: optional - used to preserve the previously selected option
-            function updateServiceOptions(selectElement, serviceId, preSelectedValue) {
-                var optionsCell = $(selectElement).closest('tr').find('.service-options-cell');
-                var optionsWrapper = optionsCell.find('.service-options-wrapper');
-                var noOptionsMessage = optionsCell.find('.no-options-message');
-                var selectServiceMessage = optionsCell.find('.select-service-message');
-                var optionsSelect = optionsWrapper.find('.service-option-select');
-
-                // Hide all messages first
-                selectServiceMessage.hide();
-                optionsWrapper.hide();
-                noOptionsMessage.hide();
-
-                if (!serviceId || serviceId === '') {
-                    // No service selected
-                    selectServiceMessage.show();
-                    optionsSelect.html('<option value="">Select Options</option>');
-                    return;
-                }
-
-                optionsSelect.html('<option value="">Select Option</option>');
-
-                if (servicesWithOptions[serviceId] && servicesWithOptions[serviceId].options && servicesWithOptions[serviceId].options.length > 0) {
-                    // Service has options - show the select
-                    $.each(servicesWithOptions[serviceId].options, function(index, option) {
-                        var isSelected = (preSelectedValue && preSelectedValue == option.id) ? ' selected' : '';
-                        optionsSelect.append('<option value="' + option.id + '"' + isSelected + '>' + option.display_name + '</option>');
+        (function() {
+            // Package dropdown → show rates table
+            var pkgSel = document.getElementById('acct-pkg-select');
+            if (pkgSel) {
+                pkgSel.addEventListener('change', function() {
+                    var val = this.value;
+                    document.querySelectorAll('.acct-pkg-row').forEach(function(r) {
+                        r.style.display = 'none';
                     });
-                    optionsWrapper.show();
-                    noOptionsMessage.hide();
-                    selectServiceMessage.hide();
-                } else {
-                    // Service has no options
-                    optionsWrapper.hide();
-                    noOptionsMessage.show();
-                    selectServiceMessage.hide();
-                }
+                    if (val) {
+                        document.querySelectorAll('.acct-pkg-row.' + val).forEach(function(r) {
+                            r.style.display = '';
+                        });
+                        document.getElementById('acct-rates-wrap').style.display = '';
+                    } else {
+                        document.getElementById('acct-rates-wrap').style.display = 'none';
+                    }
+                });
             }
 
-            // Handle service selection change (no preSelectedValue - user is choosing fresh)
-            $('body').on('change', '.service_id', function() {
-                var serviceId = $(this).val();
-                updateServiceOptions(this, serviceId, null);
-            });
+            // Confirm button
+            var confirmBtn = document.getElementById('acct-confirm-btn');
+            if (confirmBtn) {
+                confirmBtn.addEventListener('click', function() {
+                    var pkg_id = document.getElementById('acct-pkg-select').value;
+                    if (!pkg_id) {
+                        alert('Please select a package!');
+                        return;
+                    }
 
-            // Initialize options for existing rows - preserve the already-selected option from PHP
-            $('.service_id').each(function() {
-                var serviceId = $(this).val();
-                // Read the currently selected value rendered by PHP before rebuilding
-                var currentSelectedOption = $(this).closest('tr').find('.service-option-select').val();
-                updateServiceOptions(this, serviceId, currentSelectedOption);
-            });
+                    confirmBtn.disabled = true;
+                    confirmBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Processing…';
 
-            $('body').on('click', '.add-btn', function() {
-                var row = $(this).closest('tr').clone();
-                var rowIndex = $('#service-table tbody tr').length;
-                $(row).find('.add-btn').html('<i class="fa fa-trash"></i> Remove');
-                $(row).find('.add-btn').removeClass('add-btn btn-info').addClass('remove-btn btn-danger');
-                $(row).find('.service_id').val('').attr('name', 'service_id[]');
-                $(row).find('.service-option-select').attr('name', 'service_option[' + rowIndex + ']').html('<option value="">Select Option</option>');
-                // Reset the service options display
-                $(row).find('.service-options-wrapper').hide();
-                $(row).find('.no-options-message').hide();
-                $(row).find('.select-service-message').show();
-                $('#service-table tbody').append(row);
-            });
-            $('body').on('click', '.remove-btn', function() {
-                $(this).closest('tr').remove();
-            });
-            $('body').on('click', '.del-btn', function() {
-                var service_id = $(this).closest('tr').find('.service_id').val();
-                $(this).closest('tr').find('.form-control').attr('readonly', true);
-                $(this).closest('tr').find('.service_id').attr('disabled', true);
-                $(this).closest('tr').find('.service_id').removeAttr('name');
-                $(this).closest('div').append('<input type="hidden" name="service_id[]" class="temp_service_id" value="' + service_id + '">');
-                $(this).closest('div').find('.status').val(0);
-                $(this).html('<i class="fa fa-undo" ></i> Undo');
-                $(this).removeClass('del-btn').addClass('undo-btn');
-            });
-            $('body').on('click', '.undo-btn', function() {
-                $(this).closest('tr').find('.form-control').removeAttr('readonly');
-                $(this).closest('tr').find('.service_id').removeAttr('disabled');
-                $(this).closest('tr').find('.service_id').attr('name', 'service_id[]');
-                $(this).closest('div').find('.temp_service_id').remove();
-                $(this).closest('div').find('.status').val(1);
-                $(this).html('<i class="fa fa-trash" ></i> Delete');
-                $(this).removeClass('undo-btn').addClass('del-btn');
-            });
-            $('body').on('click', '#request-delete-btn', function() {
-                if (confirm("Are you sure you want to request package deletion? Admin will review your request.")) {
-                    $.ajax({
-                        type: 'post',
-                        url: '<?= base_url('package/requestdelete'); ?>',
-                        success: function(data) {
-                            window.location.reload();
-                        },
-                        error: function() {
-                            alert('Error occurred while submitting delete request!');
-                        }
-                    });
-                }
-            });
-        });
+                    var fd = new FormData();
+                    fd.append('id', 1);
+                    fd.append('type', 'Turnover');
+                    fd.append('amount', '');
+                    fd.append('package_id', pkg_id);
+
+                    fetch('<?= base_url('services/buyservice/') ?>', {
+                            method: 'POST',
+                            body: fd
+                        })
+                        .then(function(r) {
+                            return r.text();
+                        })
+                        .then(function(resp) {
+                            if (resp && resp.trim() !== '') {
+                                window.location = resp.trim();
+                            } else {
+                                window.location.reload();
+                            }
+                        })
+                        .catch(function() {
+                            alert('Something went wrong. Please try again.');
+                            confirmBtn.disabled = false;
+                            confirmBtn.innerHTML = '<i class="fe fe-check me-2"></i>Confirm Selection';
+                        });
+                });
+            }
+        })();
     </script>
-</div>
+
+    <?php
+    /* ════════════════════════════════════════════════════════
+   SECTION 1 – Existing packages
+   ════════════════════════════════════════════════════════ */
+    if (!empty($service_packages)) :
+    ?>
+        <div class="pkg-section-title">
+            <i class="fe fe-layers"></i> Your Packages
+        </div>
+        <div class="row g-3 mb-4">
+            <?php foreach ($service_packages as $pkg) :
+                /* resolve services */
+                $pkg_ids = !empty($pkg['service_ids'])
+                    ? array_filter(array_map('trim', explode(',', $pkg['service_ids']))) : [];
+                $pkg_services = [];
+                foreach ($all_services as $_s) {
+                    if (in_array((string)$_s['id'], $pkg_ids)) $pkg_services[] = $_s;
+                }
+                $pkg_type   = !empty($pkg['package_type']) ? $pkg['package_type'] : 'Yearly';
+                $meta       = pkg_type_meta($pkg_type);
+                $state      = payment_state($pkg);
+                $is_expired = $state['cls'] === 'state-overdue';
+                $expiry_ts  = !empty($pkg['expiry_date']) ? strtotime($pkg['expiry_date']) : 0;
+
+                /* days until expiry */
+                $days_left_txt = '';
+                if ($expiry_ts) {
+                    $days = (int)ceil(($expiry_ts - time()) / 86400);
+                    if ($days > 0)  $days_left_txt = "Expires in $days day" . ($days > 1 ? 's' : '');
+                    elseif ($is_expired) $days_left_txt = abs($days) . ' day' . (abs($days) != 1 ? 's' : '') . ' overdue';
+                }
+
+                /* pkg total */
+                $pkg_total  = 0;
+                $opt_ids_map = [];
+                if (!empty($pkg['service_option_ids'])) {
+                    $opt_ids_map = json_decode($pkg['service_option_ids'], true) ?: [];
+                }
+                $pkg_card_cls = $is_expired ? 'is-overdue' : 'is-active';
+            ?>
+                <div class="col-lg-6 col-xl-4">
+                    <div class="pkg-card card <?= $pkg_card_cls ?>">
+                        <!-- Card header -->
+                        <div class="pkg-card-header">
+                            <div class="d-flex align-items-start justify-content-between gap-2">
+                                <div>
+                                    <div class="d-flex align-items-center gap-2 mb-1">
+                                        <?= pkg_type_badge_inline($pkg_type) ?>
+                                        <span class="state-pill <?= $state['cls'] ?>">
+                                            <i class="<?= $state['icon'] ?>"></i>
+                                            <?= $state['label'] ?>
+                                        </span>
+                                    </div>
+                                    <div class="fw-bold text-dark" style="font-size:.95rem">
+                                        <?= htmlspecialchars($pkg['firm_name'] ?? 'My Firm') ?>
+                                    </div>
+                                    <div class="text-muted" style="font-size:.78rem">
+                                        Financial Year: <strong><?= htmlspecialchars($pkg['year'] ?? '') ?></strong>
+                                        <?php if ($days_left_txt) : ?>
+                                            &nbsp;·&nbsp;
+                                            <span class="<?= $is_expired ? 'text-danger' : 'text-warning' ?> fw-semibold">
+                                                <?= $days_left_txt ?>
+                                            </span>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                                <div class="text-end flex-shrink-0">
+                                    <div style="font-size:1.2rem;font-weight:700;color:<?= $meta['color'] ?>">
+                                        ₹<?= number_format($pkg['bill_amount'] ?? 0, 0) ?>
+                                    </div>
+                                    <div class="text-muted" style="font-size:.7rem">Total Bill</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Services list -->
+                        <div class="pkg-card-body">
+                            <ul class="svc-list">
+                                <?php foreach ($pkg_services as $psvc) :
+                                    $rate     = (float)$psvc['rate'];
+                                    $opt_label = '';
+                                    if (!empty($opt_ids_map[$psvc['id']])) {
+                                        $svc_opts = $services_with_options[$psvc['id']]['options'] ?? [];
+                                        foreach ($svc_opts as $o) {
+                                            if ((string)$o['id'] === (string)$opt_ids_map[$psvc['id']]) {
+                                                $rate      = (float)$o['rate'];
+                                                $opt_label = $o['display_name'];
+                                                break;
+                                            }
+                                        }
+                                    }
+                                    $pkg_total += $rate;
+                                ?>
+                                    <li>
+                                        <span class="svc-dot" style="background:<?= $meta['color'] ?>"></span>
+                                        <span class="svc-name">
+                                            <?= htmlspecialchars($psvc['name']) ?>
+                                            <?php if ($opt_label) : ?>
+                                                <small class="text-muted fw-normal">(<?= htmlspecialchars($opt_label) ?>)</small>
+                                            <?php endif; ?>
+                                        </span>
+                                        <span class="svc-for badge bg-light text-secondary border"><?= htmlspecialchars($psvc['service_for']) ?></span>
+                                        <?php if (!empty($psvc['debit_date'])) : ?>
+                                            <span class="svc-date">
+                                                <i class="fe fe-calendar" style="font-size:.7rem"></i>
+                                                <?= date('d M', strtotime($psvc['debit_date'])) ?>
+                                            </span>
+                                        <?php endif; ?>
+                                        <span class="svc-rate">₹<?= number_format($rate, 0) ?></span>
+                                    </li>
+                                <?php endforeach; ?>
+                            </ul>
+                        </div>
+
+                        <!-- Info strip -->
+                        <div class="pkg-info-strip">
+                            <div class="pkg-info-item">
+                                <div class="label">Purchased</div>
+                                <div class="value"><?= !empty($pkg['purchase_date']) ? date('d M Y', strtotime($pkg['purchase_date'])) : '—' ?></div>
+                            </div>
+                            <div class="pkg-info-item">
+                                <div class="label">Debit / Expiry</div>
+                                <div class="value <?= $is_expired ? 'danger' : '' ?>">
+                                    <?= !empty($pkg['expiry_date']) ? date('d M Y', strtotime($pkg['expiry_date'])) : '—' ?>
+                                </div>
+                            </div>
+                            <div class="pkg-info-item">
+                                <div class="label"># Services</div>
+                                <div class="value"><?= count($pkg_services) ?></div>
+                            </div>
+                        </div>
+
+                        <!-- Bill alert / info -->
+                        <?php if ($is_expired) : ?>
+                            <div class="pkg-bill-alert alert-danger">
+                                <span>
+                                    <i class="fe fe-alert-circle me-1"></i>
+                                    Bill of <strong>₹<?= number_format($pkg['bill_amount'], 2) ?></strong> is due. Pay to renew.
+                                </span>
+                                <button class="btn btn-danger btn-sm pay-bill-btn px-3"
+                                    data-pkg-id="<?= $pkg['id'] ?>"
+                                    data-amount="<?= $pkg['bill_amount'] ?>">
+                                    <i class="fe fe-credit-card me-1"></i>Pay Now
+                                </button>
+                            </div>
+                        <?php else : ?>
+                            <div class="pkg-bill-alert alert-warning" style="background:#fffbf0;border-top-color:#ffe8a0">
+                                <span style="color:#7d5a00">
+                                    <i class="fe fe-info me-1"></i>
+                                    <strong>₹<?= number_format($pkg['bill_amount'], 2) ?></strong>
+                                    will be billed on expiry
+                                    (<strong><?= !empty($pkg['expiry_date']) ? date('d M Y', strtotime($pkg['expiry_date'])) : '—' ?></strong>).
+                                    If wallet has balance, it auto-renews. Keep your wallet topped up.
+                                </span>
+                            </div>
+                        <?php endif; ?>
+
+                        <!-- Actions -->
+                        <div class="pkg-actions">
+                            <?php $req = isset($pkg['request']) ? (int)$pkg['request'] : 0; ?>
+                            <?php if ($req == 1) : ?>
+                                <span class="badge bg-warning text-dark px-3 py-2">
+                                    <i class="fe fe-clock me-1"></i>Delete request pending
+                                </span>
+                            <?php else : ?>
+                                <form method="post" action="<?= base_url('package/requestdelete') ?>"
+                                    style="display:inline"
+                                    onsubmit="return confirm('Request admin to delete this package?')">
+                                    <input type="hidden" name="package_id" value="<?= $pkg['id'] ?>">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                                        <i class="fe fe-trash-2 me-1"></i>Request Delete
+                                    </button>
+                                </form>
+                                <?php if ($req == 2) : ?>
+                                    <span class="badge bg-danger px-2 py-1" style="font-size:.7rem">
+                                        <i class="fe fe-x me-1"></i>Prev. request rejected
+                                    </span>
+                                <?php endif; ?>
+                            <?php endif; ?>
+                        </div>
+
+                    </div><!-- /.pkg-card -->
+                </div>
+            <?php endforeach; ?>
+        </div>
+    <?php endif; // end existing packages 
+    ?>
+
+    <?php
+    /* ════════════════════════════════════════════════════════
+   SECTION 2 – Create / Add Package
+   ════════════════════════════════════════════════════════ */
+    ?>
+    <div class="pkg-section-title mt-2">
+        <i class="fe fe-plus-circle"></i>
+        <?= !empty($service_packages) ? 'Create Another Package' : 'Create a Service Package' ?>
+    </div>
+
+    <div class="create-panel card">
+        <!-- Panel header -->
+        <div class="panel-header">
+            <h5><i class="fe fe-package me-2"></i>Select Services</h5>
+            <p>Tick the services you want to bundle. All services in one package must share the <strong>same billing type</strong>.</p>
+        </div>
+
+        <!-- Type lock banner (shown after first tick) -->
+        <div id="type-lock-banner">
+            <i class="fe fe-lock"></i>
+            <span>Package type locked to &nbsp;<strong id="locked-type-label">–</strong>.
+                Only <strong id="locked-type-label2">–</strong> services can be added to this package.</span>
+            <span class="ms-auto text-muted" style="font-size:.78rem">Uncheck all to reset.</span>
+        </div>
+
+        <?= form_open('package/savepackage', ['id' => 'pkg-form']); ?>
+
+        <!-- Service selector table -->
+        <?php if (empty($all_services)) : ?>
+            <div class="empty-pkg">
+                <i class="fe fe-inbox"></i>
+                <p>No services available at the moment.</p>
+            </div>
+        <?php else : ?>
+            <div class="table-responsive">
+                <table class="table table-hover mb-0" id="svc-table">
+                    <thead>
+                        <tr>
+                            <th style="width:52px" class="text-center">Pick</th>
+                            <th>Service</th>
+                            <th>Billing Type</th>
+                            <th>Rate</th>
+                            <th>For</th>
+                            <th>Auto Debit</th>
+                            <th>Option</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($all_services as $svc) :
+                            $in_pkg       = in_array((string)$svc['id'], $packaged_service_ids ?? []);
+                            $is_purchased = in_array((string)$svc['id'], $purchased_service_ids ?? []);
+                            $is_locked    = $in_pkg || $is_purchased;
+                            $svc_types = array_map('trim', explode(',', $svc['type']));
+                            $primary_type = 'Yearly';
+                            if (in_array('Once',      $svc_types)) $primary_type = 'Once';
+                            if (in_array('Monthly',   $svc_types)) $primary_type = 'Monthly';
+                            if (in_array('Quarterly', $svc_types)) $primary_type = 'Quarterly';
+                            if (in_array('Yearly',    $svc_types)) $primary_type = 'Yearly';
+                            $opts     = $services_with_options[$svc['id']]['options'] ?? [];
+                            $row_cls  = $is_locked ? 'row-inpkg' : '';
+                            $t_meta   = pkg_type_meta($primary_type);
+                        ?>
+                            <tr class="svc-row <?= $row_cls ?>"
+                                data-svc-id="<?= $svc['id'] ?>"
+                                data-primary-type="<?= $primary_type ?>"
+                                data-rate="<?= $svc['rate'] ?>">
+
+                                <td class="text-center">
+                                    <?php if ($in_pkg) : ?>
+                                        <span class="pkg-type-pill"
+                                            style="background:#e8f4fd;color:#1a5fa8;border:1px solid #bee3f8"
+                                            title="Already in a package">
+                                            <i class="fe fe-layers me-1" style="font-size:.7rem"></i>In Pkg
+                                        </span>
+                                    <?php elseif ($is_purchased) : ?>
+                                        <span class="pkg-type-pill"
+                                            style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0"
+                                            title="Already purchased individually from Services page">
+                                            <i class="fe fe-check-circle me-1" style="font-size:.7rem"></i>Purchased
+                                        </span>
+                                    <?php else : ?>
+                                        <div class="svc-check-wrap">
+                                            <input type="checkbox"
+                                                class="svc-check svc-checkbox"
+                                                name="service_id[]"
+                                                value="<?= $svc['id'] ?>"
+                                                data-primary-type="<?= $primary_type ?>"
+                                                data-rate="<?= $svc['rate'] ?>"
+                                                data-svc-id="<?= $svc['id'] ?>">
+                                        </div>
+                                    <?php endif; ?>
+                                </td>
+
+                                <td>
+                                    <div class="fw-semibold <?= $is_locked ? 'text-muted' : 'text-dark' ?>" style="font-size:.875rem">
+                                        <?= htmlspecialchars($svc['name']) ?>
+                                        <?php if ($is_purchased) : ?>
+                                            <span class="ms-1 text-muted" style="font-size:.75rem;font-weight:400"
+                                                title="Purchased individually. Go to Services page to manage.">
+                                                (individually purchased)
+                                            </span>
+                                        <?php endif; ?>
+                                    </div>
+                                </td>
+
+                                <td><?= pkg_type_badge_inline($primary_type) ?></td>
+
+                                <td class="rate-cell">
+                                    <span class="svc-display-rate">₹<?= number_format($svc['rate'], 2) ?></span>
+                                </td>
+
+                                <td>
+                                    <span class="badge bg-light text-secondary border" style="font-size:.75rem">
+                                        <?= htmlspecialchars($svc['service_for']) ?>
+                                    </span>
+                                </td>
+
+                                <td style="font-size:.82rem;color:#555">
+                                    <?php if (!empty($svc['debit_date'])) : ?>
+                                        <i class="fe fe-calendar me-1" style="color:#aaa"></i>
+                                        <?= date('d M Y', strtotime($svc['debit_date'])) ?>
+                                    <?php else : ?>
+                                        <span class="text-muted">—</span>
+                                    <?php endif; ?>
+                                </td>
+
+                                <td>
+                                    <?php if (!empty($opts) && !$in_pkg) : ?>
+                                        <select name="service_option[<?= $svc['id'] ?>]"
+                                            class="opt-select svc-option-select"
+                                            data-svc-id="<?= $svc['id'] ?>"
+                                            disabled>
+                                            <option value="">Select option…</option>
+                                            <?php foreach ($opts as $opt) : ?>
+                                                <option value="<?= $opt['id'] ?>" data-rate="<?= $opt['rate'] ?>">
+                                                    <?= htmlspecialchars($opt['display_name']) ?>
+                                                    – ₹<?= number_format($opt['rate'], 2) ?>
+                                                </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    <?php elseif (!$in_pkg) : ?>
+                                        <span class="text-muted" style="font-size:.78rem">—</span>
+                                    <?php else : ?>
+                                        <span class="text-muted" style="font-size:.78rem">—</span>
+                                    <?php endif; ?>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- ── Summary / save bar (visible after first service is ticked) ── -->
+            <div id="pkg-sticky-bar">
+                <div class="bar-left">
+                    <span class="bar-total">₹<span id="bar-total-amt">0.00</span></span>
+                    <span class="bar-count" id="bar-count-txt">0 services selected</span>
+                    <span class="bar-type d-none" id="bar-type-label"></span>
+                    <span class="text-white-50" style="font-size:.75rem" id="bar-gst-note"></span>
+                </div>
+                <button type="submit" form="pkg-form" name="savepackage" class="btn btn-success px-4 fw-semibold" id="save-pkg-btn">
+                    <i class="fe fe-save me-2"></i>Save Package
+                </button>
+            </div>
+
+        <?php endif; ?>
+
+        <?= form_close(); ?>
+    </div>
+
+    <!-- ── Scripts ── -->
+    <script>
+        (function($) {
+            'use strict';
+
+            var lockedType = null;
+
+            /* ── Recalculate total ─────────────────────────── */
+            function recalcTotal() {
+                var total = 0;
+                $('.svc-checkbox:checked').each(function() {
+                    var row = $(this).closest('tr');
+                    var optSel = row.find('.svc-option-select');
+                    if (optSel.length && optSel.val()) {
+                        total += parseFloat(optSel.find('option:selected').data('rate')) || 0;
+                    } else {
+                        total += parseFloat($(this).data('rate')) || 0;
+                    }
+                });
+                var fmt = total.toLocaleString('en-IN', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                });
+                $('#bar-total-amt').text(fmt);
+                return total;
+            }
+
+            /* ── Refresh full UI ───────────────────────────── */
+            function refreshUI() {
+                var checked = $('.svc-checkbox:checked');
+                var count = checked.length;
+
+                if (count === 0) {
+                    lockedType = null;
+                    $('#type-lock-banner').hide();
+                    $('.svc-row').removeClass('row-selected row-disabled');
+                    $('.svc-checkbox').prop('disabled', false);
+                    $('#pkg-sticky-bar').hide();
+                    $('#bar-type-label').addClass('d-none').text('');
+                } else {
+                    $('#type-lock-banner').css('display', 'flex');
+                    $('#locked-type-label, #locked-type-label2').text(lockedType);
+                    $('#bar-type-label').removeClass('d-none').text(lockedType + ' Package');
+                    $('#pkg-sticky-bar').css('display', 'flex');
+                    $('#bar-count-txt').text(count + ' service' + (count > 1 ? 's' : '') + ' selected');
+                    $('#bar-gst-note').text('(+ 18% GST if applicable)');
+                }
+
+                /* dim non-matching rows */
+                $('.svc-row:not(.row-inpkg)').each(function() {
+                    var rowType = $(this).data('primary-type');
+                    if (lockedType && rowType !== lockedType) {
+                        $(this).addClass('row-disabled').removeClass('row-selected');
+                        $(this).find('.svc-checkbox').prop('disabled', true).prop('checked', false);
+                    } else {
+                        $(this).removeClass('row-disabled');
+                        $(this).find('.svc-checkbox').prop('disabled', false);
+                    }
+                });
+
+                recalcTotal();
+            }
+
+            /* ── Checkbox change ───────────────────────────── */
+            $('body').on('change', '.svc-checkbox', function() {
+                var row = $(this).closest('tr');
+                var rowType = $(this).data('primary-type');
+
+                if ($(this).is(':checked')) {
+                    if (!lockedType) lockedType = rowType;
+                    row.addClass('row-selected');
+                    row.find('.svc-option-select').prop('disabled', false);
+                } else {
+                    row.removeClass('row-selected');
+                    row.find('.svc-option-select').prop('disabled', true).val('');
+                    if ($('.svc-checkbox:checked').length === 0) lockedType = null;
+                }
+                refreshUI();
+            });
+
+            /* ── Option select change ──────────────────────── */
+            $('body').on('change', '.svc-option-select', function() {
+                var row = $(this).closest('tr');
+                var rate = parseFloat($(this).find('option:selected').data('rate')) || 0;
+                if ($(this).val()) {
+                    row.find('.svc-display-rate').text('₹' + rate.toLocaleString('en-IN', {
+                        minimumFractionDigits: 2
+                    }));
+                } else {
+                    var base = parseFloat(row.data('rate')) || 0;
+                    row.find('.svc-display-rate').text('₹' + base.toLocaleString('en-IN', {
+                        minimumFractionDigits: 2
+                    }));
+                }
+                recalcTotal();
+            });
+
+            /* ── Pay Bill button AJAX ──────────────────────── */
+            $('body').on('click', '.pay-bill-btn', function() {
+                var pkgId = $(this).data('pkg-id');
+                var amount = parseFloat($(this).data('amount'));
+                var amtFmt = amount.toLocaleString('en-IN', {
+                    minimumFractionDigits: 2
+                });
+
+                if (!confirm('Pay package bill of ₹' + amtFmt + '?\n\nThis amount will be deducted from your wallet.')) {
+                    return false;
+                }
+                var $btn = $(this).prop('disabled', true)
+                    .html('<span class="spinner-border spinner-border-sm me-1"></span>Processing…');
+
+                $.ajax({
+                    type: 'POST',
+                    url: '<?= base_url('package/paybill') ?>',
+                    data: {
+                        package_id: pkgId
+                    },
+                    dataType: 'json',
+                    success: function(r) {
+                        if (r.status) {
+                            alertify.success(r.message || 'Payment successful!');
+                            setTimeout(function() {
+                                location.reload();
+                            }, 1800);
+                        } else {
+                            alertify.error(r.message || 'Payment failed.');
+                            if (r.redirect) setTimeout(function() {
+                                location.href = r.redirect;
+                            }, 2500);
+                            $btn.prop('disabled', false).html('<i class="fe fe-credit-card me-1"></i>Pay Now');
+                        }
+                    },
+                    error: function() {
+                        alertify.error('An error occurred. Please try again.');
+                        $btn.prop('disabled', false).html('<i class="fe fe-credit-card me-1"></i>Pay Now');
+                    }
+                });
+            });
+
+
+        }(jQuery));
+    </script>
+</div><!-- /.pkg-page -->

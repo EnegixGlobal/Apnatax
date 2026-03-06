@@ -248,12 +248,20 @@ class Customer_model extends CI_Model
         $this->db->trans_start();
         $datetime = date('Y-m-d H:i:s');
         $data['added_on'] = $data['updated_on'] = $datetime;
+
+        // Build unique-check WHERE clause.
+        // If package_type is provided, one package per (user, firm, year, type).
+        // Otherwise fall back to old behaviour: one package per (user, firm, year).
         $where = array('user_id' => $data['user_id'], 'firm_id' => $data['firm_id'], 'year' => $data['year']);
+        if (!empty($data['package_type'])) {
+            $where['package_type'] = $data['package_type'];
+        }
+
         if ($this->db->get_where('service_packages', $where)->num_rows() == 0) {
             if ($this->db->insert("service_packages", $data)) {
-                $firm_id = $this->db->insert_id();
+                $new_id = $this->db->insert_id();
                 $this->db->trans_complete();
-                return array("status" => true, "message" => "Package Created Successfully!");
+                return array("status" => true, "message" => "Package Created Successfully!", "package_id" => $new_id);
             } else {
                 $error = $this->db->error();
                 return array("status" => false, "message" => $error['message']);
@@ -267,7 +275,10 @@ class Customer_model extends CI_Model
                     $message = "No changes done in Package!";
                 }
                 $this->db->trans_complete();
-                return array("status" => true, "message" => $message);
+                // Return the existing package id
+                $existing = $this->db->get_where('service_packages', $where)->unbuffered_row('array');
+                $pkg_id = !empty($existing['id']) ? $existing['id'] : 0;
+                return array("status" => true, "message" => $message, "package_id" => $pkg_id);
             } else {
                 $error = $this->db->error();
                 return array("status" => false, "message" => $error['message']);

@@ -192,8 +192,16 @@ $amount_words = amount_in_words($total);
         }
 
         .invoice-logo img {
-            max-width: 150px;
+            max-width: 110px;
             height: auto;
+            vertical-align: middle;
+        }
+
+        .company-name {
+            font-size: 26px;
+            font-weight: bold;
+            vertical-align: middle;
+            padding-left: 10px;
         }
 
         @media print {
@@ -228,9 +236,10 @@ $amount_words = amount_in_words($total);
                     $host = isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : 'localhost';
                     $logo_url = $protocol . $host . '/' . ltrim($logo_url, '/');
                 }
-                echo '<img src="' . htmlspecialchars($logo_url) . '" alt="ApnoTax Logo" />';
+                echo '<img src="' . htmlspecialchars($logo_url) . '" alt="ApnoTax Logo" style="display:inline-block;vertical-align:middle;" />';
             }
             ?>
+            <span class="company-name" style="display:inline-block;vertical-align:middle;">ApnoTax Solutions</span>
         </div>
 
         <h2>TAX INVOICE</h2>
@@ -384,7 +393,7 @@ $amount_words = amount_in_words($total);
                     </ul>
                 </td>
                 <td class="text-right" style="vertical-align:bottom;">
-                    For <?php echo htmlspecialchars($firm_name); ?><br><br><br>
+                    For ApnoTax<br><br><br>
                     ___________________________<br>
                     Authorised Signatory
                 </td>

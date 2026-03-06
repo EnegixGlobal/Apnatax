@@ -40,16 +40,20 @@ class Services extends CI_Controller
             }
         }
 
-        // Collect service IDs that are already in the user's service package
+        // Collect service IDs that are already in ANY of the user's service packages
         $package_service_ids = array();
         if (!empty($user['id']) && !empty($firm_id) && !empty($year)) {
-            $service_package = $this->customer->getservicepackage(
+            $all_packages = $this->customer->getservicepackage(
                 ['t1.user_id' => $user['id'], 't1.firm_id' => $firm_id, 't1.year' => $year],
-                'single'
+                'all'
             );
-            if (!empty($service_package) && !empty($service_package['service_ids'])) {
-                $package_service_ids = array_map('trim', explode(',', $service_package['service_ids']));
-                $package_service_ids = array_filter($package_service_ids);
+            if (!empty($all_packages)) {
+                foreach ($all_packages as $pkg) {
+                    if (!empty($pkg['service_ids'])) {
+                        $ids = array_filter(array_map('trim', explode(',', $pkg['service_ids'])));
+                        $package_service_ids = array_unique(array_merge($package_service_ids, $ids));
+                    }
+                }
             }
         }
 
@@ -180,7 +184,7 @@ class Services extends CI_Controller
     public function pendingservices()
     {
         $data = ['title' => 'Pending Services'];
-        $data['breadcrumb'] = array("active" => "Purchased Services");
+        $data['breadcrumb'] = array("active" => "Pending Services");
         $year = $this->session->year;
         $firm_id = $this->session->firm;
         $user = getuser();
@@ -193,141 +197,35 @@ class Services extends CI_Controller
             return;
         }
 
-        // Get service package for this user/firm/year to get package service IDs
-        $service_package = $this->customer->getservicepackage(['t1.user_id' => $user['id'], 't1.firm_id' => $firm_id, 't1.year' => $year], 'single');
-
-        $services = array();
-        $package_service_ids = array();
-
-        // Get service IDs from current year package
-        if (!empty($service_package) && !empty($service_package['service_ids'])) {
-            $package_service_ids = explode(',', $service_package['service_ids']);
-        }
-
-        // Also check for expired packages (packages from previous years)
-        // Use raw query for != operator
-        $user_id_escaped = $this->db->escape($user['id']);
-        $firm_id_escaped = $this->db->escape($firm_id);
-        $year_escaped = $this->db->escape($year);
-        $expired_query = $this->db->query("SELECT t1.* FROM tf_service_packages t1 
-            LEFT JOIN tf_customers t2 ON t1.user_id=t2.user_id 
-            LEFT JOIN tf_firms t3 ON t1.firm_id=t3.id 
-            WHERE t1.user_id={$user_id_escaped} AND t1.firm_id={$firm_id_escaped} AND t1.year!={$year_escaped}");
-        $expired_packages = $expired_query->result_array();
-
-        // Collect service IDs from expired packages
-        if (!empty($expired_packages)) {
-            foreach ($expired_packages as $expired_package) {
-                if (!empty($expired_package['service_ids'])) {
-                    $expired_service_ids = explode(',', $expired_package['service_ids']);
-                    $package_service_ids = array_merge($package_service_ids, $expired_service_ids);
-                }
-            }
-        }
-
-        // Remove duplicates
-        $package_service_ids = array_unique(array_filter($package_service_ids));
-
-        if (!empty($package_service_ids)) {
-            // Filter to show pending services that are part of current or expired packages
-            $service_ids_str = implode(',', array_map('intval', $package_service_ids));
-            // Use proper escaping for SQL query
-            $user_id_escaped = $this->db->escape($user['id']);
-            $firm_id_escaped = $this->db->escape($firm_id);
-            $year_escaped = $this->db->escape($year);
-            $where = "t1.user_id={$user_id_escaped} AND t1.firm_id={$firm_id_escaped} AND t1.year={$year_escaped} AND t1.status='0' AND t1.service_id IN ($service_ids_str)";
-            $services = $this->service->getpurchasedservices($where, 'all', true); // Pass flag for group_by
-
-            // Also get pending services from expired packages
-            if (!empty($expired_packages)) {
-                foreach ($expired_packages as $expired_package) {
-                    if (!empty($expired_package['service_ids'])) {
-                        $expired_year = $expired_package['year'];
-                        $expired_service_ids = explode(',', $expired_package['service_ids']);
-                        $expired_service_ids_str = implode(',', array_map('intval', $expired_service_ids));
-                        $expired_year_escaped = $this->db->escape($expired_year);
-                        $where_expired = "t1.user_id={$user_id_escaped} AND t1.firm_id={$firm_id_escaped} AND t1.year={$expired_year_escaped} AND t1.status='0' AND t1.service_id IN ($expired_service_ids_str)";
-                        $expired_services = $this->service->getpurchasedservices($where_expired, 'all', true);
-
-                        // Mark expired services
-                        if (!empty($expired_services)) {
-                            foreach ($expired_services as $key => $expired_service) {
-                                $expired_services[$key]['expired_package'] = true;
-                                $expired_services[$key]['expired_year'] = $expired_year;
-                            }
-                            $services = array_merge($services, $expired_services);
+        // ── Expired / unpaid service packages ───────────────────────────
+        // Show only packages whose expiry_date has passed AND payment_status = 0
+        // (i.e. auto-renewal failed due to insufficient wallet balance).
+        $expired_pkgs = array();
+        $all_user_pkgs = $this->customer->getservicepackage(
+            ['t1.user_id' => $user['id'], 't1.firm_id' => $firm_id],
+            'all'
+        );
+        if (!empty($all_user_pkgs)) {
+            foreach ($all_user_pkgs as $_pkg) {
+                $exp = !empty($_pkg['expiry_date']) ? strtotime($_pkg['expiry_date']) : 0;
+                $is_unpaid = empty($_pkg['payment_status']) || $_pkg['payment_status'] == 0;
+                if ($exp && $exp <= time() && $is_unpaid) {
+                    // Resolve service names for display
+                    $svc_ids = array_filter(array_map('trim', explode(',', $_pkg['service_ids'] ?? '')));
+                    $svc_names = [];
+                    foreach ($svc_ids as $_sid) {
+                        $svc = $this->master->getservices(['id' => (int)$_sid], 'single');
+                        if (!empty($svc['name'])) {
+                            $svc_names[] = $svc['name'];
                         }
                     }
+                    $_pkg['service_names'] = $svc_names;
+                    $expired_pkgs[] = $_pkg;
                 }
             }
         }
+        $data['expired_packages'] = $expired_pkgs;
 
-        /**
-         * Renewal candidates:
-         * - Services that existed in any expired package for this firm/user
-         * - But are NOT present in the current year's package
-         * These are shown as "Renew" rows without requiring an existing purchase.
-         */
-        $renewals = array();
-
-        // Build quick lookup for current year package service IDs
-        $current_service_ids = array();
-        if (!empty($service_package) && !empty($service_package['service_ids'])) {
-            $current_ids_raw = explode(',', $service_package['service_ids']);
-            $current_service_ids = array_filter(array_map('trim', $current_ids_raw));
-        }
-
-        if (!empty($expired_packages)) {
-            foreach ($expired_packages as $expired_package) {
-                if (empty($expired_package['service_ids'])) {
-                    continue;
-                }
-                $expired_service_ids = array_filter(array_map('trim', explode(',', $expired_package['service_ids'])));
-                foreach ($expired_service_ids as $sid) {
-                    if ($sid === '') {
-                        continue;
-                    }
-                    // Skip if already in current package
-                    if (in_array($sid, $current_service_ids, true)) {
-                        continue;
-                    }
-                    // Avoid duplicates across multiple expired years
-                    if (isset($renewals[$sid])) {
-                        continue;
-                    }
-
-                    // Get service details
-                    $service = $this->master->getservices(array('id' => $sid), 'single');
-                    if (empty($service)) {
-                        continue;
-                    }
-
-                    // Optional: if you want to consider debit_date, you can add checks here
-                    // For now, any service from expired packages that is not in current package is a renewal candidate.
-
-                    $renewals[$sid] = array(
-                        'id' => 0,
-                        'service_id' => (int)$sid,
-                        'service_name' => $service['name'],
-                        'service_slug' => $service['slug'],
-                        'month' => '',
-                        'amount' => $service['rate'],
-                        'is_renewal' => 1,
-                        'expired_year' => $expired_package['year']
-                    );
-                }
-            }
-        }
-
-        // Merge real pending purchases with renewal candidates
-        if (!empty($renewals)) {
-            $services = array_merge($services, array_values($renewals));
-        }
-
-        $data['services'] = $services;
-        //print_pre($data,true);
-        $data['datatable'] = true;
-        //$data['folders']=$folders;
         $this->template->load('services', 'pendingservices', $data);
     }
 
@@ -485,6 +383,215 @@ class Services extends CI_Controller
             $message = !empty($result['message']) ? $result['message'] : 'Failed to renew service. Please try again.';
             echo json_encode(array('status' => false, 'message' => $message));
         }
+    }
+
+    /**
+     * Manually renew an expired service package from Pending Services.
+     * Deducts bill_amount from wallet, creates purchase rows, generates
+     * invoice, and extends the package expiry.
+     *
+     * POST param: package_id
+     */
+    public function renewpackage()
+    {
+        header('Content-Type: application/json');
+
+        if ($this->session->role != 'customer') {
+            echo json_encode(['status' => false, 'message' => 'Unauthorized.']);
+            return;
+        }
+
+        $package_id = (int)$this->input->post('package_id');
+        $user       = getuser();
+
+        if (empty($package_id)) {
+            echo json_encode(['status' => false, 'message' => 'Invalid package.']);
+            return;
+        }
+
+        // Fetch package owned by this user
+        $pkg = $this->db->get_where(
+            'service_packages',
+            ['id' => $package_id, 'user_id' => $user['id']]
+        )->unbuffered_row('array');
+
+        if (empty($pkg)) {
+            echo json_encode(['status' => false, 'message' => 'Package not found.']);
+            return;
+        }
+
+        // Must be expired to renew
+        $exp = !empty($pkg['expiry_date']) ? strtotime($pkg['expiry_date']) : 0;
+        if (!$exp || $exp > time()) {
+            echo json_encode(['status' => false, 'message' => 'This package has not expired yet.']);
+            return;
+        }
+
+        $bill = (float)($pkg['bill_amount'] ?? 0);
+        if ($bill <= 0) {
+            echo json_encode(['status' => false, 'message' => 'No bill amount for this package.']);
+            return;
+        }
+
+        // Check wallet balance
+        $balance = $this->wallet->getwalletbalance($user['id']);
+        if ($balance < $bill) {
+            $needed = $bill - $balance;
+            echo json_encode([
+                'status'   => false,
+                'message'  => 'Insufficient wallet balance. Please add ₹' . number_format($needed, 2) . ' to your wallet first.',
+                'redirect' => base_url('mywallet/')
+            ]);
+            return;
+        }
+
+        // ── Resolve services ───────────────────────────────────────────
+        $s_ids    = array_filter(array_map('trim', explode(',', $pkg['service_ids'] ?? '')));
+        $services = [];
+        if (!empty($s_ids)) {
+            $services = $this->master->getservices("status='1' AND id IN ('" . implode("','", $s_ids) . "')");
+        }
+        if (empty($services)) {
+            echo json_encode(['status' => false, 'message' => 'No active services found in this package.']);
+            return;
+        }
+
+        $pkg_type = !empty($pkg['package_type']) ? $pkg['package_type'] : 'Yearly';
+        $firm_id  = $pkg['firm_id'];
+        $year     = $pkg['year'];
+        $today    = date('Y-m-d');
+        $datetime = date('Y-m-d H:i:s');
+
+        // Service option rates
+        $opt_data = [];
+        if (!empty($pkg['service_option_ids'])) {
+            $opt_data = json_decode($pkg['service_option_ids'], true) ?: [];
+        }
+
+        // ── Check customer GST setting ──────────────────────────────────
+        $customer = $this->customer->getcustomers(['t1.user_id' => $user['id']], 'single');
+        $gst_enabled = !empty($customer) && !empty($customer['gst_enabled']) && $customer['gst_enabled'] == 1;
+
+        // ── Calculate total base rate and GST distribution ───────────────
+        $total_base_rate = 0;
+        $service_rates = [];
+        foreach ($services as $svc) {
+            $rate = (float)$svc['rate'];
+            if (!empty($opt_data[$svc['id']])) {
+                $opt = $this->master->getserviceoptions(
+                    ['id' => $opt_data[$svc['id']], 'status' => 1],
+                    'single'
+                );
+                if (!empty($opt['rate'])) $rate = (float)$opt['rate'];
+            }
+            $service_rates[$svc['id']] = $rate;
+            $total_base_rate += $rate;
+        }
+
+        // Calculate GST amounts if enabled
+        $total_gst = 0;
+        if ($gst_enabled && $total_base_rate > 0) {
+            // bill is total (subtotal + GST), extract subtotal and GST
+            $subtotal_from_bill = round($bill / 1.18, 2);
+            $total_gst = round($bill - $subtotal_from_bill, 2);
+        }
+
+        // ── Create a purchase row per service (deducts from wallet) ────
+        foreach ($services as $svc) {
+            $rate = $service_rates[$svc['id']];
+            $subtotal = $rate;
+            $gst_amount = 0;
+
+            // Distribute GST proportionally across services
+            if ($gst_enabled && $total_base_rate > 0 && $total_gst > 0) {
+                $gst_amount = round(($rate / $total_base_rate) * $total_gst, 2);
+            }
+
+            $amount = $subtotal + $gst_amount;
+
+            $this->db->insert('purchases', [
+                'date'       => $today,
+                'year'       => $year,
+                'type'       => $pkg_type,
+                'user_id'    => $user['id'],
+                'service_id' => $svc['id'],
+                'firm_id'    => $firm_id,
+                'service'    => $svc['name'] . ' (Package Renewal)',
+                'rate'       => $rate,
+                'subtotal'   => $subtotal,
+                'gst_amount' => $gst_amount,
+                'gst_enabled' => $gst_enabled ? 1 : 0,
+                'amount'     => $amount,
+                'status'     => 0,
+                'added_on'   => $datetime,
+                'updated_on' => $datetime,
+            ]);
+        }
+
+        // ── Calculate new expiry ───────────────────────────────────────
+        $ts = strtotime($today);
+        switch ($pkg_type) {
+            case 'Monthly':
+                $new_expiry = date('Y-m-d', strtotime('+1 month',  $ts));
+                break;
+            case 'Quarterly':
+                $new_expiry = date('Y-m-d', strtotime('+3 months', $ts));
+                break;
+            case 'Once':
+            case 'Yearly':
+            default:
+                $new_expiry = date('Y-m-d', strtotime('+1 year',   $ts));
+                break;
+        }
+
+        // ── Update expiry (keep payment_status=0 so next expiry triggers renewal again)
+        $this->db->update('service_packages', [
+            'payment_status' => 0,
+            'purchase_date'  => $today,
+            'expiry_date'    => $new_expiry,
+            'updated_on'     => $datetime,
+        ], ['id' => $package_id]);
+
+        // ── Generate invoice ───────────────────────────────────────────
+        $customer  = $this->customer->getcustomers(['t1.user_id' => $user['id']], 'single');
+        $firm_info = $this->customer->getfirms(['t1.id' => $firm_id], 'single');
+        $gst_on    = !empty($customer['gst_enabled']) && $customer['gst_enabled'] == 1;
+        $subtotal  = $gst_on ? round($bill / 1.18, 2) : $bill;
+        $gst_amt   = $gst_on ? round($bill - $subtotal, 2) : 0;
+
+        $svc_names = array_column($services, 'name');
+        $inv_no    = '';
+        try {
+            $inv_result = $this->invoice->create_custom_invoice([
+                'user_id'        => $user['id'],
+                'firm_id'        => $firm_id,
+                'year'           => $year,
+                'invoice_date'   => $today,
+                'billing_name'   => !empty($customer['name'])   ? $customer['name']   : $user['name'],
+                'billing_email'  => !empty($customer['email'])  ? $customer['email']  : '',
+                'billing_mobile' => !empty($customer['mobile']) ? $customer['mobile'] : '',
+                'firm_name'      => !empty($firm_info['name'])  ? $firm_info['name']  : '',
+                'firm_gstin'     => !empty($firm_info['gstin']) ? $firm_info['gstin'] : '',
+                'firm_pan'       => !empty($firm_info['pan'])   ? $firm_info['pan']   : '',
+                'service_name'   => implode(', ', $svc_names) . ' (Package Renewal)',
+                'type'           => $pkg_type,
+                'period_value'   => $year,
+                'subtotal'       => $subtotal,
+                'gst_rate'       => $gst_on ? 18.0 : 0.0,
+                'gst_amount'     => $gst_amt,
+                'total_amount'   => $bill,
+            ]);
+            if (!empty($inv_result['status']) && $inv_result['status'] === true) {
+                $inv_no = $inv_result['invoice']['invoice_no'];
+            }
+        } catch (Exception $e) {
+            log_message('error', 'Package manual renewal invoice error: ' . $e->getMessage());
+        }
+
+        $msg = 'Package renewed successfully! ₹' . number_format($bill, 2) . ' deducted. Next expiry: ' . date('d-m-Y', strtotime($new_expiry)) . '.';
+        if ($inv_no) $msg .= ' Invoice: ' . $inv_no;
+
+        echo json_encode(['status' => true, 'message' => $msg]);
     }
 
     public function monthlyservices($slug = NULL)
@@ -998,18 +1105,29 @@ class Services extends CI_Controller
                     }
                 }
 
-                // Check if service is already included in the user's service package (skip for service_id=1 / accountancy)
+                // Check if service is already included in ANY of the user's service packages (skip for service_id=1 / accountancy)
                 if ($service_id != 1) {
-                    $service_package = $this->customer->getservicepackage(
+                    $all_user_packages = $this->customer->getservicepackage(
                         ['t1.user_id' => $user['id'], 't1.firm_id' => $firm_id, 't1.year' => $year],
-                        'single'
+                        'all'
                     );
-                    if (!empty($service_package) && !empty($service_package['service_ids'])) {
-                        $package_service_ids = array_map('trim', explode(',', $service_package['service_ids']));
-                        if (in_array((string)$service_id, $package_service_ids)) {
-                            $this->session->set_flashdata("err_msg", $service['name'] . " is already included in your service package. You cannot purchase it separately.");
-                            redirect($_SERVER['HTTP_REFERER']);
-                            return;
+                    if (!empty($all_user_packages)) {
+                        foreach ($all_user_packages as $_pkg) {
+                            if (!empty($_pkg['service_ids'])) {
+                                $pkg_ids = array_filter(array_map('trim', explode(',', $_pkg['service_ids'])));
+                                if (in_array((string)$service_id, $pkg_ids)) {
+                                    $ptype = !empty($_pkg['package_type']) ? $_pkg['package_type'] : '';
+                                    $this->session->set_flashdata(
+                                        "err_msg",
+                                        $service['name'] . " is already included in your " .
+                                            ($ptype ? $ptype . ' ' : '') .
+                                            "service package. Please manage it from the <a href=\"" .
+                                            base_url('package/') . "\">Package page</a>."
+                                    );
+                                    redirect($_SERVER['HTTP_REFERER']);
+                                    return;
+                                }
+                            }
                         }
                     }
                 }
