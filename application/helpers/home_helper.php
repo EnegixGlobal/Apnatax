@@ -92,85 +92,31 @@
   		function countpendingservices() {
     		$CI   = get_instance();
             $user = getuser();
-            $year = $CI->session->year;
             $firm_id = $CI->session->firm;
 
-            if (empty($user['id']) || empty($year) || empty($firm_id)) {
+            if (empty($user['id']) || empty($firm_id)) {
                 return 0;
             }
 
-            $pending_count  = 0;
-            $renewal_ids    = array();
-            $current_ids    = array();
-
-            // Get current year service package (to know active services)
-            $service_package = $CI->customer->getservicepackage(
-                ['t1.user_id' => $user['id'], 't1.firm_id' => $firm_id, 't1.year' => $year],
-                'single'
+            // Count only expired & unpaid packages (payment_status=0, expiry_date <= today)
+            // These are packages that failed to auto-renew due to insufficient wallet balance.
+            $count = 0;
+            $all_pkgs = $CI->customer->getservicepackage(
+                ['t1.user_id' => $user['id'], 't1.firm_id' => $firm_id],
+                'all'
             );
-
-            if (!empty($service_package) && !empty($service_package['service_ids'])) {
-                $current_ids_raw = explode(',', $service_package['service_ids']);
-                $current_ids = array_filter(array_map('trim', $current_ids_raw));
-
-                if (!empty($current_ids)) {
-                    // Count real pending purchases (old behaviour)
-                    $service_ids_str = implode(',', array_map('intval', $current_ids));
-                    $where = "t1.user_id='$user[id]' and t1.firm_id='$firm_id' and t1.year='$year' and t1.status='0' and t1.service_id IN ($service_ids_str)";
-                    $CI->db->group_by('t1.service_id');
-                    $services = $CI->service->getpurchasedservices($where);
-                    $pending_count = !empty($services) ? count($services) : 0;
-                }
-            }
-
-            /**
-             * Renewal candidates (same as pendingservices page logic):
-             * - Services that were in any expired package (previous years)
-             * - But are NOT present in the current year's package
-             * These should also be reflected in the dashboard count.
-             */
-            $prefix = $CI->db->dbprefix;
-            $table  = $prefix . 'service_packages';
-
-            $user_id_escaped = $CI->db->escape($user['id']);
-            $firm_id_escaped = $CI->db->escape($firm_id);
-            $year_escaped    = $CI->db->escape($year);
-
-            $expired_sql = "
-                SELECT *
-                FROM {$table}
-                WHERE user_id = {$user_id_escaped}
-                  AND firm_id = {$firm_id_escaped}
-                  AND year != {$year_escaped}
-            ";
-            $expired_packages = $CI->db->query($expired_sql)->result_array();
-
-            if (!empty($expired_packages)) {
-                foreach ($expired_packages as $expired_package) {
-                    if (empty($expired_package['service_ids'])) {
-                        continue;
-                    }
-                    $expired_ids = array_filter(array_map('trim', explode(',', $expired_package['service_ids'])));
-                    foreach ($expired_ids as $sid) {
-                        if ($sid === '') {
-                            continue;
-                        }
-                        // Skip if already in current year's package
-                        if (in_array($sid, $current_ids, true)) {
-                            continue;
-                        }
-                        // Avoid duplicates across multiple expired packages
-                        if (in_array($sid, $renewal_ids, true)) {
-                            continue;
-                        }
-                        $renewal_ids[] = $sid;
+            if (!empty($all_pkgs)) {
+                $today = time();
+                foreach ($all_pkgs as $_pkg) {
+                    $exp = !empty($_pkg['expiry_date']) ? strtotime($_pkg['expiry_date']) : 0;
+                    $is_unpaid = empty($_pkg['payment_status']) || $_pkg['payment_status'] == 0;
+                    if ($exp && $exp <= $today && $is_unpaid) {
+                        $count++;
                     }
                 }
             }
 
-            $renewal_count = count($renewal_ids);
-
-            return $pending_count + $renewal_count;
+            return $count;
 		}  
 	}
 

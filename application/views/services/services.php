@@ -18,6 +18,8 @@
                                         if (!empty($services)) {
                                             $i = 0;
                                             foreach ($services as $single) {
+                                                // Account Work (id=1) is managed on the Package page
+                                                if ($single['id'] == 1) continue;
                                                 $i++;
                                                 $single = checkservicepurchase($single, $user, $this->session->firm);
                                                 $in_package = !empty($package_service_ids) && in_array((string)$single['id'], $package_service_ids);
