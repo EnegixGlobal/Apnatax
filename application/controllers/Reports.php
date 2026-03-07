@@ -119,12 +119,11 @@ class Reports extends CI_Controller
                         'outstanding' => round($outstanding, 4),
                         'gto' => round($single['turnover'], 4),
                         'acc_fees' => round($acc_fees, 4),
-                        'other_fee' => round($other_fee, 4),
+                        'penalty' => round($penalty, 4),
+                        'total' => round($total, 4),
                         'paid' => round($paid, 4),
                         'balance' => round($balance, 4),
                         'due_date' => $due_date,
-                        'penalty' => round($penalty, 4),
-                        'total' => round($total, 4),
                         'due_days' => $days
                     );
 
@@ -135,12 +134,11 @@ class Reports extends CI_Controller
                     'outstanding' => 0,
                     'gto' => round($total_turnover, 4),
                     'acc_fees' => round($total_fees, 4),
-                    'other_fee' => round($total_other, 4),
+                    'penalty' => round($total_penalty, 4),
+                    'total' => round(($total_fees + $total_penalty - $total_paid), 4),
                     'paid' => round($total_paid, 4),
                     'balance' => 0,
                     'due_date' => '',
-                    'penalty' => round($total_penalty, 4),
-                    'total' => round(($total_fees + $total_penalty - $total_paid), 4),
                     'due_days' => $total_days
                 );
 
@@ -681,14 +679,14 @@ class Reports extends CI_Controller
         $current_date = date('Y-m-d');
         $current_month = date('m');
         $current_year = date('Y');
-        
+
         // Financial year starts from April, so if current month < April, use previous year
         if ($current_month < 4) {
             $fy_start_year = $current_year - 1;
         } else {
             $fy_start_year = $current_year;
         }
-        
+
         // Default year format: YYYY(YYYY+1) e.g., 20232024
         $default_year = $fy_start_year . ($fy_start_year + 1);
         $year = $selected_year ? $selected_year : $default_year;
@@ -699,9 +697,9 @@ class Reports extends CI_Controller
             // Employees can only see customers they added
             $where_customers['md5(t1.added_by)'] = $this->session->user;
         }
-        
+
         $all_customers = $this->customer->getcustomers($where_customers);
-        
+
         // Get all firms for these customers
         $customer_user_ids = array();
         if (!empty($all_customers)) {
@@ -716,9 +714,9 @@ class Reports extends CI_Controller
             if (!empty($customer_id)) {
                 $packages_where['t1.user_id'] = $customer_id;
             }
-            
+
             $all_packages = $this->customer->getservicepackage($packages_where, 'all');
-            
+
             // Group packages by user_id and firm_id
             $packages_by_customer = array();
             if (!empty($all_packages)) {
@@ -734,13 +732,13 @@ class Reports extends CI_Controller
             // Process each customer-firm combination
             foreach ($packages_by_customer as $key => $packages) {
                 if (empty($packages)) continue;
-                
+
                 $first_pkg = $packages[0];
                 $user_id = $first_pkg['user_id'];
                 $firm_id = $first_pkg['firm_id'];
                 $customer_name = $first_pkg['customer_name'];
                 $firm_name = $first_pkg['firm_name'];
-                
+
                 // Get customer ID from user_id
                 $customer = $this->customer->getcustomers(array('t1.user_id' => $user_id), 'single');
                 $customer_id = !empty($customer) ? $customer['id'] : null;
@@ -748,7 +746,7 @@ class Reports extends CI_Controller
                 // Find current year package
                 $current_package = null;
                 $expired_packages = array();
-                
+
                 foreach ($packages as $pkg) {
                     if ($pkg['year'] == $year) {
                         $current_package = $pkg;
@@ -766,16 +764,16 @@ class Reports extends CI_Controller
                 // Find renewal candidates (services in expired packages but not in current)
                 $renewal_services = array();
                 $expired_years = array();
-                
+
                 foreach ($expired_packages as $exp_pkg) {
                     if (empty($exp_pkg['service_ids'])) continue;
-                    
+
                     $exp_service_ids = array_filter(array_map('trim', explode(',', $exp_pkg['service_ids'])));
                     $exp_year = $exp_pkg['year'];
-                    
+
                     foreach ($exp_service_ids as $service_id) {
                         if (empty($service_id)) continue;
-                        
+
                         // If service is not in current package, it's a renewal candidate
                         if (!in_array($service_id, $current_service_ids, true)) {
                             if (!isset($renewal_services[$service_id])) {
@@ -791,7 +789,7 @@ class Reports extends CI_Controller
                             }
                         }
                     }
-                    
+
                     if (!empty($exp_service_ids)) {
                         $expired_years[] = $exp_year;
                     }
@@ -802,13 +800,13 @@ class Reports extends CI_Controller
                 if (!empty($current_service_ids) || !empty($renewal_services)) {
                     $all_service_ids = array_merge($current_service_ids, array_keys($renewal_services));
                     $all_service_ids = array_unique(array_filter($all_service_ids));
-                    
+
                     if (!empty($all_service_ids)) {
                         $user_id_escaped = $this->db->escape($user_id);
                         $firm_id_escaped = $this->db->escape($firm_id);
                         $year_escaped = $this->db->escape($year);
                         $service_ids_str = implode(',', array_map('intval', $all_service_ids));
-                        
+
                         $where_pending = "t1.user_id={$user_id_escaped} AND t1.firm_id={$firm_id_escaped} AND t1.year={$year_escaped} AND t1.status='0' AND t1.service_id IN ($service_ids_str)";
                         $pending_purchases = $this->service->getpurchasedservices($where_pending, 'all', true);
                     }

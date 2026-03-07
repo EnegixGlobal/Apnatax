@@ -37,33 +37,43 @@ function payment_state($pkg)
 <style>
     /* ── design tokens ── */
     :root {
-        --pkg-radius: 10px;
-        --pkg-shadow: 0 1px 8px rgba(0, 0, 0, .08);
-        --pkg-shadow-hover: 0 4px 20px rgba(0, 0, 0, .13);
-        --pkg-border: #e6e9ec;
-        --transition: .18s ease;
-        --section-gap: 2rem;
-        /* vertical gap between page sections */
+        --pkg-radius: 12px;
+        --pkg-shadow: 0 2px 8px rgba(0, 0, 0, .06);
+        --pkg-shadow-hover: 0 8px 24px rgba(0, 0, 0, .12);
+        --pkg-border: #e8ecef;
+        --transition: .25s cubic-bezier(0.4, 0, 0.2, 1);
+        --section-gap: 2.5rem;
+        --spacing-xs: 0.5rem;
+        --spacing-sm: 1rem;
+        --spacing-md: 1.5rem;
+        --spacing-lg: 2rem;
+        --spacing-xl: 3rem;
     }
 
     /* ── page wrapper ── */
     .pkg-page {
-        max-width: 1100px;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 0 var(--spacing-md);
     }
 
     /* ── section title ── */
     .pkg-section-title {
         display: flex;
         align-items: center;
-        gap: 8px;
-        font-size: .72rem;
+        gap: 10px;
+        font-size: .75rem;
         font-weight: 700;
         text-transform: uppercase;
-        letter-spacing: .7px;
-        color: #6c757d;
-        margin: 0 0 14px;
-        padding-bottom: 8px;
-        border-bottom: 1px solid var(--pkg-border);
+        letter-spacing: 1px;
+        color: #495057;
+        margin: var(--spacing-xl) 0 var(--spacing-md) 0;
+        padding-bottom: var(--spacing-sm);
+        border-bottom: 2px solid var(--pkg-border);
+    }
+
+    .pkg-section-title:first-of-type {
+        margin-top: 0;
     }
 
     .pkg-section-title i {
@@ -115,41 +125,62 @@ function payment_state($pkg)
 
     /* ── stat chips ── */
     .stat-chips {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-        margin-bottom: var(--section-gap);
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: var(--spacing-md);
+        margin-bottom: var(--spacing-xl);
     }
 
     .stat-chip {
         display: flex;
         align-items: center;
-        gap: 12px;
-        background: #fff;
+        gap: var(--spacing-sm);
+        background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
         border: 1px solid var(--pkg-border);
         border-radius: var(--pkg-radius);
-        padding: 12px 18px;
-        min-width: 150px;
+        padding: var(--spacing-md) var(--spacing-lg);
         box-shadow: var(--pkg-shadow);
-        flex: 1 1 150px;
+        transition: all var(--transition);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .stat-chip::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 4px;
+        height: 100%;
+        background: linear-gradient(180deg, #4a90d9 0%, #357abd 100%);
+    }
+
+    .stat-chip:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--pkg-shadow-hover);
+        border-color: #d0d7de;
     }
 
     .stat-chip .chip-icon {
-        font-size: 1.35rem;
+        font-size: 1.5rem;
         line-height: 1;
+        opacity: 0.9;
     }
 
     .stat-chip .chip-val {
-        font-size: 1.15rem;
-        font-weight: 700;
-        line-height: 1;
-        color: #2c3e50;
+        font-size: 1.4rem;
+        font-weight: 800;
+        line-height: 1.2;
+        color: #212529;
+        letter-spacing: -0.5px;
     }
 
     .stat-chip .chip-lbl {
-        font-size: .7rem;
-        color: #9aa1aa;
-        margin-top: 3px;
+        font-size: .75rem;
+        color: #6c757d;
+        margin-top: 4px;
+        font-weight: 500;
+        letter-spacing: 0.3px;
     }
 
     /* ── generic card wrapper ── */
@@ -159,12 +190,14 @@ function payment_state($pkg)
         border-radius: var(--pkg-radius);
         box-shadow: var(--pkg-shadow);
         overflow: hidden;
-        transition: box-shadow var(--transition), transform var(--transition);
+        transition: all var(--transition);
+        margin-bottom: var(--spacing-lg);
     }
 
     .pkg-card-wrap:hover {
         box-shadow: var(--pkg-shadow-hover);
-        transform: translateY(-1px);
+        transform: translateY(-4px);
+        border-color: #d0d7de;
     }
 
     /* ── existing package card ── */
@@ -172,14 +205,18 @@ function payment_state($pkg)
         border-radius: var(--pkg-radius);
         border: 1px solid var(--pkg-border);
         box-shadow: var(--pkg-shadow);
-        transition: box-shadow var(--transition), transform var(--transition);
+        transition: all var(--transition);
         overflow: hidden;
         background: #fff;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
     }
 
     .pkg-card:hover {
         box-shadow: var(--pkg-shadow-hover);
-        transform: translateY(-1px);
+        transform: translateY(-4px);
+        border-color: #d0d7de;
     }
 
     .pkg-card.is-overdue {
@@ -195,9 +232,9 @@ function payment_state($pkg)
     }
 
     .pkg-card-header {
-        padding: 14px 18px 12px;
+        padding: var(--spacing-md) var(--spacing-lg);
         border-bottom: 1px solid #f0f2f4;
-        background: #fafbfc;
+        background: linear-gradient(135deg, #fafbfc 0%, #ffffff 100%);
     }
 
     .pkg-card-body {
@@ -214,10 +251,15 @@ function payment_state($pkg)
     .svc-list li {
         display: flex;
         align-items: center;
-        padding: 9px 18px;
+        padding: var(--spacing-sm) var(--spacing-lg);
         border-bottom: 1px solid #f4f5f7;
-        font-size: .865rem;
-        gap: 10px;
+        font-size: .875rem;
+        gap: var(--spacing-sm);
+        transition: background-color var(--transition);
+    }
+
+    .svc-list li:hover {
+        background-color: #f8f9fa;
     }
 
     .svc-list li:last-child {
@@ -265,9 +307,9 @@ function payment_state($pkg)
 
     .pkg-info-item {
         flex: 1 1 33%;
-        padding: 10px 18px;
+        padding: var(--spacing-sm) var(--spacing-lg);
         border-right: 1px solid #f0f2f4;
-        font-size: .78rem;
+        font-size: .8rem;
     }
 
     .pkg-info-item:last-child {
@@ -299,26 +341,27 @@ function payment_state($pkg)
     .pkg-bill-alert {
         margin: 0;
         border-radius: 0;
-        padding: 10px 18px;
+        padding: var(--spacing-sm) var(--spacing-lg);
         display: flex;
         align-items: center;
         justify-content: space-between;
         flex-wrap: wrap;
-        gap: 8px;
-        font-size: .865rem;
+        gap: var(--spacing-sm);
+        font-size: .875rem;
         border: none;
         border-top: 1px solid rgba(0, 0, 0, .06);
     }
 
     /* ── card actions ── */
     .pkg-actions {
-        padding: 10px 18px;
+        padding: var(--spacing-sm) var(--spacing-lg);
         border-top: 1px solid #f0f2f4;
         display: flex;
         justify-content: flex-end;
         align-items: center;
-        gap: 8px;
-        background: #fafbfc;
+        gap: var(--spacing-sm);
+        background: linear-gradient(135deg, #fafbfc 0%, #ffffff 100%);
+        margin-top: auto;
     }
 
     /* ── Account Work card ── */
@@ -331,7 +374,7 @@ function payment_state($pkg)
 
     .acct-status-body {
         flex: 1;
-        padding: 16px 20px;
+        padding: var(--spacing-md) var(--spacing-lg);
     }
 
     .acct-status-icon {
@@ -345,7 +388,8 @@ function payment_state($pkg)
 
     .acct-rate-section {
         border-top: 1px solid #f0f2f4;
-        padding: 14px 20px 18px;
+        padding: var(--spacing-md) var(--spacing-lg) var(--spacing-lg);
+        background: #fafbfc;
     }
 
     .acct-rate-section .rate-title {
@@ -358,7 +402,46 @@ function payment_state($pkg)
     }
 
     .acct-form-body {
-        padding: 20px 24px 24px;
+        padding: var(--spacing-lg) var(--spacing-xl);
+    }
+
+    /* ── Account Work Service Table ── */
+    .acct-form-body .table-responsive {
+        border-radius: var(--pkg-radius);
+        overflow: hidden;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        margin-bottom: var(--spacing-md);
+    }
+
+    .acct-form-body .table {
+        margin-bottom: 0;
+        background: #fff;
+    }
+
+    .acct-form-body .table thead th {
+        background: linear-gradient(135deg, #f7f8fa 0%, #ffffff 100%);
+        color: #495057;
+        font-weight: 700;
+        font-size: .8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        padding: var(--spacing-sm) var(--spacing-md);
+        border-bottom: 2px solid var(--pkg-border);
+        white-space: nowrap;
+    }
+
+    .acct-form-body .table tbody td {
+        padding: var(--spacing-sm) var(--spacing-md);
+        vertical-align: middle;
+        color: #495057;
+    }
+
+    .acct-form-body .table tbody tr {
+        transition: background-color var(--transition);
+    }
+
+    .acct-form-body .table tbody tr:hover {
+        background-color: #f8f9fa;
     }
 
     /* ── Create Package panel ── */
@@ -372,7 +455,7 @@ function payment_state($pkg)
 
     .create-panel .panel-header {
         background: linear-gradient(135deg, #2c3e50 0%, #3a5068 100%);
-        padding: 18px 24px;
+        padding: var(--spacing-md) var(--spacing-xl);
         color: #fff;
     }
 
@@ -410,21 +493,21 @@ function payment_state($pkg)
     }
 
     #svc-table thead th {
-        background: #f7f8fa;
-        color: #555;
-        font-size: .72rem;
+        background: linear-gradient(135deg, #f7f8fa 0%, #ffffff 100%);
+        color: #495057;
+        font-size: .75rem;
         font-weight: 700;
         text-transform: uppercase;
-        letter-spacing: .4px;
+        letter-spacing: .5px;
         border-bottom: 2px solid #e6e9ec;
-        padding: 10px 14px;
+        padding: var(--spacing-sm) var(--spacing-md);
         white-space: nowrap;
     }
 
     #svc-table tbody td {
-        padding: 10px 14px;
+        padding: var(--spacing-sm) var(--spacing-md);
         vertical-align: middle;
-        font-size: .865rem;
+        font-size: .875rem;
     }
 
     #svc-table tbody tr {
@@ -485,11 +568,12 @@ function payment_state($pkg)
         align-items: center;
         justify-content: space-between;
         flex-wrap: wrap;
-        gap: 10px;
-        background: #2c3e50;
+        gap: var(--spacing-sm);
+        background: linear-gradient(135deg, #2c3e50 0%, #1a252f 100%);
         color: #fff;
-        padding: 13px 20px;
+        padding: var(--spacing-md) var(--spacing-lg);
         border-top: 1px solid rgba(255, 255, 255, .1);
+        box-shadow: 0 -4px 12px rgba(0, 0, 0, .15);
     }
 
     #pkg-sticky-bar .bar-left {
@@ -500,8 +584,9 @@ function payment_state($pkg)
     }
 
     #pkg-sticky-bar .bar-total {
-        font-size: 1.05rem;
-        font-weight: 700;
+        font-size: 1.2rem;
+        font-weight: 800;
+        letter-spacing: -0.5px;
     }
 
     #pkg-sticky-bar .bar-count {
@@ -535,17 +620,129 @@ function payment_state($pkg)
     }
 
     /* ── responsive ── */
-    @media (max-width: 576px) {
-        .pkg-info-item {
-            flex: 1 1 50%;
+    @media (max-width: 992px) {
+        .pkg-page {
+            padding: 0 var(--spacing-sm);
+        }
+
+        .stat-chips {
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: var(--spacing-sm);
+        }
+    }
+
+    @media (max-width: 768px) {
+        .pkg-page {
+            padding: 0 var(--spacing-sm);
+        }
+
+        .stat-chips {
+            grid-template-columns: repeat(2, 1fr);
+            gap: var(--spacing-sm);
+            margin-bottom: var(--spacing-lg);
         }
 
         .stat-chip {
-            min-width: 120px;
+            padding: var(--spacing-sm) var(--spacing-md);
+        }
+
+        .pkg-section-title {
+            margin-top: var(--spacing-lg);
+            margin-bottom: var(--spacing-sm);
+            font-size: .7rem;
+        }
+
+        .pkg-card-header {
+            padding: var(--spacing-sm) var(--spacing-md);
+        }
+
+        .svc-list li {
+            padding: var(--spacing-xs) var(--spacing-md);
+            flex-wrap: wrap;
+        }
+
+        .pkg-info-item {
+            flex: 1 1 50%;
+            padding: var(--spacing-xs) var(--spacing-md);
         }
 
         .acct-form-body {
-            padding: 16px;
+            padding: var(--spacing-md);
+        }
+
+        .acct-form-body .col-md-4,
+        .acct-form-body .col-md-6 {
+            margin-bottom: var(--spacing-md);
+        }
+
+        #svc-table {
+            font-size: .8rem;
+        }
+
+        #svc-table thead th,
+        #svc-table tbody td {
+            padding: var(--spacing-xs) var(--spacing-sm);
+        }
+
+        .table-responsive {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+    }
+
+    @media (max-width: 576px) {
+        .pkg-page {
+            padding: 0 var(--spacing-xs);
+        }
+
+        .stat-chips {
+            grid-template-columns: 1fr;
+            gap: var(--spacing-sm);
+        }
+
+        .pkg-info-item {
+            flex: 1 1 100%;
+            border-right: none;
+            border-bottom: 1px solid #f0f2f4;
+        }
+
+        .pkg-info-item:last-child {
+            border-bottom: none;
+        }
+
+        .pkg-info-strip {
+            flex-direction: column;
+        }
+
+        .acct-form-body {
+            padding: var(--spacing-sm);
+        }
+
+        .pkg-actions {
+            flex-direction: column;
+        }
+
+        .pkg-actions .btn {
+            width: 100%;
+        }
+
+        .pkg-bill-alert {
+            flex-direction: column;
+            align-items: flex-start !important;
+        }
+
+        .pkg-bill-alert .btn {
+            width: 100%;
+            margin-top: var(--spacing-xs);
+        }
+
+        #pkg-sticky-bar {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        #pkg-sticky-bar .btn {
+            width: 100%;
         }
     }
 </style>
@@ -689,6 +886,42 @@ if (!empty($service_packages)) {
                 <p>Choose your account work plan based on firm turnover.</p>
             </div>
             <div class="acct-form-body">
+                <?php
+                // Get Account Work service (id=1) details
+                $account_work_service = $this->master->getservices(['id' => 1, 'status' => 1], 'single');
+                if (!empty($account_work_service)) :
+                ?>
+                    <!-- Account Work Service Details Table -->
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold mb-3" style="font-size:.9rem; color: #495057;">
+                            <i class="fe fe-info me-2"></i>Account Work Service Details
+                        </label>
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-hover mb-0" style="font-size:.875rem;">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="width: 60px;">Sl.No.</th>
+                                        <th>Service</th>
+                                        <th class="text-end">Rate</th>
+                                        <th>Service For</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>1</td>
+                                        <td class="fw-semibold"><?= htmlspecialchars($account_work_service['name']) ?></td>
+                                        <td class="text-end">
+                                            <strong class="text-success">₹<?= number_format($account_work_service['rate'], 0) ?></strong>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-light text-secondary border"><?= htmlspecialchars($account_work_service['service_for'] ?? 'N/A') ?></span>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                <?php endif; ?>
 
                 <div class="row g-3 align-items-start">
                     <!-- Left: package dropdown -->
@@ -809,7 +1042,7 @@ if (!empty($service_packages)) {
         <div class="pkg-section-title">
             <i class="fe fe-layers"></i> Your Packages
         </div>
-        <div class="row g-3 mb-4">
+        <div class="row g-4 mb-4">
             <?php foreach ($service_packages as $pkg) :
                 /* resolve services */
                 $pkg_ids = !empty($pkg['service_ids'])
@@ -840,7 +1073,7 @@ if (!empty($service_packages)) {
                 }
                 $pkg_card_cls = $is_expired ? 'is-overdue' : 'is-active';
             ?>
-                <div class="col-lg-6 col-xl-4">
+                <div class="col-lg-6 col-xl-4 mb-4">
                     <div class="pkg-card card <?= $pkg_card_cls ?>">
                         <!-- Card header -->
                         <div class="pkg-card-header">
@@ -993,12 +1226,12 @@ if (!empty($service_packages)) {
    SECTION 2 – Create / Add Package
    ════════════════════════════════════════════════════════ */
     ?>
-    <div class="pkg-section-title mt-2">
+    <div class="pkg-section-title">
         <i class="fe fe-plus-circle"></i>
         <?= !empty($service_packages) ? 'Create Another Package' : 'Create a Service Package' ?>
     </div>
 
-    <div class="create-panel card">
+    <div class="create-panel card mb-4">
         <!-- Panel header -->
         <div class="panel-header">
             <h5><i class="fe fe-package me-2"></i>Select Services</h5>
