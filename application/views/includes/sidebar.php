@@ -165,6 +165,7 @@
                             <li class="side-menu-label1"><a href="javascript:void(0)">Fee Report</a></li>
                             <li><a href="<?= base_url('reports/'); ?>" class="slide-item <?= activate_menu('reports'); ?>"> Accounting Fee</a></li>
                             <li><a href="<?= base_url('reports/otherfee/'); ?>" class="slide-item <?= activate_menu('reports/otherfee'); ?>"> Other Fee</a></li>
+                            <li><a href="<?= base_url('reports/payment/'); ?>" class="slide-item <?= activate_menu('reports/payment'); ?>"> Accounting Pay</a></li>
                         </ul>
                     </li>
                     <li class="slide">

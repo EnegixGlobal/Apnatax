@@ -552,14 +552,7 @@ class Orders extends CI_Controller
                         $cpackage = $query->unbuffered_row('array');
                         foreach ($firm_ids as $firm_id) {
                             foreach ($turnovers[$user_id][$firm_id] as $key => $turnover) {
-                                if (empty($turnover) && $turnover != 0) {
-                                    continue;
-                                }
-                                $data = array();
-                                $data['user_id'] = $user_id;
-                                $data['firm_id'] = $firm_id;
-                                $data['added_by'] = $user['id'];
-                                $data['package_id'] = $cpackage['package_id'];
+                                // Calculate date first
                                 if ($key <= 8) {
                                     $month = $key + 4;
                                     $month = strlen($month) == 1 ? '0' . $month : $month;
@@ -570,15 +563,43 @@ class Orders extends CI_Controller
                                     $month = $years['year2'] . $month;
                                 }
                                 $dateval = getyearmonthvalues($month);
-                                $data['date'] = $dateval['start'];
-                                $data['turnover'] = $turnover;
-                                $data['due_date'] = date('Y-m-06', strtotime($dateval['start'] . ' next month'));;
-                                $data['added_on'] = $data['updated_on'] = date('Y-m-d H:i:s');
+                                $date = $dateval['start'];
+                                
+                                // Check if record exists
                                 $getprev = $this->db->get_where('accountancy', [
-                                    'date' => $data['date'],
+                                    'date' => $date,
                                     'user_id' => $user_id,
                                     'firm_id' => $firm_id
                                 ]);
+                                
+                                // If turnover is empty and record exists, delete it
+                                if ((empty($turnover) && $turnover != 0) && $getprev->num_rows() > 0) {
+                                    $previous = $getprev->unbuffered_row('array');
+                                    $where = ['id' => $previous['id']];
+                                    $result = $this->service->deleteturnover($where);
+                                    if ($result['status'] === true) {
+                                        $this->session->set_flashdata(['msg' => "Turnover Deleted Successfully!"]);
+                                    } else {
+                                        $this->session->set_flashdata(['err_msg' => $result['message']]);
+                                    }
+                                    continue;
+                                }
+                                
+                                // Skip if empty and no record exists
+                                if (empty($turnover) && $turnover != 0) {
+                                    continue;
+                                }
+                                
+                                $data = array();
+                                $data['user_id'] = $user_id;
+                                $data['firm_id'] = $firm_id;
+                                $data['added_by'] = $user['id'];
+                                $data['package_id'] = $cpackage['package_id'];
+                                $data['date'] = $date;
+                                $data['turnover'] = $turnover;
+                                $data['due_date'] = date('Y-m-06', strtotime($dateval['start'] . ' next month'));;
+                                $data['added_on'] = $data['updated_on'] = date('Y-m-d H:i:s');
+                                
                                 //print_pre($data);
                                 if ($getprev->num_rows() == 0) {
                                     $result = $this->service->saveturnover($data);
