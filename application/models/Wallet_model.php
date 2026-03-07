@@ -211,8 +211,16 @@ class Wallet_model extends CI_Model{
         $data['added_on']=$data['updated_on']=$datetime;
         $month=date('m',strtotime($data['acc_date']));
         $year=date('Y',strtotime($data['acc_date']));
-        $where="user_id='$data[user_id]' and firm_id='$data[firm_id]' and year='$data[year]' and month(acc_date)='$month' and year(acc_date)='$year'";
-        if($this->db->get_where('acc_payment',$where)->num_rows()==0){
+        
+        // Check if payment already exists for this month using proper query builder
+        $this->db->where('user_id', $data['user_id']);
+        $this->db->where('firm_id', $data['firm_id']);
+        $this->db->where('year', $data['year']);
+        $this->db->where("MONTH(acc_date) = $month", null, false);
+        $this->db->where("YEAR(acc_date) = $year", null, false);
+        $existing = $this->db->get('acc_payment');
+        
+        if($existing->num_rows()==0){
             if($this->db->insert("acc_payment",$data)){
                 return array("status"=>true,"message"=>"Accountancy Payment Done Successfully");
             }
@@ -222,7 +230,6 @@ class Wallet_model extends CI_Model{
             }
         }
         else{
-            $error=$this->db->error();
             return array("status"=>false,"message"=>"Accountancy Payment already paid for this month!");
         }
     }
