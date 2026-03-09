@@ -360,6 +360,22 @@ class Masterkey extends CI_Controller
         redirect($_SERVER['HTTP_REFERER']);
     }
 
+    public function deletereqdocuments()
+    {
+        $service_id = $this->input->post('service_id');
+        if (!empty($service_id)) {
+            $result = $this->master->deletereqdocuments($service_id);
+            if ($result['status'] === true) {
+                $this->session->set_flashdata("msg", $result['message']);
+            } else {
+                $this->session->set_flashdata("err_msg", $result['message']);
+            }
+        } else {
+            $this->session->set_flashdata("err_msg", "Service ID is required!");
+        }
+        redirect('masterkey/documentlist/');
+    }
+
     public function getreq()
     {
         $id = $this->input->post('id');

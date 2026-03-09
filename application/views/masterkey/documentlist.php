@@ -25,6 +25,7 @@
                                             <td>
                                                 <button type="button" class="btn btn-sm btn-info view-btn" value="<?= $single['id'] ?>"><i class="fa fa-eye"></i> Required Documents</button>
                                                 <a href="<?= base_url('masterkey/editdocuments/'.md5('service-id-'.$single['id'])); ?>" class="btn btn-sm btn-primary edit-btn"><i class="fa fa-edit"></i></a>
+                                                <button type="button" class="btn btn-sm btn-danger delete-btn" data-service-id="<?= $single['id'] ?>" data-service-name="<?= htmlspecialchars($single['name']) ?>" title="Delete Required Documents"><i class="fa fa-trash"></i></button>
                                             </td>
                                         </tr>
                                         <?php
@@ -90,6 +91,26 @@
                     });
                     $('body').on('click','.close-btn',function(){
                         $('#doc-row').addClass('d-none');
+                    });
+                    $('body').on('click','.delete-btn',function(){
+                        var service_id = $(this).data('service-id');
+                        var service_name = $(this).data('service-name');
+                        if(confirm('Are you sure you want to delete all required documents for "' + service_name + '"?\n\nThis action cannot be undone.')){
+                            var $btn = $(this);
+                            $btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Deleting...');
+                            $.ajax({
+                                type: "POST",
+                                url: "<?= base_url('masterkey/deletereqdocuments'); ?>",
+                                data: {service_id: service_id},
+                                success: function(response){
+                                    location.reload();
+                                },
+                                error: function(){
+                                    alert('An error occurred while deleting. Please try again.');
+                                    $btn.prop('disabled', false).html('<i class="fa fa-trash"></i>');
+                                }
+                            });
+                        }
                     });
                     $('#table').dataTable();
                 });

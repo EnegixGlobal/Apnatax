@@ -183,6 +183,8 @@ class Home extends CI_Controller
         }
         // ── Auto-renew expired service packages ─────────────────────────
         $this->_autoRenewExpiredPackages();
+        // ── Auto-renew expired Account Work packages ───────────────────
+        $this->_autoRenewExpiredAccountWork();
 
         $day = date('d');
         $date = date('Y-m-d');
@@ -354,8 +356,12 @@ class Home extends CI_Controller
             $customer  = $this->customer->getcustomers(['t1.user_id' => $user_id], 'single');
             $firm_info = $this->customer->getfirms(['t1.id' => $firm_id], 'single');
             $gst_on    = !empty($customer['gst_enabled']) && $customer['gst_enabled'] == 1;
-            $subtotal  = $gst_on ? round($bill / 1.18, 2) : $bill;
-            $gst_amt   = $gst_on ? round($bill - $subtotal, 2) : 0;
+            
+            // Calculate GST - bill is base rate, GST is added on top
+            $subtotal  = $bill; // Base rate
+            $gst_rate = $gst_on ? 18.0 : 0.0;
+            $gst_amt   = $gst_on ? round(($bill * $gst_rate) / 100, 2) : 0; // 18% of base rate
+            $total_amt = $subtotal + $gst_amt; // Total = base + GST
 
             $svc_names = array_column($services, 'name');
             try {
@@ -374,9 +380,9 @@ class Home extends CI_Controller
                     'type'           => $pkg_type,
                     'period_value'   => $year,
                     'subtotal'       => $subtotal,
-                    'gst_rate'       => $gst_on ? 18.0 : 0.0,
+                    'gst_rate'       => $gst_rate,
                     'gst_amount'     => $gst_amt,
-                    'total_amount'   => $bill,
+                    'total_amount'   => $total_amt,
                 ]);
             } catch (Exception $e) {
                 log_message('error', 'Package auto-renewal invoice error: ' . $e->getMessage());
@@ -399,9 +405,156 @@ class Home extends CI_Controller
                 return date('Y-m-d', strtotime('+3 months', $ts));
             case 'Once':
                 return date('Y-m-d', strtotime('+1 year',   $ts));
+            case 'Turnover':
+            case 'Turnover':
             case 'Yearly':
             default:
                 return date('Y-m-d', strtotime('+1 year',   $ts));
+        }
+    }
+
+    /**
+     * Auto-renew expired Account Work packages (customer_packages).
+     * 
+     * For each expired Account Work package (expiry_date <= today, payment_status = 0):
+     *   – If wallet balance >= bill_amount → create purchase row, generate invoice,
+     *     extend expiry to the next cycle (payment_status stays 0).
+     *   – Otherwise → skip (it will appear in Pending Services for manual renewal).
+     */
+    private function _autoRenewExpiredAccountWork()
+    {
+        $today = date('Y-m-d');
+
+        // Find all expired, unpaid Account Work packages
+        $expired = $this->db->query(
+            "SELECT cp.*, u.name AS user_name, s.debit_date AS service_debit_date
+             FROM {$this->db->dbprefix('customer_packages')} cp
+             JOIN {$this->db->dbprefix('users')} u ON u.id = cp.user_id
+             LEFT JOIN {$this->db->dbprefix('services')} s ON s.id = 1
+             WHERE cp.expiry_date <= '{$today}'
+               AND cp.payment_status = 0
+               AND cp.status = 1"
+        )->result_array();
+
+        if (empty($expired)) return;
+
+        $this->load->model('Invoice_model', 'invoice');
+
+        foreach ($expired as $pkg) {
+            $user_id    = $pkg['user_id'];
+            $firm_id    = $pkg['firm_id'];
+            $year       = $pkg['year'];
+            $pkg_type   = !empty($pkg['package_type']) ? $pkg['package_type'] : 'Turnover';
+            
+            // Always use service rate (₹5,000) for Account Work packages
+            if ($pkg_type == 'Turnover') {
+                // Use the base service rate from services table
+                $account_work_service = $this->master->getservices(['id' => 1, 'status' => 1], 'single');
+                $bill = !empty($account_work_service['rate']) ? (float)$account_work_service['rate'] : 5000;
+            } else {
+                // For Monthly type, use the amount field
+                $bill = (float)($pkg['bill_amount'] ?? $pkg['amount'] ?? 0);
+            }
+
+            if ($bill <= 0) continue;
+
+            // Check wallet balance
+            $balance = $this->wallet->getwalletbalance($user_id);
+            if ($balance < $bill) {
+                // Not enough balance — leave for manual renewal in pending services
+                continue;
+            }
+
+            // ── Check customer GST setting ──────────────────────────────────
+            $customer = $this->customer->getcustomers(['t1.user_id' => $user_id], 'single');
+            $gst_enabled = !empty($customer) && !empty($customer['gst_enabled']) && $customer['gst_enabled'] == 1;
+
+            // Calculate GST - bill is base rate, GST is added on top
+            $subtotal = $bill; // Base rate (e.g., 5000)
+            $gst_rate = $gst_enabled ? 18.0 : 0.0;
+            $gst_amount = $gst_enabled ? round(($bill * $gst_rate) / 100, 2) : 0; // 18% of base rate (e.g., 900)
+            $total_amount = $subtotal + $gst_amount; // Total = base + GST (e.g., 5900)
+
+            $datetime = date('Y-m-d H:i:s');
+            $service_name = $pkg['package_id'] == 1 ? 'Accountancy Prime' : 'Accountancy Premium';
+
+            // ── Create purchase row for Account Work ────────────────────────
+            $this->db->insert('purchases', [
+                'date'       => $today,
+                'year'       => $year,
+                'type'       => $pkg_type,
+                'user_id'    => $user_id,
+                'service_id' => 1, // Account Work
+                'firm_id'    => $firm_id,
+                'service'    => $service_name . ' (Account Work Auto-Renew)',
+                'rate'       => $subtotal, // Base rate
+                'subtotal'   => $subtotal, // Base rate
+                'gst_amount' => $gst_amount, // GST amount
+                'gst_enabled' => $gst_enabled ? 1 : 0,
+                'amount'     => $total_amount, // Total = base + GST
+                'status'     => 0,
+                'added_on'   => $datetime,
+                'updated_on' => $datetime,
+            ]);
+
+            // ── Calculate new expiry ───────────────────────────────────────
+            $new_expiry = $this->_nextExpiry($pkg_type, $today);
+            
+            // For Turnover type, use service debit_date if available
+            if ($pkg_type == 'Turnover' && !empty($pkg['service_debit_date'])) {
+                $dm = (int)date('m', strtotime($pkg['service_debit_date']));
+                $dd = (int)date('d', strtotime($pkg['service_debit_date']));
+                $cy = (int)date('Y', strtotime($today));
+                
+                $candidate = sprintf('%04d-%02d-%02d', $cy, $dm, $dd);
+                if (strtotime($candidate) <= strtotime($today)) {
+                    $candidate = sprintf('%04d-%02d-%02d', $cy + 1, $dm, $dd);
+                }
+                $new_expiry = $candidate;
+            }
+
+            // Update bill_amount for Turnover type (calculated based on actual turnover)
+            $update_data = [
+                'payment_status' => 0,
+                'purchase_date'  => $today,
+                'expiry_date'    => $new_expiry,
+                'updated_on'     => $datetime,
+            ];
+            
+            if ($pkg_type == 'Turnover') {
+                $update_data['bill_amount'] = $bill;
+            }
+
+            // ── Update expiry (keep payment_status=0 so next expiry triggers renewal again)
+            $this->db->update('customer_packages', $update_data, ['id' => $pkg['id']]);
+
+            // ── Generate invoice ───────────────────────────────────────────
+            $firm_info = $this->customer->getfirms(['t1.id' => $firm_id], 'single');
+            try {
+                $this->invoice->create_custom_invoice([
+                    'user_id'        => $user_id,
+                    'firm_id'        => $firm_id,
+                    'year'           => $year,
+                    'invoice_date'   => $today,
+                    'billing_name'   => !empty($customer['name'])   ? $customer['name']   : $pkg['user_name'],
+                    'billing_email'  => !empty($customer['email'])  ? $customer['email']  : '',
+                    'billing_mobile' => !empty($customer['mobile']) ? $customer['mobile'] : '',
+                    'firm_name'      => !empty($firm_info['name'])  ? $firm_info['name']  : '',
+                    'firm_gstin'     => !empty($firm_info['gstin']) ? $firm_info['gstin'] : '',
+                    'firm_pan'       => !empty($firm_info['pan'])   ? $firm_info['pan']   : '',
+                    'service_name'   => $service_name . ' (Account Work Auto-Renew)',
+                    'type'           => $pkg_type,
+                    'period_value'   => $year,
+                    'subtotal'       => round($subtotal, 2),
+                    'gst_rate'       => $gst_rate,
+                    'gst_amount'     => round($gst_amount, 2),
+                    'total_amount'   => $total_amount,
+                ]);
+            } catch (Exception $e) {
+                log_message('error', 'Account Work auto-renewal invoice error: ' . $e->getMessage());
+            }
+
+            log_message('info', "Account Work package #{$pkg['id']} auto-renewed for user {$user_id}, bill ₹{$bill}, new expiry {$new_expiry}");
         }
     }
 

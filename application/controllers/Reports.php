@@ -123,13 +123,13 @@ class Reports extends CI_Controller
                     $due_date = $single['due_date'] != '' ? date('d-m-Y', strtotime($single['due_date'])) : '--';
                     $row = array(
                         'month' => $month,
-                        'outstanding' => round($outstanding, 4),
-                        'gto' => round($single['turnover'], 4),
-                        'acc_fees' => round($acc_fees, 4),
-                        'penalty' => round($penalty, 4),
-                        'total' => round($total, 4),
-                        'paid' => round($paid, 4),
-                        'balance' => round($balance, 4),
+                        'outstanding' => round($outstanding, 2),
+                        'gto' => round($single['turnover'], 2),
+                        'acc_fees' => round($acc_fees, 2),
+                        'penalty' => round($penalty, 2),
+                        'total' => round($total, 2),
+                        'paid' => round($paid, 2),
+                        'balance' => round($balance, 2),
                         'due_date' => $due_date,
                         'due_days' => $days
                     );
@@ -139,11 +139,11 @@ class Reports extends CI_Controller
                 $row = array(
                     'month' => 'Total',
                     'outstanding' => 0,
-                    'gto' => round($total_turnover, 4),
-                    'acc_fees' => round($total_fees, 4),
-                    'penalty' => round($total_penalty, 4),
-                    'total' => round($total_sum, 4), // Use sum of all row totals instead of calculation
-                    'paid' => round($total_paid, 4),
+                    'gto' => round($total_turnover, 2),
+                    'acc_fees' => round($total_fees, 2),
+                    'penalty' => round($total_penalty, 2),
+                    'total' => round($total_sum, 2), // Use sum of all row totals instead of calculation
+                    'paid' => round($total_paid, 2),
                     'balance' => 0,
                     'due_date' => '',
                     'due_days' => $total_days
@@ -1013,6 +1013,58 @@ class Reports extends CI_Controller
             }
         }
 
+        // Check customer GST setting and calculate GST if enabled
+        $customer = $this->customer->getcustomers(['t1.user_id' => $user_id], 'single');
+        $gst_enabled = !empty($customer) && !empty($customer['gst_enabled']) && $customer['gst_enabled'] == 1;
+        $gst_rate = $gst_enabled ? 18.0 : 0.0;
+        $gst_amount = $gst_enabled ? round(($last_month_balance * $gst_rate) / 100, 2) : 0;
+        $total_with_gst = round($last_month_balance + $gst_amount, 2);
+
+        // Get customer state for SGST/CGST vs IGST calculation
+        $customer_state_id = null;
+        if (!empty($customer) && !empty($customer['parent_id'])) {
+            $customer_state_id = $customer['parent_id'];
+        }
+
+        // Get admin/company state (from admin user address)
+        $admin_state_id = null;
+        $admin_user = $this->db->select('id')->where_in('role', ['admin', 'superadmin'])->limit(1)->get('users')->row_array();
+        if (!empty($admin_user)) {
+            $admin_address = $this->customer->getaddresses(['t1.user_id' => $admin_user['id']], 'single');
+            if (!empty($admin_address) && !empty($admin_address['parent_id'])) {
+                $admin_state_id = $admin_address['parent_id'];
+            }
+        }
+
+        // Calculate SGST/CGST or IGST breakdown
+        $sgst_amount = 0;
+        $cgst_amount = 0;
+        $igst_amount = 0;
+        $states_match = false;
+
+        if ($gst_amount > 0 && !empty($customer_state_id) && !empty($admin_state_id)) {
+            $states_match = ($customer_state_id == $admin_state_id);
+
+            if ($states_match) {
+                // Same state: SGST 9% + CGST 9% = 18%
+                $sgst_amount = round(($last_month_balance * 9) / 100, 2);
+                $cgst_amount = round(($last_month_balance * 9) / 100, 2);
+                // Adjust for rounding differences
+                $total_gst = round($sgst_amount + $cgst_amount, 2);
+                if (abs($total_gst - $gst_amount) > 0.01) {
+                    $diff = round($gst_amount - $total_gst, 2);
+                    $sgst_amount = round($sgst_amount + round($diff / 2, 2), 2);
+                    $cgst_amount = round($gst_amount - $sgst_amount, 2);
+                }
+            } else {
+                // Different states: IGST 18%
+                $igst_amount = round($gst_amount, 2);
+            }
+        } else {
+            // Fallback: if states not available, use IGST
+            $igst_amount = $gst_amount;
+        }
+
         $data['unpaid_months'] = $unpaid_months;
         $data['total_balance'] = $total_balance;
         $data['last_month_balance'] = $last_month_balance;
@@ -1023,6 +1075,14 @@ class Reports extends CI_Controller
         $data['year'] = $year;
         $data['firm_id'] = $firm_id;
         $data['user_id'] = $user_id;
+        $data['gst_enabled'] = $gst_enabled;
+        $data['gst_rate'] = $gst_rate;
+        $data['gst_amount'] = $gst_amount;
+        $data['total_with_gst'] = $total_with_gst;
+        $data['sgst_amount'] = $sgst_amount;
+        $data['cgst_amount'] = $cgst_amount;
+        $data['igst_amount'] = $igst_amount;
+        $data['states_match'] = $states_match;
 
         $this->template->load('reports', 'payment', $data);
     }
@@ -1151,8 +1211,14 @@ class Reports extends CI_Controller
                 $last_month_balance = $last_month_data['balance'];
             }
 
-            if (abs($amount - $last_month_balance) > 0.01) {
-                $this->session->set_flashdata('err_msg', 'Payment amount does not match the last month balance!');
+            // Check customer GST setting to validate payment amount
+            $customer_check = $this->customer->getcustomers(['t1.user_id' => $user_id], 'single');
+            $gst_enabled_check = !empty($customer_check) && !empty($customer_check['gst_enabled']) && $customer_check['gst_enabled'] == 1;
+            $gst_amount_check = $gst_enabled_check ? round(($last_month_balance * 18) / 100, 2) : 0;
+            $expected_total = $last_month_balance + $gst_amount_check;
+
+            if (abs($amount - $expected_total) > 0.01) {
+                $this->session->set_flashdata('err_msg', 'Payment amount does not match the expected total! Expected: ₹' . number_format($expected_total, 2) . ($gst_enabled_check ? ' (including GST)' : ''));
                 redirect('reports/payment/');
                 return;
             }
@@ -1167,9 +1233,11 @@ class Reports extends CI_Controller
                 return;
             }
 
-            if ($wallet_balance < $last_month_balance) {
-                $needed = $last_month_balance - $wallet_balance;
-                $this->session->set_flashdata('err_msg', 'Insufficient wallet balance! You need ₹' . number_format($needed, 2) . ' more. Current balance: ₹' . number_format($wallet_balance, 2) . ', Required: ₹' . number_format($last_month_balance, 2));
+            $total_amount_needed = $expected_total;
+
+            if ($wallet_balance < $total_amount_needed) {
+                $needed = round($total_amount_needed - $wallet_balance, 2);
+                $this->session->set_flashdata('err_msg', 'Insufficient wallet balance! You need ₹' . number_format($needed, 2) . ' more. Current balance: ₹' . number_format(round($wallet_balance, 2), 2) . ', Required: ₹' . number_format($total_amount_needed, 2) . ($gst_enabled_check ? ' (including GST)' : ''));
                 redirect('reports/payment/');
                 return;
             }
@@ -1210,13 +1278,17 @@ class Reports extends CI_Controller
                     // Ensure acc_date is in correct format (should already be Y-m-d from database)
                     $acc_date = !empty($month_data['date']) ? $month_data['date'] : date('Y-m-d');
 
+                    // Calculate GST for this month's payment if enabled (use customer_check defined earlier)
+                    $month_gst = $gst_enabled_check ? round(($month_payment_amount * 18) / 100, 2) : 0;
+                    $month_total = round($month_payment_amount + $month_gst, 2);
+
                     $payment_data = array(
                         'user_id' => $user_id,
                         'firm_id' => $firm_id,
                         'year' => $year,
                         'acc_date' => $acc_date,
                         'date' => $payment_date,
-                        'amount' => $month_payment_amount,
+                        'amount' => $month_total, // Include GST in payment amount
                         'added_by' => $user['id']
                     );
 
@@ -1242,6 +1314,15 @@ class Reports extends CI_Controller
             $this->load->model('Customer_model', 'customer');
             $customer = $this->customer->getcustomers(['t1.user_id' => $user_id], 'single');
             $firm = $this->db->get_where('firms', ['id' => $firm_id])->row_array();
+
+            // Check if GST is enabled for this customer
+            $gst_enabled = !empty($customer) && !empty($customer['gst_enabled']) && $customer['gst_enabled'] == 1;
+            
+            // Calculate GST - last_month_balance is base rate, GST is added on top
+            $subtotal = $last_month_balance; // Base rate
+            $gst_rate = $gst_enabled ? 18.0 : 0.0;
+            $gst_amount = $gst_enabled ? round(($last_month_balance * $gst_rate) / 100, 2) : 0; // 18% of base rate
+            $total_amount = $subtotal + $gst_amount; // Total = base + GST
 
             // Generate invoice for the payment - show period range from first to last unpaid month
             $this->load->model('Invoice_model', 'invoice');
@@ -1271,14 +1352,17 @@ class Reports extends CI_Controller
                 'firm_id' => $firm_id,
                 'type' => 'accountancy',
                 'year' => $year,
-                'subtotal' => $last_month_balance,
-                'gst_amount' => 0,
-                'total_amount' => $last_month_balance,
+                'subtotal' => $subtotal,
+                'gst_rate' => $gst_rate,
+                'gst_amount' => $gst_amount,
+                'total_amount' => $total_amount,
                 'invoice_date' => date('Y-m-d'),
                 'billing_name' => !empty($customer['name']) ? $customer['name'] : '',
                 'billing_email' => !empty($customer['email']) ? $customer['email'] : '',
                 'billing_mobile' => !empty($customer['mobile']) ? $customer['mobile'] : '',
                 'firm_name' => !empty($firm['name']) ? $firm['name'] : '',
+                'firm_gstin' => !empty($firm['gstin']) ? $firm['gstin'] : '',
+                'firm_pan' => !empty($firm['pan']) ? $firm['pan'] : '',
                 'service_name' => 'Accountancy Service',
                 'period_value' => $period_value
             );
@@ -1289,7 +1373,12 @@ class Reports extends CI_Controller
                 $invoice_no = $invoice_result['invoice']['invoice_no'];
             }
 
-            $this->session->set_flashdata('msg', 'Payment of ₹' . number_format($amount, 2) . ' processed successfully!' . (!empty($invoice_no) ? ' Invoice: ' . $invoice_no : ''));
+            $payment_msg = 'Payment of ₹' . number_format($subtotal, 2);
+            if ($gst_enabled && $gst_amount > 0) {
+                $payment_msg .= ' + GST ₹' . number_format($gst_amount, 2) . ' (Total: ₹' . number_format($total_amount, 2) . ')';
+            }
+            $payment_msg .= ' processed successfully!' . (!empty($invoice_no) ? ' Invoice: ' . $invoice_no : '');
+            $this->session->set_flashdata('msg', $payment_msg);
             redirect('reports/');
         } else {
             redirect('reports/payment/');

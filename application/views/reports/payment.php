@@ -49,9 +49,40 @@
                             <?php } ?>
                         </tbody>
                         <tfoot>
+                            <?php if (!empty($gst_enabled) && $gst_enabled && $gst_amount > 0) { ?>
+                                <tr>
+                                    <th colspan="5" class="cell-right">Subtotal:</th>
+                                    <th class="cell-right"><?= $this->amount->toDecimal($last_month_balance, false); ?></th>
+                                    <th></th>
+                                </tr>
+                                <?php if (!empty($states_match) && $states_match && ($sgst_amount > 0 || $cgst_amount > 0)) { ?>
+                                    <tr>
+                                        <th colspan="5" class="cell-right">SGST (9%):</th>
+                                        <th class="cell-right"><?= $this->amount->toDecimal($sgst_amount, false); ?></th>
+                                        <th></th>
+                                    </tr>
+                                    <tr>
+                                        <th colspan="5" class="cell-right">CGST (9%):</th>
+                                        <th class="cell-right"><?= $this->amount->toDecimal($cgst_amount, false); ?></th>
+                                        <th></th>
+                                    </tr>
+                                <?php } elseif (!empty($igst_amount) && $igst_amount > 0) { ?>
+                                    <tr>
+                                        <th colspan="5" class="cell-right">IGST (18%):</th>
+                                        <th class="cell-right"><?= $this->amount->toDecimal($igst_amount, false); ?></th>
+                                        <th></th>
+                                    </tr>
+                                <?php } else { ?>
+                                    <tr>
+                                        <th colspan="5" class="cell-right">GST (<?= $gst_rate; ?>%):</th>
+                                        <th class="cell-right"><?= $this->amount->toDecimal($gst_amount, false); ?></th>
+                                        <th></th>
+                                    </tr>
+                                <?php } ?>
+                            <?php } ?>
                             <tr>
                                 <th colspan="5" class="cell-right">Total Amount to Pay:</th>
-                                <th class="cell-right"><?= $this->amount->toDecimal($last_month_balance, false); ?></th>
+                                <th class="cell-right"><?= $this->amount->toDecimal(!empty($total_with_gst) ? $total_with_gst : $last_month_balance, false); ?></th>
                                 <th></th>
                             </tr>
                         </tfoot>
@@ -69,7 +100,18 @@
                             <?php if (!empty($last_month_data)) { ?>
                                 <p><strong>Payment Month:</strong> <?= !empty($payment_month_range) ? $payment_month_range : $last_month_data['month']; ?></p>
                                 <p><strong>Due Date:</strong> <?= $last_month_data['due_date']; ?></p>
-                                <p><strong>Amount to Pay:</strong> <span class="text-success" style="font-size: 1.2em;">₹<?= $this->amount->toDecimal($last_month_balance, false); ?></span></p>
+                                <?php if (!empty($gst_enabled) && $gst_enabled && $gst_amount > 0) { ?>
+                                    <p><strong>Subtotal:</strong> ₹<?= $this->amount->toDecimal($last_month_balance, false); ?></p>
+                                    <?php if (!empty($states_match) && $states_match && ($sgst_amount > 0 || $cgst_amount > 0)) { ?>
+                                        <p><strong>SGST (9%):</strong> ₹<?= $this->amount->toDecimal($sgst_amount, false); ?></p>
+                                        <p><strong>CGST (9%):</strong> ₹<?= $this->amount->toDecimal($cgst_amount, false); ?></p>
+                                    <?php } elseif (!empty($igst_amount) && $igst_amount > 0) { ?>
+                                        <p><strong>IGST (18%):</strong> ₹<?= $this->amount->toDecimal($igst_amount, false); ?></p>
+                                    <?php } else { ?>
+                                        <p><strong>GST (<?= $gst_rate; ?>%):</strong> ₹<?= $this->amount->toDecimal($gst_amount, false); ?></p>
+                                    <?php } ?>
+                                <?php } ?>
+                                <p><strong>Amount to Pay:</strong> <span class="text-success" style="font-size: 1.2em;">₹<?= $this->amount->toDecimal(!empty($total_with_gst) ? $total_with_gst : $last_month_balance, false); ?></span></p>
                             <?php } ?>
                         </div>
                     </div>
@@ -82,13 +124,14 @@
                 <?= create_form_input('hidden', 'year', '', true, $year); ?>
                 <?= create_form_input('hidden', 'firm_id', '', true, $firm_id); ?>
                 <?= create_form_input('hidden', 'user_id', '', true, $user_id); ?>
-                <?= create_form_input('hidden', 'amount', '', true, $last_month_balance); ?>
+                <?= create_form_input('hidden', 'amount', '', true, !empty($total_with_gst) ? $total_with_gst : $last_month_balance); ?>
+                <?= create_form_input('hidden', 'makepayment', '', true, '1'); ?>
                 <?php if (!empty($last_month_data)) { ?>
                     <?= create_form_input('hidden', 'last_month_id', '', true, $last_month_data['id']); ?>
                     <?= create_form_input('hidden', 'last_month_date', '', true, $last_month_data['date']); ?>
                 <?php } ?>
                 <button type="button" id="payButton" class="btn btn-success btn-lg" data-bs-toggle="modal" data-bs-target="#paymentConfirmModal">
-                    <i class="fa fa-money"></i> Pay ₹<?= $this->amount->toDecimal($last_month_balance, false); ?>
+                    <i class="fa fa-money"></i> Pay ₹<?= $this->amount->toDecimal(!empty($total_with_gst) ? $total_with_gst : $last_month_balance, false); ?>
                 </button>
                 <a href="<?= base_url('reports/'); ?>" class="btn btn-secondary btn-lg">Cancel</a>
             </div>
@@ -113,14 +156,40 @@
                                 <div class="col-7"><?= !empty($payment_month_range) ? $payment_month_range : (!empty($last_month_data) ? $last_month_data['month'] : 'N/A'); ?></div>
                             </div>
                             <?php if (!empty($last_month_data)) { ?>
-                            <div class="row mb-2">
-                                <div class="col-5"><strong>Due Date:</strong></div>
-                                <div class="col-7"><?= $last_month_data['due_date']; ?></div>
-                            </div>
+                                <div class="row mb-2">
+                                    <div class="col-5"><strong>Due Date:</strong></div>
+                                    <div class="col-7"><?= $last_month_data['due_date']; ?></div>
+                                </div>
+                            <?php } ?>
+                            <?php if (!empty($gst_enabled) && $gst_enabled && $gst_amount > 0) { ?>
+                                <div class="row mb-2">
+                                    <div class="col-5"><strong>Subtotal:</strong></div>
+                                    <div class="col-7">₹<?= $this->amount->toDecimal($last_month_balance, false); ?></div>
+                                </div>
+                                <?php if (!empty($states_match) && $states_match && ($sgst_amount > 0 || $cgst_amount > 0)) { ?>
+                                    <div class="row mb-2">
+                                        <div class="col-5"><strong>SGST (9%):</strong></div>
+                                        <div class="col-7">₹<?= $this->amount->toDecimal($sgst_amount, false); ?></div>
+                                    </div>
+                                    <div class="row mb-2">
+                                        <div class="col-5"><strong>CGST (9%):</strong></div>
+                                        <div class="col-7">₹<?= $this->amount->toDecimal($cgst_amount, false); ?></div>
+                                    </div>
+                                <?php } elseif (!empty($igst_amount) && $igst_amount > 0) { ?>
+                                    <div class="row mb-2">
+                                        <div class="col-5"><strong>IGST (18%):</strong></div>
+                                        <div class="col-7">₹<?= $this->amount->toDecimal($igst_amount, false); ?></div>
+                                    </div>
+                                <?php } else { ?>
+                                    <div class="row mb-2">
+                                        <div class="col-5"><strong>GST (<?= $gst_rate; ?>%):</strong></div>
+                                        <div class="col-7">₹<?= $this->amount->toDecimal($gst_amount, false); ?></div>
+                                    </div>
+                                <?php } ?>
                             <?php } ?>
                             <div class="row mb-2">
                                 <div class="col-5"><strong>Total Amount:</strong></div>
-                                <div class="col-7"><span class="text-success fw-bold" style="font-size: 1.1em;">₹<?= $this->amount->toDecimal($last_month_balance, false); ?></span></div>
+                                <div class="col-7"><span class="text-success fw-bold" style="font-size: 1.1em;">₹<?= $this->amount->toDecimal(!empty($total_with_gst) ? $total_with_gst : $last_month_balance, false); ?></span></div>
                             </div>
                             <div class="row">
                                 <div class="col-5"><strong>Months to Pay:</strong></div>
@@ -158,26 +227,26 @@
 </div>
 
 <script>
-$(document).ready(function() {
-    // Handle confirm payment button click
-    $('#confirmPayButton').on('click', function() {
-        var $btn = $(this);
-        // Disable button to prevent double submission
-        $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span>Processing...');
-        
-        // Close modal
-        var modalElement = $('#paymentConfirmModal');
-        modalElement.modal('hide');
-        
-        // Submit the form after a short delay to allow modal to close
-        setTimeout(function() {
-            $('form').submit();
-        }, 300);
+    $(document).ready(function() {
+        // Handle confirm payment button click
+        $('#confirmPayButton').on('click', function() {
+            var $btn = $(this);
+            // Disable button to prevent double submission
+            $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span>Processing...');
+
+            // Close modal
+            var modalElement = $('#paymentConfirmModal');
+            modalElement.modal('hide');
+
+            // Submit the form after a short delay to allow modal to close
+            setTimeout(function() {
+                $('form').submit();
+            }, 300);
+        });
+
+        // Reset button state if modal is closed without confirming
+        $('#paymentConfirmModal').on('hidden.bs.modal', function() {
+            $('#confirmPayButton').prop('disabled', false).html('<i class="fa fa-check me-1"></i>Confirm & Pay');
+        });
     });
-    
-    // Reset button state if modal is closed without confirming
-    $('#paymentConfirmModal').on('hidden.bs.modal', function() {
-        $('#confirmPayButton').prop('disabled', false).html('<i class="fa fa-check me-1"></i>Confirm & Pay');
-    });
-});
 </script>

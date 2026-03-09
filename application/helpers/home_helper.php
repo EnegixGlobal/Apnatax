@@ -101,15 +101,34 @@
             // Count only expired & unpaid packages (payment_status=0, expiry_date <= today)
             // These are packages that failed to auto-renew due to insufficient wallet balance.
             $count = 0;
+            $today = time();
+            
+            // Count expired service packages
             $all_pkgs = $CI->customer->getservicepackage(
                 ['t1.user_id' => $user['id'], 't1.firm_id' => $firm_id],
                 'all'
             );
             if (!empty($all_pkgs)) {
-                $today = time();
                 foreach ($all_pkgs as $_pkg) {
                     $exp = !empty($_pkg['expiry_date']) ? strtotime($_pkg['expiry_date']) : 0;
                     $is_unpaid = empty($_pkg['payment_status']) || $_pkg['payment_status'] == 0;
+                    if ($exp && $exp <= $today && $is_unpaid) {
+                        $count++;
+                    }
+                }
+            }
+            
+            // Count expired Account Work packages (customer_packages)
+            $account_work_pkgs = $CI->db->get_where('customer_packages', [
+                'user_id' => $user['id'],
+                'firm_id' => $firm_id,
+                'status' => 1
+            ])->result_array();
+            
+            if (!empty($account_work_pkgs)) {
+                foreach ($account_work_pkgs as $_acpkg) {
+                    $exp = !empty($_acpkg['expiry_date']) ? strtotime($_acpkg['expiry_date']) : 0;
+                    $is_unpaid = empty($_acpkg['payment_status']) || $_acpkg['payment_status'] == 0;
                     if ($exp && $exp <= $today && $is_unpaid) {
                         $count++;
                     }
