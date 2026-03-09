@@ -77,7 +77,8 @@ class Wallet_model extends CI_Model{
         $security_deposit=$this->getsecuritydeposit($user_id);
         $balance-=$security_deposit;
         
-        return $balance;
+        // Round to 2 decimal places to avoid floating-point precision issues
+        return round($balance, 2);
     }
     
     public function getsecuritydeposit($user_id){
