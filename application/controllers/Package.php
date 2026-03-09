@@ -100,6 +100,26 @@ class Package extends CI_Controller
         $acctpkg = $this->db->get_where('customer_packages', ['user_id' => $user['id'], 'firm_id' => $firm_id, 'year' => $year, 'status' => 1]);
         $data['package'] = ($acctpkg->num_rows() > 0) ? $acctpkg->unbuffered_row('array') : null;
 
+        // Calculate bill_amount for expired Account Work packages if needed
+        if (!empty($data['package'])) {
+            $pkg = $data['package'];
+            $expiry_ts = !empty($pkg['expiry_date']) ? strtotime($pkg['expiry_date']) : 0;
+            $is_expired = $expiry_ts && $expiry_ts <= time();
+            $is_unpaid = empty($pkg['payment_status']) || $pkg['payment_status'] == 0;
+            $pkg_type = !empty($pkg['package_type']) ? $pkg['package_type'] : 'Turnover';
+
+            // If expired and bill_amount is 0, use the service rate (always show ₹5,000)
+            if ($is_expired && $is_unpaid && (empty($pkg['bill_amount']) || $pkg['bill_amount'] == 0)) {
+                // Always use the base service rate from services table
+                $account_work_service = $this->master->getservices(['id' => 1, 'status' => 1], 'single');
+                $data['package']['bill_amount'] = !empty($account_work_service['rate']) ? (float)$account_work_service['rate'] : 5000;
+            }
+        }
+
+        // Pass user and firm_id to view
+        $data['user'] = $user;
+        $data['firm_id'] = $firm_id;
+
         // Accountancy master packages (Prime / Premium) for the selection UI
         $data['accountancy_packages'] = $this->master->getpackages();
 
@@ -430,12 +450,11 @@ class Package extends CI_Controller
             $total_base_rate += $rate;
         }
 
-        // Calculate GST amounts if enabled
+        // Calculate GST amounts if enabled - bill_amount is base rate, GST is added on top
         $total_gst = 0;
         if ($gst_enabled && $total_base_rate > 0) {
-            // bill_amount is total (subtotal + GST), extract subtotal and GST
-            $subtotal_from_bill = round($bill_amount / 1.18, 2);
-            $total_gst = round($bill_amount - $subtotal_from_bill, 2);
+            // GST is 18% of the base rate
+            $total_gst = round(($bill_amount * 18) / 100, 2);
         }
 
         // Insert a purchase record per service so the wallet balance reduces automatically

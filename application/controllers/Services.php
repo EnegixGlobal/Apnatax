@@ -220,11 +220,45 @@ class Services extends CI_Controller
                         }
                     }
                     $_pkg['service_names'] = $svc_names;
+                    $_pkg['package_source'] = 'service_packages';
                     $expired_pkgs[] = $_pkg;
                 }
             }
         }
-        $data['expired_packages'] = $expired_pkgs;
+
+        // ── Expired / unpaid Account Work packages ───────────────────────
+        // Show Account Work packages whose expiry_date has passed AND payment_status = 0
+        $expired_account_work = array();
+        $account_work_pkgs = $this->db->get_where('customer_packages', [
+            'user_id' => $user['id'],
+            'firm_id' => $firm_id,
+            'status' => 1
+        ])->result_array();
+        
+        if (!empty($account_work_pkgs)) {
+            foreach ($account_work_pkgs as $_acpkg) {
+                $exp = !empty($_acpkg['expiry_date']) ? strtotime($_acpkg['expiry_date']) : 0;
+                $is_unpaid = empty($_acpkg['payment_status']) || $_acpkg['payment_status'] == 0;
+                if ($exp && $exp <= time() && $is_unpaid) {
+                    // For Turnover type, use service rate (always show ₹5,000)
+                    if (empty($_acpkg['bill_amount']) || $_acpkg['bill_amount'] == 0) {
+                        // Always use the base service rate from services table
+                        $account_work_service = $this->master->getservices(['id' => 1, 'status' => 1], 'single');
+                        $_acpkg['bill_amount'] = !empty($account_work_service['rate']) ? (float)$account_work_service['rate'] : 5000;
+                    }
+                    
+                    $package_id = $_acpkg['package_id'];
+                    $service_name = $package_id == 1 ? 'Accountancy Prime' : 'Accountancy Premium';
+                    $_acpkg['service_names'] = ['Account Work (' . $service_name . ')'];
+                    $_acpkg['package_source'] = 'customer_packages';
+                    $_acpkg['package_type'] = !empty($_acpkg['package_type']) ? $_acpkg['package_type'] : 'Turnover';
+                    $expired_account_work[] = $_acpkg;
+                }
+            }
+        }
+        
+        // Merge both types of expired packages
+        $data['expired_packages'] = array_merge($expired_pkgs, $expired_account_work);
 
         $this->template->load('services', 'pendingservices', $data);
     }
@@ -409,11 +443,21 @@ class Services extends CI_Controller
             return;
         }
 
-        // Fetch package owned by this user
+        // Fetch package owned by this user - check both service_packages and customer_packages
         $pkg = $this->db->get_where(
             'service_packages',
             ['id' => $package_id, 'user_id' => $user['id']]
         )->unbuffered_row('array');
+        
+        $is_account_work = false;
+        if (empty($pkg)) {
+            // Try customer_packages (Account Work)
+            $pkg = $this->db->get_where(
+                'customer_packages',
+                ['id' => $package_id, 'user_id' => $user['id']]
+            )->unbuffered_row('array');
+            $is_account_work = !empty($pkg);
+        }
 
         if (empty($pkg)) {
             echo json_encode(['status' => false, 'message' => 'Package not found.']);
@@ -445,121 +489,218 @@ class Services extends CI_Controller
             return;
         }
 
-        // ── Resolve services ───────────────────────────────────────────
-        $s_ids    = array_filter(array_map('trim', explode(',', $pkg['service_ids'] ?? '')));
-        $services = [];
-        if (!empty($s_ids)) {
-            $services = $this->master->getservices("status='1' AND id IN ('" . implode("','", $s_ids) . "')");
-        }
-        if (empty($services)) {
-            echo json_encode(['status' => false, 'message' => 'No active services found in this package.']);
-            return;
-        }
-
-        $pkg_type = !empty($pkg['package_type']) ? $pkg['package_type'] : 'Yearly';
+        $pkg_type = !empty($pkg['package_type']) ? $pkg['package_type'] : ($is_account_work ? 'Turnover' : 'Yearly');
         $firm_id  = $pkg['firm_id'];
         $year     = $pkg['year'];
         $today    = date('Y-m-d');
         $datetime = date('Y-m-d H:i:s');
 
-        // Service option rates
-        $opt_data = [];
-        if (!empty($pkg['service_option_ids'])) {
-            $opt_data = json_decode($pkg['service_option_ids'], true) ?: [];
-        }
-
-        // ── Check customer GST setting ──────────────────────────────────
-        $customer = $this->customer->getcustomers(['t1.user_id' => $user['id']], 'single');
-        $gst_enabled = !empty($customer) && !empty($customer['gst_enabled']) && $customer['gst_enabled'] == 1;
-
-        // ── Calculate total base rate and GST distribution ───────────────
-        $total_base_rate = 0;
-        $service_rates = [];
-        foreach ($services as $svc) {
-            $rate = (float)$svc['rate'];
-            if (!empty($opt_data[$svc['id']])) {
-                $opt = $this->master->getserviceoptions(
-                    ['id' => $opt_data[$svc['id']], 'status' => 1],
-                    'single'
-                );
-                if (!empty($opt['rate'])) $rate = (float)$opt['rate'];
+        // ── Handle Account Work packages ────────────────────────────────
+        if ($is_account_work) {
+            // For Turnover type, recalculate bill_amount if needed
+            if ($pkg_type == 'Turnover' && (empty($pkg['bill_amount']) || $pkg['bill_amount'] == 0)) {
+                $dates = getfiscaldates(date('Y-m-d', strtotime($pkg['purchase_date'] ?? $pkg['added_on'])));
+                $from = $dates['from'];
+                $to = $dates['to'];
+                $where2 = "t1.user_id='{$user['id']}' and t1.firm_id='{$firm_id}' and t1.date>='$from' and t1.date<='$to'";
+                $accountancy = $this->service->getturnoverswithpayment($where2);
+                $turnovers = !empty($accountancy) ? array_column($accountancy, 'turnover') : array(0);
+                $turnover = array_sum($turnovers);
+                $total_turnover = $turnover * 100000; // multiplier
+                
+                $package_id = $pkg['package_id'];
+                $name = $package_id == 1 ? 'Accountancy Prime' : 'Accountancy Premium';
+                $package = $this->master->getpackages(['name' => $name, 'turnover>' => $turnover], 'single');
+                
+                if (!empty($package)) {
+                    $fees = $total_turnover / $package['turnover'];
+                    $fees *= $package['rate'];
+                    $bill = (float)$fees;
+                } else {
+                    $package = $this->master->getpackages(['name' => $name], 'single');
+                    $bill = !empty($package['rate']) ? (float)$package['rate'] : 0;
+                }
             }
-            $service_rates[$svc['id']] = $rate;
-            $total_base_rate += $rate;
-        }
+            
+            // ── Check customer GST setting ──────────────────────────────────
+            $customer = $this->customer->getcustomers(['t1.user_id' => $user['id']], 'single');
+            $gst_enabled = !empty($customer) && !empty($customer['gst_enabled']) && $customer['gst_enabled'] == 1;
 
-        // Calculate GST amounts if enabled
-        $total_gst = 0;
-        if ($gst_enabled && $total_base_rate > 0) {
-            // bill is total (subtotal + GST), extract subtotal and GST
-            $subtotal_from_bill = round($bill / 1.18, 2);
-            $total_gst = round($bill - $subtotal_from_bill, 2);
-        }
+            // Calculate GST - bill is base rate, GST is added on top
+            $subtotal = $bill; // Base rate (e.g., 5000)
+            $gst_rate = $gst_enabled ? 18.0 : 0.0;
+            $gst_amount = $gst_enabled ? round(($bill * $gst_rate) / 100, 2) : 0; // 18% of base rate (e.g., 900)
+            $total_amount = $subtotal + $gst_amount; // Total = base + GST (e.g., 5900)
 
-        // ── Create a purchase row per service (deducts from wallet) ────
-        foreach ($services as $svc) {
-            $rate = $service_rates[$svc['id']];
-            $subtotal = $rate;
-            $gst_amount = 0;
+            $service_name = $pkg['package_id'] == 1 ? 'Accountancy Prime' : 'Accountancy Premium';
 
-            // Distribute GST proportionally across services
-            if ($gst_enabled && $total_base_rate > 0 && $total_gst > 0) {
-                $gst_amount = round(($rate / $total_base_rate) * $total_gst, 2);
-            }
-
-            $amount = $subtotal + $gst_amount;
-
+            // ── Create purchase row for Account Work ────────────────────────
             $this->db->insert('purchases', [
                 'date'       => $today,
                 'year'       => $year,
                 'type'       => $pkg_type,
                 'user_id'    => $user['id'],
-                'service_id' => $svc['id'],
+                'service_id' => 1, // Account Work
                 'firm_id'    => $firm_id,
-                'service'    => $svc['name'] . ' (Package Renewal)',
-                'rate'       => $rate,
-                'subtotal'   => $subtotal,
-                'gst_amount' => $gst_amount,
+                'service'    => $service_name . ' (Account Work Renewal)',
+                'rate'       => $subtotal, // Base rate
+                'subtotal'   => $subtotal, // Base rate
+                'gst_amount' => $gst_amount, // GST amount
                 'gst_enabled' => $gst_enabled ? 1 : 0,
-                'amount'     => $amount,
+                'amount'     => $total_amount, // Total = base + GST
                 'status'     => 0,
                 'added_on'   => $datetime,
                 'updated_on' => $datetime,
             ]);
+        } else {
+            // ── Resolve services for regular packages ─────────────────────────
+            $s_ids    = array_filter(array_map('trim', explode(',', $pkg['service_ids'] ?? '')));
+            $services = [];
+            if (!empty($s_ids)) {
+                $services = $this->master->getservices("status='1' AND id IN ('" . implode("','", $s_ids) . "')");
+            }
+            if (empty($services)) {
+                echo json_encode(['status' => false, 'message' => 'No active services found in this package.']);
+                return;
+            }
+
+            // Service option rates
+            $opt_data = [];
+            if (!empty($pkg['service_option_ids'])) {
+                $opt_data = json_decode($pkg['service_option_ids'], true) ?: [];
+            }
+
+            // ── Check customer GST setting ──────────────────────────────────
+            $customer = $this->customer->getcustomers(['t1.user_id' => $user['id']], 'single');
+            $gst_enabled = !empty($customer) && !empty($customer['gst_enabled']) && $customer['gst_enabled'] == 1;
+
+            // ── Calculate total base rate and GST distribution ───────────────
+            $total_base_rate = 0;
+            $service_rates = [];
+            foreach ($services as $svc) {
+                $rate = (float)$svc['rate'];
+                if (!empty($opt_data[$svc['id']])) {
+                    $opt = $this->master->getserviceoptions(
+                        ['id' => $opt_data[$svc['id']], 'status' => 1],
+                        'single'
+                    );
+                    if (!empty($opt['rate'])) $rate = (float)$opt['rate'];
+                }
+                $service_rates[$svc['id']] = $rate;
+                $total_base_rate += $rate;
+            }
+
+            // Calculate GST amounts if enabled - bill is base rate, GST is added on top
+            $total_gst = 0;
+            if ($gst_enabled && $total_base_rate > 0) {
+                // GST is 18% of the base rate
+                $total_gst = round(($bill * 18) / 100, 2);
+            }
+
+            // ── Create a purchase row per service (deducts from wallet) ────
+            foreach ($services as $svc) {
+                $rate = $service_rates[$svc['id']];
+                $subtotal = $rate;
+                $gst_amount = 0;
+
+                // Distribute GST proportionally across services
+                if ($gst_enabled && $total_base_rate > 0 && $total_gst > 0) {
+                    $gst_amount = round(($rate / $total_base_rate) * $total_gst, 2);
+                }
+
+                $amount = $subtotal + $gst_amount;
+
+                $this->db->insert('purchases', [
+                    'date'       => $today,
+                    'year'       => $year,
+                    'type'       => $pkg_type,
+                    'user_id'    => $user['id'],
+                    'service_id' => $svc['id'],
+                    'firm_id'    => $firm_id,
+                    'service'    => $svc['name'] . ' (Package Renewal)',
+                    'rate'       => $rate,
+                    'subtotal'   => $subtotal,
+                    'gst_amount' => $gst_amount,
+                    'gst_enabled' => $gst_enabled ? 1 : 0,
+                    'amount'     => $amount,
+                    'status'     => 0,
+                    'added_on'   => $datetime,
+                    'updated_on' => $datetime,
+                ]);
+            }
         }
 
         // ── Calculate new expiry ───────────────────────────────────────
         $ts = strtotime($today);
-        switch ($pkg_type) {
-            case 'Monthly':
-                $new_expiry = date('Y-m-d', strtotime('+1 month',  $ts));
-                break;
-            case 'Quarterly':
-                $new_expiry = date('Y-m-d', strtotime('+3 months', $ts));
-                break;
-            case 'Once':
-            case 'Yearly':
-            default:
-                $new_expiry = date('Y-m-d', strtotime('+1 year',   $ts));
-                break;
+        $new_expiry = null;
+        
+        if ($is_account_work && $pkg_type == 'Turnover') {
+            // For Turnover type, use service debit_date if available
+            $service = $this->master->getservices(['id' => 1], 'single');
+            if (!empty($service['debit_date'])) {
+                $dm = (int)date('m', strtotime($service['debit_date']));
+                $dd = (int)date('d', strtotime($service['debit_date']));
+                $cy = (int)date('Y', $ts);
+                
+                $candidate = sprintf('%04d-%02d-%02d', $cy, $dm, $dd);
+                if (strtotime($candidate) <= $ts) {
+                    $candidate = sprintf('%04d-%02d-%02d', $cy + 1, $dm, $dd);
+                }
+                $new_expiry = $candidate;
+            } else {
+                $new_expiry = date('Y-m-d', strtotime('+1 year', $ts));
+            }
+        } else {
+            switch ($pkg_type) {
+                case 'Monthly':
+                    $new_expiry = date('Y-m-d', strtotime('+1 month',  $ts));
+                    break;
+                case 'Quarterly':
+                    $new_expiry = date('Y-m-d', strtotime('+3 months', $ts));
+                    break;
+                case 'Turnover':
+                case 'Once':
+                case 'Yearly':
+                default:
+                    $new_expiry = date('Y-m-d', strtotime('+1 year',   $ts));
+                    break;
+            }
         }
 
         // ── Update expiry (keep payment_status=0 so next expiry triggers renewal again)
-        $this->db->update('service_packages', [
+        $table_name = $is_account_work ? 'customer_packages' : 'service_packages';
+        $update_data = [
             'payment_status' => 0,
             'purchase_date'  => $today,
             'expiry_date'    => $new_expiry,
             'updated_on'     => $datetime,
-        ], ['id' => $package_id]);
+        ];
+        
+        // For Account Work Turnover type, update bill_amount
+        if ($is_account_work && $pkg_type == 'Turnover') {
+            $update_data['bill_amount'] = $bill;
+        }
+        
+        $this->db->update($table_name, $update_data, ['id' => $package_id]);
 
         // ── Generate invoice ───────────────────────────────────────────
         $customer  = $this->customer->getcustomers(['t1.user_id' => $user['id']], 'single');
         $firm_info = $this->customer->getfirms(['t1.id' => $firm_id], 'single');
         $gst_on    = !empty($customer['gst_enabled']) && $customer['gst_enabled'] == 1;
-        $subtotal  = $gst_on ? round($bill / 1.18, 2) : $bill;
-        $gst_amt   = $gst_on ? round($bill - $subtotal, 2) : 0;
+        
+        // Calculate GST - bill is base rate, GST is added on top
+        $subtotal  = $bill; // Base rate (e.g., 5000)
+        $gst_rate = $gst_on ? 18.0 : 0.0;
+        $gst_amt   = $gst_on ? round(($bill * $gst_rate) / 100, 2) : 0; // 18% of base rate (e.g., 900)
+        $total_amt = $subtotal + $gst_amt; // Total = base + GST (e.g., 5900)
 
-        $svc_names = array_column($services, 'name');
+        if ($is_account_work) {
+            $service_name = $pkg['package_id'] == 1 ? 'Accountancy Prime' : 'Accountancy Premium';
+            $svc_names = ['Account Work (' . $service_name . ')'];
+        } else {
+            $svc_names = array_column($services, 'name');
+        }
+        
         $inv_no    = '';
         try {
             $inv_result = $this->invoice->create_custom_invoice([
@@ -573,13 +714,13 @@ class Services extends CI_Controller
                 'firm_name'      => !empty($firm_info['name'])  ? $firm_info['name']  : '',
                 'firm_gstin'     => !empty($firm_info['gstin']) ? $firm_info['gstin'] : '',
                 'firm_pan'       => !empty($firm_info['pan'])   ? $firm_info['pan']   : '',
-                'service_name'   => implode(', ', $svc_names) . ' (Package Renewal)',
+                'service_name'   => implode(', ', $svc_names) . ($is_account_work ? ' (Account Work Renewal)' : ' (Package Renewal)'),
                 'type'           => $pkg_type,
                 'period_value'   => $year,
                 'subtotal'       => $subtotal,
-                'gst_rate'       => $gst_on ? 18.0 : 0.0,
+                'gst_rate'       => $gst_rate,
                 'gst_amount'     => $gst_amt,
-                'total_amount'   => $bill,
+                'total_amount'   => $total_amt,
             ]);
             if (!empty($inv_result['status']) && $inv_result['status'] === true) {
                 $inv_no = $inv_result['invoice']['invoice_no'];
@@ -897,7 +1038,15 @@ class Services extends CI_Controller
                             $newslug = '';
                             if ($document['file'] > 0) {
                                 $upload_path = './assets/service/documents/';
-                                $allowed_types = $document['file_type'];
+                                // Ensure PDF, JPG, JPEG, PNG are always allowed
+                                $allowed_types = 'pdf|jpg|jpeg|png';
+                                // If document has specific file types, merge them with required types
+                                if (!empty($document['file_type'])) {
+                                    $db_types = explode('|', $document['file_type']);
+                                    $required_types = ['pdf', 'jpg', 'jpeg', 'png'];
+                                    $merged_types = array_unique(array_merge($required_types, $db_types));
+                                    $allowed_types = implode('|', $merged_types);
+                                }
                                 if ($document['file'] == 1) {
                                     $newslug = $slug . '-file';
                                     if (isset($_FILES[$newslug]['tmp_name'])) {
@@ -1158,12 +1307,58 @@ class Services extends CI_Controller
                     }
                     if ($status) {
                         $datetime = date('Y-m-d H:i:s');
+                        $purchase_date = date('Y-m-d');
+                        
+                        // Calculate expiry date based on type
+                        $expiry_date = null;
+                        $package_type = $type; // Turnover, Monthly, etc.
+                        $bill_amount = 0;
+                        
+                        if ($type == "Monthly") {
+                            // Monthly: expiry = purchase_date + 1 month
+                            $expiry_date = date('Y-m-d', strtotime('+1 month', strtotime($purchase_date)));
+                            $bill_amount = (float)$amount;
+                        } else {
+                            // Turnover/Yearly: expiry = next year's debit_date or +1 year
+                            $debit_date = !empty($service['debit_date']) ? $service['debit_date'] : null;
+                            if ($debit_date) {
+                                $dm = (int)date('m', strtotime($debit_date));
+                                $dd = (int)date('d', strtotime($debit_date));
+                                $cy = (int)date('Y', strtotime($purchase_date));
+                                
+                                $candidate = sprintf('%04d-%02d-%02d', $cy, $dm, $dd);
+                                if (strtotime($candidate) <= strtotime($purchase_date)) {
+                                    $candidate = sprintf('%04d-%02d-%02d', $cy + 1, $dm, $dd);
+                                }
+                                $expiry_date = $candidate;
+                            } else {
+                                $expiry_date = date('Y-m-d', strtotime('+1 year', strtotime($purchase_date)));
+                            }
+                            $package_type = 'Turnover';
+                            // For turnover-based, bill_amount will be calculated on renewal based on actual turnover
+                            // Set to 0 initially, will be calculated when expired
+                            $bill_amount = 0;
+                        }
+                        
+                        // Calculate GST if enabled
+                        $customer = $this->customer->getcustomers(['t1.user_id' => $user['id']], 'single');
+                        $gst_enabled = !empty($customer) && !empty($customer['gst_enabled']) && $customer['gst_enabled'] == 1;
+                        if ($gst_enabled && $bill_amount > 0) {
+                            $gst_amount = round($bill_amount * 18 / 100, 2);
+                            $bill_amount = $bill_amount + $gst_amount;
+                        }
+                        
                         $data = array(
                             'user_id' => $user['id'],
                             'package_id' => $package_id,
                             'firm_id' => $firm_id,
                             'year' => $year,
                             'status' => 1,
+                            'expiry_date' => $expiry_date,
+                            'payment_status' => 0,
+                            'purchase_date' => $purchase_date,
+                            'bill_amount' => $bill_amount,
+                            'package_type' => $package_type,
                             'added_on' => $datetime,
                             'updated_on' => $datetime
                         );
@@ -1176,7 +1371,7 @@ class Services extends CI_Controller
                         }
                         $result = $this->db->insert("customer_packages", $data);
                         if ($result) {
-                            $this->session->set_flashdata("msg", "Accountancy Package Selected Successfully!");
+                            $this->session->set_flashdata("msg", "Accountancy Package Selected Successfully! Package expires on " . date('d-m-Y', strtotime($expiry_date)) . ".");
                         } else {
                             $error = $this->db->error();
                             $this->session->set_flashdata("err_msg", $error['message']);

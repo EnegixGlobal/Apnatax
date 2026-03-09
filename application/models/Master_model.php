@@ -239,6 +239,17 @@ class Master_model extends CI_Model
         return array('status' => true, 'message' => '');
     }
 
+    public function deletereqdocuments($service_id)
+    {
+        $where = array('service_id' => $service_id);
+        if ($this->db->delete('docs_required', $where)) {
+            return array("status" => true, "message" => "Required Documents Deleted Successfully!");
+        } else {
+            $error = $this->db->error();
+            return array("status" => false, "message" => $error['message']);
+        }
+    }
+
     public function addsalarypercent($data)
     {
         $status = TRUE;

@@ -471,6 +471,25 @@ function payment_state($pkg)
         opacity: .7;
     }
 
+    /* ── Account Work panel header ── */
+    .pkg-card-wrap .panel-header {
+        background: linear-gradient(135deg, #2c3e50 0%, #3a5068 100%);
+        padding: var(--spacing-md) var(--spacing-xl);
+        color: #fff;
+    }
+
+    .pkg-card-wrap .panel-header h5 {
+        margin: 0;
+        font-size: .95rem;
+        font-weight: 600;
+    }
+
+    .pkg-card-wrap .panel-header p {
+        margin: 4px 0 0;
+        font-size: .8rem;
+        opacity: .7;
+    }
+
     /* type-lock banner */
     #type-lock-banner {
         padding: 9px 20px;
@@ -548,6 +567,49 @@ function payment_state($pkg)
         border: 1px solid #dee2e6;
         min-width: 150px;
         background: #fff;
+    }
+
+    /* fix double dropdown arrow on form-select - aggressive fix */
+    select.form-select,
+    select#acct-pkg-select,
+    #acct-pkg-select.form-select,
+    #acct-pkg-select {
+        -webkit-appearance: none !important;
+        -moz-appearance: none !important;
+        appearance: none !important;
+        /* Ensure Bootstrap's arrow is the only one showing */
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23343a40' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e") !important;
+        background-repeat: no-repeat !important;
+        background-position: right 0.75rem center !important;
+        background-size: 16px 12px !important;
+        padding-right: 2.25rem !important;
+    }
+
+    /* Hide native arrow in IE/Edge */
+    select.form-select::-ms-expand,
+    select#acct-pkg-select::-ms-expand,
+    #acct-pkg-select::-ms-expand {
+        display: none !important;
+        opacity: 0 !important;
+        width: 0 !important;
+        height: 0 !important;
+    }
+
+    /* For WebKit browsers - ensure native arrow is hidden */
+    select.form-select::-webkit-inner-spin-button,
+    select.form-select::-webkit-outer-spin-button,
+    #acct-pkg-select::-webkit-inner-spin-button,
+    #acct-pkg-select::-webkit-outer-spin-button {
+        -webkit-appearance: none !important;
+        margin: 0 !important;
+    }
+
+    /* For form-select-sm specifically */
+    select.form-select-sm,
+    #acct-pkg-select.form-select-sm {
+        background-size: 16px 12px !important;
+        background-position: right 0.5rem center !important;
+        padding-right: 1.75rem !important;
     }
 
     .opt-select:disabled {
@@ -809,20 +871,35 @@ if (!empty($service_packages)) {
 
         <?php if (!empty($package)) :
             $acct_name = $package['package_id'] == 1 ? 'Accountancy Prime' : 'Accountancy Premium';
+            $expiry_ts = !empty($package['expiry_date']) ? strtotime($package['expiry_date']) : 0;
+            $is_expired = $expiry_ts && $expiry_ts <= time();
+            $is_unpaid = empty($package['payment_status']) || $package['payment_status'] == 0;
+            $pkg_type = !empty($package['package_type']) ? $package['package_type'] : 'Turnover';
+
+            // Determine status
+            if ($is_expired && $is_unpaid) {
+                $status_class = 'state-overdue';
+                $status_icon = 'fe-alert-circle';
+                $status_label = 'Expired – Renew';
+            } else {
+                $status_class = 'state-paid';
+                $status_icon = 'fe-check-circle';
+                $status_label = 'Active';
+            }
         ?>
             <!-- ── Already selected ── -->
-            <div class="acct-status-row">
+            <div class="acct-status-row" style="border-left-color: <?= $is_expired && $is_unpaid ? '#dc3545' : '#28a745' ?>;">
                 <div class="acct-status-body">
                     <div class="d-flex align-items-center flex-wrap gap-2 mb-2">
                         <span class="pkg-type-pill" style="background:#eaf7ee;color:#28a745;border:1px solid #28a74540">
                             <i class="fe fe-briefcase me-1" style="font-size:.68rem"></i>
                             <?= htmlspecialchars($acct_name) ?>
                         </span>
-                        <span class="state-pill state-paid">
-                            <i class="fe fe-check-circle"></i> Active
+                        <span class="state-pill <?= $status_class ?>">
+                            <i class="fe <?= $status_icon ?>"></i> <?= $status_label ?>
                         </span>
                         <span class="pkg-type-pill" style="background:#f0f9f1;color:#3a7d44;border:1px solid #b7e0be">
-                            <i class="fe fe-trending-up me-1" style="font-size:.68rem"></i>Turnover-Based
+                            <i class="fe fe-trending-up me-1" style="font-size:.68rem"></i><?= htmlspecialchars($pkg_type) ?>
                         </span>
                     </div>
                     <div class="d-flex flex-wrap gap-3" style="font-size:.82rem;color:#555;">
@@ -836,7 +913,32 @@ if (!empty($service_packages)) {
                                 Year: <strong><?= htmlspecialchars($package['year']) ?></strong>
                             </span>
                         <?php endif; ?>
+                        <?php if (!empty($package['expiry_date'])) : ?>
+                            <span class="<?= $is_expired && $is_unpaid ? 'text-danger fw-semibold' : '' ?>">
+                                <i class="fe fe-clock me-1 text-muted"></i>
+                                Expires: <strong><?= date('d M Y', $expiry_ts) ?></strong>
+                            </span>
+                        <?php endif; ?>
                     </div>
+                    <?php if ($is_expired && $is_unpaid) :
+                        $bill_amount = !empty($package['bill_amount']) ? (float)$package['bill_amount'] : 0;
+                    ?>
+                        <div class="mt-3 p-3 bg-light border" style="border-color:#dc3545!important;">
+                            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                <div>
+                                    <strong class="text-danger">Package Expired!</strong>
+                                    <div class="text-muted" style="font-size:.85rem;">
+                                        Bill amount: <strong>₹<?= number_format($bill_amount, 2) ?></strong>
+                                    </div>
+                                </div>
+                                <button class="btn btn-danger btn-sm renew-acct-work-btn"
+                                    data-pkg-id="<?= $package['id'] ?>"
+                                    data-amount="<?= $bill_amount ?>">
+                                    <i class="fe fe-credit-card me-1"></i>Renew & Pay
+                                </button>
+                            </div>
+                        </div>
+                    <?php endif; ?>
                 </div>
                 <div class="acct-status-icon">
                     <i class="fe fe-briefcase"></i>
@@ -1486,6 +1588,49 @@ if (!empty($service_packages)) {
                     }));
                 }
                 recalcTotal();
+            });
+
+            /* ── Account Work Renewal button AJAX ──────────────────────── */
+            $('body').on('click', '.renew-acct-work-btn', function() {
+                var btn = $(this);
+                var pkgId = btn.data('pkg-id');
+                var amount = parseFloat(btn.data('amount'));
+                var amtFmt = amount.toLocaleString('en-IN', {
+                    minimumFractionDigits: 2
+                });
+
+                if (!confirm('Renew Account Work package for ₹' + amtFmt + '?\n\nThis amount will be deducted from your wallet.')) {
+                    return false;
+                }
+
+                btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span>Processing…');
+
+                $.ajax({
+                    type: 'POST',
+                    url: '<?= base_url('services/renewpackage') ?>',
+                    data: {
+                        package_id: pkgId
+                    },
+                    dataType: 'json',
+                    success: function(r) {
+                        if (r.status) {
+                            alertify.success(r.message || 'Renewal successful!');
+                            setTimeout(function() {
+                                location.reload();
+                            }, 1800);
+                        } else {
+                            alertify.error(r.message || 'Renewal failed.');
+                            if (r.redirect) setTimeout(function() {
+                                location.href = r.redirect;
+                            }, 2500);
+                            btn.prop('disabled', false).html('<i class="fe fe-credit-card me-1"></i>Renew & Pay');
+                        }
+                    },
+                    error: function() {
+                        alertify.error('An error occurred. Please try again.');
+                        btn.prop('disabled', false).html('<i class="fe fe-credit-card me-1"></i>Renew & Pay');
+                    }
+                });
             });
 
             /* ── Pay Bill button AJAX ──────────────────────── */

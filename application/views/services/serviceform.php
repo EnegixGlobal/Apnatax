@@ -113,8 +113,15 @@ if ($order['status'] == 2) {
                         if (!$single['editable']) {
                             $attr['readonly'] = 'true';
                         }
+                        // Add accept attribute for file inputs to restrict to PDF, JPG, JPEG, PNG
+                        if ($type == 'file') {
+                            $attr['accept'] = '.pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/jpg,image/png';
+                        }
                         echo create_form_input($type, $name, $label, true, $value, $attr);
-
+                        // Add help text for file inputs
+                        if ($type == 'file') {
+                            echo '<small class="text-muted d-block mt-1"><i class="fa fa-info-circle"></i> Allowed formats: PDF, JPG, JPEG, PNG</small>';
+                        }
                         ?>
                     </div>
                 </div>
