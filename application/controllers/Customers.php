@@ -462,17 +462,47 @@ class Customers extends CI_Controller
         $data['datatable'] = true;
 
         // Check if request column exists in service_packages table
-        $check_column = $this->db->query("SHOW COLUMNS FROM `tf_service_packages` LIKE 'request'");
-        if ($check_column->num_rows() == 0) {
+        $check_column_service = $this->db->query("SHOW COLUMNS FROM `tf_service_packages` LIKE 'request'");
+        $check_column_customer = $this->db->query("SHOW COLUMNS FROM `tf_customer_packages` LIKE 'request'");
+        
+        if ($check_column_service->num_rows() == 0 && $check_column_customer->num_rows() == 0) {
             // Column doesn't exist, show message to run migration
             $data['packages'] = array();
+            $data['accountancy_packages'] = array();
             $data['migration_needed'] = true;
         } else {
-            // Only filter by request, not status (service_packages table doesn't have status column)
-            $where = array('t1.request' => 1);
-            $data['packages'] = $this->customer->getservicepackage($where);
-            if ($data['packages'] === false || $data['packages'] === null) {
+            // Fetch service packages with delete requests
+            if ($check_column_service->num_rows() > 0) {
+                $where = array('t1.request' => 1);
+                $data['packages'] = $this->customer->getservicepackage($where);
+                if ($data['packages'] === false || $data['packages'] === null) {
+                    $data['packages'] = array();
+                }
+            } else {
                 $data['packages'] = array();
+            }
+
+            // Fetch Account Work packages (customer_packages) with delete requests
+            if ($check_column_customer->num_rows() > 0) {
+                $this->db->select('cp.*, u.name, f.name as firm_name');
+                $this->db->from('customer_packages cp');
+                $this->db->join('users u', 'u.id = cp.user_id', 'left');
+                $this->db->join('firms f', 'f.id = cp.firm_id', 'left');
+                $this->db->where('cp.request', 1);
+                $this->db->where('cp.status', 1);
+                $accountancy_packages = $this->db->get()->result_array();
+                
+                // Format package name
+                if (!empty($accountancy_packages)) {
+                    foreach ($accountancy_packages as $key => $pkg) {
+                        $package_name = $pkg['package_id'] == 1 ? 'Accountancy Prime' : 'Accountancy Premium';
+                        $package_type = !empty($pkg['package_type']) ? $pkg['package_type'] : 'Turnover';
+                        $accountancy_packages[$key]['package'] = $package_name . ' (' . $package_type . ')';
+                    }
+                }
+                $data['accountancy_packages'] = !empty($accountancy_packages) ? $accountancy_packages : array();
+            } else {
+                $data['accountancy_packages'] = array();
             }
         }
         $this->template->load('customer', 'packagedeleterequests', $data);
@@ -570,27 +600,61 @@ class Customers extends CI_Controller
     {
         $id = $this->input->post('id');
         $status = $this->input->post('status');
-        // Only filter by request, not status (service_packages table doesn't have status column)
-        $package = $this->customer->getservicepackage(["md5(concat('package-id-',t1.id))" => $id, 't1.request' => 1], 'single');
-        if (!empty($package)) {
-            $message = $status == 1 ? "Package Deleted Successfully" : "Package Delete Request Rejected!";
-            $request = $status == 1 ? 1 : 2;
+        $package_type = $this->input->post('package_type'); // 'service' or 'accountancy'
+        
+        $is_account_work = ($package_type === 'accountancy');
+        
+        if ($is_account_work) {
+            // Handle Account Work packages (customer_packages)
+            $package = $this->db->get_where(
+                'customer_packages',
+                ["md5(concat('package-id-',id))" => $id, 'request' => 1, 'status' => 1]
+            )->unbuffered_row('array');
+            
+            if (!empty($package)) {
+                $message = $status == 1 ? "Account Work Package Deleted Successfully" : "Account Work Package Delete Request Rejected!";
+                $request = $status == 1 ? 1 : 2;
 
-            if ($status == 1) {
-                // Approve: Delete the package record
-                logupdateoperations('service_packages', ['request' => $request], ['id' => $package['id']]);
-                $result = $this->db->delete('service_packages', ['id' => $package['id']]);
-            } else {
-                // Reject: Just update request to 2
-                logupdateoperations('service_packages', ['request' => $request], ['id' => $package['id']]);
-                $result = $this->db->update('service_packages', ['request' => $request], ['id' => $package['id']]);
+                if ($status == 1) {
+                    // Approve: Delete the package (set status to 0)
+                    logupdateoperations('customer_packages', ['request' => $request, 'status' => 0], ['id' => $package['id']]);
+                    $result = $this->db->update('customer_packages', ['request' => $request, 'status' => 0], ['id' => $package['id']]);
+                } else {
+                    // Reject: Just update request to 2
+                    logupdateoperations('customer_packages', ['request' => $request], ['id' => $package['id']]);
+                    $result = $this->db->update('customer_packages', ['request' => $request], ['id' => $package['id']]);
+                }
+
+                if ($result) {
+                    $this->session->set_flashdata("msg", $message);
+                } else {
+                    $error = $this->db->error();
+                    $this->session->set_flashdata("err_msg", $error['message']);
+                }
             }
+        } else {
+            // Handle regular service packages (service_packages)
+            $package = $this->customer->getservicepackage(["md5(concat('package-id-',t1.id))" => $id, 't1.request' => 1], 'single');
+            if (!empty($package)) {
+                $message = $status == 1 ? "Package Deleted Successfully" : "Package Delete Request Rejected!";
+                $request = $status == 1 ? 1 : 2;
 
-            if ($result) {
-                $this->session->set_flashdata("msg", $message);
-            } else {
-                $error = $this->db->error();
-                $this->session->set_flashdata("err_msg", $error['message']);
+                if ($status == 1) {
+                    // Approve: Delete the package record
+                    logupdateoperations('service_packages', ['request' => $request], ['id' => $package['id']]);
+                    $result = $this->db->delete('service_packages', ['id' => $package['id']]);
+                } else {
+                    // Reject: Just update request to 2
+                    logupdateoperations('service_packages', ['request' => $request], ['id' => $package['id']]);
+                    $result = $this->db->update('service_packages', ['request' => $request], ['id' => $package['id']]);
+                }
+
+                if ($result) {
+                    $this->session->set_flashdata("msg", $message);
+                } else {
+                    $error = $this->db->error();
+                    $this->session->set_flashdata("err_msg", $error['message']);
+                }
             }
         }
     }

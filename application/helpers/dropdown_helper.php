@@ -172,6 +172,60 @@
         }
     }
 
+    /**
+     * Get GST rate from admin settings
+     * Uses Master_model->getgstrates() if available, otherwise checks tables directly
+     * Defaults to 18% if not configured
+     * 
+     * @return float GST rate percentage (e.g., 18.0)
+     */
+    if(!function_exists('get_gst_rate')){
+        function get_gst_rate() {
+            $CI =& get_instance();
+            
+            // Try to use Master_model->getgstrates() method if available
+            $CI->load->model('Master_model', 'master');
+            if (method_exists($CI->master, 'getgstrates')) {
+                $gstrates = $CI->master->getgstrates(array('status' => 1), 'single');
+                if (!empty($gstrates) && !empty($gstrates['gst_rate'])) {
+                    return (float)$gstrates['gst_rate'];
+                }
+            }
+            
+            // Try to get GST rate from gst_rates table directly (if exists and has active rate)
+            if ($CI->db->table_exists('gst_rates')) {
+                $gst_query = $CI->db->select('gst_rate')
+                    ->where('status', 1)
+                    ->order_by('id', 'DESC')
+                    ->limit(1)
+                    ->get('gst_rates');
+                if ($gst_query->num_rows() > 0) {
+                    $gst = $gst_query->row_array();
+                    if (!empty($gst['gst_rate'])) {
+                        return (float)$gst['gst_rate'];
+                    }
+                }
+            }
+            
+            // Try to get GST rate from settings table (if exists)
+            // Admin can create a settings table with key='gst_rate' and value='18' (or any configured value)
+            if ($CI->db->table_exists('settings')) {
+                $settings_query = $CI->db->get_where('settings', array('key' => 'gst_rate'), 1);
+                if ($settings_query->num_rows() > 0) {
+                    $setting = $settings_query->row_array();
+                    $gst_rate = !empty($setting['value']) ? (float)$setting['value'] : 18.0;
+                    return $gst_rate;
+                }
+            }
+            
+            // Default GST rate (can be changed by admin in settings)
+            // Admin can configure this by:
+            // 1. Creating a gst_rates table with status=1 and gst_rate column
+            // 2. Creating a settings table with key='gst_rate' and value='18' (or desired rate)
+            return 18.0;
+        }
+    }
+
     if(!function_exists('unit_dropdown')){
         function unit_dropdown($where){
             $CI = get_instance();

@@ -594,4 +594,58 @@ class Package extends CI_Controller
         }
         redirect($_SERVER['HTTP_REFERER']);
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // REQUEST DELETE ACCOUNT WORK PACKAGE
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public function requestdeleteaccountwork()
+    {
+        // Check column exists
+        if ($this->db->query("SHOW COLUMNS FROM `tf_customer_packages` LIKE 'request'")->num_rows() == 0) {
+            $this->session->set_flashdata("err_msg", "Delete request feature is not available. Please contact administrator.");
+            redirect($_SERVER['HTTP_REFERER']);
+            return;
+        }
+
+        $user    = getuser();
+        $firm_id = $this->session->firm;
+        $year    = $this->session->year;
+
+        // Support deleting a specific package_id via POST, or fall back to first for firm/year
+        $package_id = (int)$this->input->post('package_id');
+
+        if ($package_id > 0) {
+            $account_work_package = $this->db->get_where(
+                'customer_packages',
+                ['id' => $package_id, 'user_id' => $user['id'], 'firm_id' => $firm_id, 'year' => $year, 'status' => 1]
+            )->unbuffered_row('array');
+        } else {
+            $account_work_package = $this->db->get_where(
+                'customer_packages',
+                ['user_id' => $user['id'], 'firm_id' => $firm_id, 'year' => $year, 'status' => 1]
+            )->unbuffered_row('array');
+        }
+
+        if (!empty($account_work_package)) {
+            if (!isset($account_work_package['request'])) {
+                $account_work_package['request'] = 0;
+            }
+            if ($account_work_package['request'] == 0 || $account_work_package['request'] == 2) {
+                if ($this->db->update('customer_packages', ['request' => 1], ['id' => $account_work_package['id']])) {
+                    $msg = $account_work_package['request'] == 2
+                        ? "Account Work Package Delete Request Resubmitted! Admin will review your request."
+                        : "Account Work Package Delete Request Saved! Admin will review your request.";
+                    $this->session->set_flashdata("msg", $msg);
+                } else {
+                    $this->session->set_flashdata("err_msg", "Failed to save delete request!");
+                }
+            } else {
+                $this->session->set_flashdata("err_msg", "Delete Request already submitted!");
+            }
+        } else {
+            $this->session->set_flashdata("err_msg", "Account Work Package not found!");
+        }
+        redirect($_SERVER['HTTP_REFERER']);
+    }
 }

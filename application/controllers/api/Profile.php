@@ -231,7 +231,7 @@ class Profile extends RestController
                     ], RestController::HTTP_OK);
                     return;
                 }
-                
+
                 // Aadhar is now optional - validate only if provided
                 $checkaadhar = true; // Default to true (optional)
                 if (!empty($aadhar)) {
@@ -244,25 +244,25 @@ class Profile extends RestController
                         return;
                     }
                 }
-                
+
                 if ($checkaadhar && $checkpan) {
                     $data = array("user_id" => $user['id'], "pan" => $pan);
-                    
+
                     // Add firm_id if provided
                     if (!empty($firm_id)) {
                         $data['firm_id'] = (int)$firm_id;
                     }
-                    
+
                     // Add aadhar only if provided
                     if (!empty($aadhar)) {
                         $data['aadhar'] = $aadhar;
                     }
-                    
+
                     $status = true;
                     $message = array();
                     $upload_path = './assets/images/profile/kyc/';
                     $allowed_types = 'gif|jpg|jpeg|png|svg';
-                    
+
                     // PAN image (required)
                     $upload = upload_file('pan_image', $upload_path, $allowed_types, generate_slug($user['name'] . '-pan-' . ($firm_id ? $firm_id : 'user')));
                     if ($upload['status'] === true) {
@@ -271,7 +271,7 @@ class Profile extends RestController
                         $status = false;
                         $message[] = "PAN- " . trim($upload['msg']);
                     }
-                    
+
                     // Aadhar images (optional - only upload if provided)
                     if (!empty($_FILES['aadhar_image']['name'])) {
                         $upload = upload_file('aadhar_image', $upload_path, $allowed_types, generate_slug($user['name'] . '-aadhar-' . ($firm_id ? $firm_id : 'user')));
@@ -282,7 +282,7 @@ class Profile extends RestController
                             $message[] = "Aadhar Front- " . trim($upload['msg']);
                         }
                     }
-                    
+
                     if (!empty($_FILES['aadhar_back']['name'])) {
                         $upload = upload_file('aadhar_back', $upload_path, $allowed_types, generate_slug($user['name'] . '-aadhar-back-' . ($firm_id ? $firm_id : 'user')));
                         if ($upload['status'] === true) {
@@ -580,84 +580,125 @@ class Profile extends RestController
                     if (!empty($services)) {
                         // Process service options - convert to JSON if provided
                         $service_option_ids_json = NULL;
+                        $service_option_ids_map = array();
                         if (!empty($service_option_ids)) {
                             // If it's already a JSON string, validate it; otherwise try to decode
                             if (is_string($service_option_ids)) {
                                 $decoded = json_decode($service_option_ids, true);
                                 if (json_last_error() === JSON_ERROR_NONE) {
                                     $service_option_ids_json = $service_option_ids;
+                                    $service_option_ids_map = $decoded;
                                 } else {
                                     // If not valid JSON, try to parse as array
                                     $service_option_ids_json = json_encode($service_option_ids);
+                                    $service_option_ids_map = is_array($service_option_ids) ? $service_option_ids : array();
                                 }
                             } else {
                                 $service_option_ids_json = json_encode($service_option_ids);
+                                $service_option_ids_map = is_array($service_option_ids) ? $service_option_ids : array();
                             }
                         }
 
+                        // ── Determine package_type from services ─────────────────────────────
+                        $type_groups = array();
+                        foreach ($services as $svc) {
+                            $types = array_map('trim', explode(',', $svc['type']));
+                            // Primary type: Yearly > Quarterly > Monthly > Once
+                            $primary = 'Yearly';
+                            if (in_array('Once',      $types)) $primary = 'Once';
+                            if (in_array('Monthly',   $types)) $primary = 'Monthly';
+                            if (in_array('Quarterly', $types)) $primary = 'Quarterly';
+                            if (in_array('Yearly',    $types)) $primary = 'Yearly';
+                            $type_groups[$primary][] = $svc['name'];
+                        }
+                        $package_type = !empty($type_groups) ? array_key_first($type_groups) : 'Yearly';
+
+                        // ── Calculate bill amount ────────────────────────────────────────────
+                        $subtotal = 0.0;
+                        foreach ($services as $svc) {
+                            $rate = isset($svc['rate']) ? (float)$svc['rate'] : 0.0;
+                            // If service has options and an option was chosen, use option rate
+                            if (!empty($service_option_ids_map[$svc['id']])) {
+                                $opt = $this->master->getserviceoptions(['id' => $service_option_ids_map[$svc['id']], 'status' => 1], 'single');
+                                if (!empty($opt['rate'])) $rate = (float)$opt['rate'];
+                            }
+                            $subtotal += $rate;
+                        }
+                        $customer = $this->customer->getcustomers(['t1.user_id' => $user['id']], 'single');
+                        $gst_enabled = !empty($customer) && !empty($customer['gst_enabled']) && $customer['gst_enabled'] == 1;
+                        $this->load->helper('dropdown');
+                        $gst_rate = $gst_enabled ? get_gst_rate() : 0.0;
+                        $gst_amount = $gst_enabled ? round($subtotal * $gst_rate / 100, 2) : 0.0;
+                        $total = $subtotal + $gst_amount;
+
+                        // ── Calculate expiry date ────────────────────────────────────────────
+                        $purchase_date = date('Y-m-d');
+                        $pts = strtotime($purchase_date);
+                        $expiry_date = null;
+
+                        switch ($package_type) {
+                            case 'Monthly':
+                                $expiry_date = date('Y-m-d', strtotime('+1 month', $pts));
+                                break;
+                            case 'Quarterly':
+                                $expiry_date = date('Y-m-d', strtotime('+3 months', $pts));
+                                break;
+                            case 'Once':
+                                $expiry_date = date('Y-m-d', strtotime('+1 year', $pts));
+                                break;
+                            case 'Yearly':
+                            default:
+                                $earliest = null;
+                                foreach ($services as $svc) {
+                                    if (empty($svc['debit_date'])) continue;
+                                    $dm = (int)date('m', strtotime($svc['debit_date']));
+                                    $dd = (int)date('d', strtotime($svc['debit_date']));
+                                    $cy = (int)date('Y', $pts);
+
+                                    // Build candidate date in current year
+                                    $candidate = sprintf('%04d-%02d-%02d', $cy, $dm, $dd);
+                                    if (strtotime($candidate) <= $pts) {
+                                        // Already passed this year → use next year
+                                        $candidate = sprintf('%04d-%02d-%02d', $cy + 1, $dm, $dd);
+                                    }
+                                    if ($earliest === null || strtotime($candidate) < strtotime($earliest)) {
+                                        $earliest = $candidate;
+                                    }
+                                }
+                                $expiry_date = $earliest !== null ? $earliest : date('Y-m-d', strtotime('+1 year', $pts));
+                                break;
+                        }
+
+                        // ── Prepare package data ────────────────────────────────────────────
                         $data = array(
                             'user_id' => $user['id'],
                             'firm_id' => $firm_id,
                             'year' => $year,
                             'service_ids' => $service_ids,
-                            'service_option_ids' => $service_option_ids_json
+                            'service_option_ids' => $service_option_ids_json,
+                            'package_type' => $package_type,
+                            'purchase_date' => $purchase_date,
+                            'expiry_date' => $expiry_date,
+                            'payment_status' => 0,   // bill generated, not yet deducted
+                            'bill_amount' => $total,
                         );
                         $result = $this->customer->createpackage($data);
                         if ($result['status'] === true) {
-                            // Generate invoice for service package creation
-                            $invoice_no = '';
-                            $invoice_id = 0;
-                            try {
-                                // Calculate total from service rates
-                                $subtotal = 0;
-                                $service_names = [];
-                                foreach ($services as $svc) {
-                                    if (!empty($svc['rate']) && is_numeric($svc['rate'])) {
-                                        $subtotal += floatval($svc['rate']);
-                                    }
-                                    $service_names[] = $svc['name'];
-                                }
-                                // Only generate invoice if there is an amount
-                                if ($subtotal > 0) {
-                                    $this->load->model('Customer_model', 'customer_inv');
-                                    $customer = $this->customer->getcustomers(['t1.user_id' => $user['id']], 'single');
-                                    $gst_enabled = !empty($customer) && !empty($customer['gst_enabled']) && $customer['gst_enabled'] == 1;
-                                    $gst_amount  = $gst_enabled ? round(($subtotal * 18) / 100, 2) : 0;
-                                    $total_amount = $subtotal + $gst_amount;
-
-                                    $this->load->model('Invoice_model', 'invoice_model');
-                                    $inv_data = [
-                                        'user_id'        => $user['id'],
-                                        'firm_id'        => $firm_id,
-                                        'year'           => $year,
-                                        'invoice_date'   => date('Y-m-d'),
-                                        'billing_name'   => $user['name'],
-                                        'billing_email'  => !empty($user['email']) ? $user['email'] : '',
-                                        'billing_mobile' => !empty($user['mobile']) ? $user['mobile'] : '',
-                                        'firm_name'      => !empty($firm['name']) ? $firm['name'] : '',
-                                        'firm_gstin'     => !empty($firm['gstin']) ? $firm['gstin'] : '',
-                                        'service_name'   => implode(', ', $service_names),
-                                        'type'           => 'Yearly',
-                                        'period'         => $year,
-                                        'subtotal'       => $subtotal,
-                                        'gst_rate'       => $gst_enabled ? 18 : 0,
-                                        'gst_amount'     => $gst_amount,
-                                        'total_amount'   => $total_amount,
-                                    ];
-                                    $inv_result = $this->invoice_model->create_custom_invoice($inv_data);
-                                    if ($inv_result['status'] && !empty($inv_result['invoice'])) {
-                                        $invoice_no = $inv_result['invoice']['invoice_no'];
-                                        $invoice_id = (int)$inv_result['invoice']['id'];
-                                    }
-                                }
-                            } catch (Exception $e) {
-                                // Invoice generation failure should not block package save
+                            // No invoice at purchase time — invoice is only generated when the
+                            // package expires and gets renewed (auto or manual).
+                            // Use already calculated values
+                            $message = $result['message'] . ' | ₹' . number_format($total, 2) .
+                                ' will be billed when the package expires';
+                            if ($expiry_date) {
+                                $message .= ' on ' . date('d-m-Y', strtotime($expiry_date));
                             }
+                            $message .= '.';
+
                             $this->response([
                                 'status'     => true,
-                                'message'    => $result['message'],
-                                'invoice_no' => $invoice_no,
-                                'invoice_id' => $invoice_id,
+                                'message'    => $message,
+                                'bill_amount' => $total,
+                                'expiry_date' => $expiry_date,
                             ], RestController::HTTP_OK);
                         } else {
                             $this->response([
@@ -736,13 +777,118 @@ class Profile extends RestController
         }
     }
 
+    public function getservicepackages_post()
+    {
+        $token = $this->post('token');
+        $firm_id = $this->post('firm_id'); // Optional: filter by firm
+        $year = $this->post('year'); // Optional: filter by year
+
+        if (!empty($token)) {
+            $user = $this->account->verify_token($token);
+            if (!empty($user) && is_array($user) && $user['role'] == 'customer') {
+                $where = array('t1.user_id' => $user['id']);
+                if (!empty($firm_id)) {
+                    $where['t1.firm_id'] = $firm_id;
+                }
+                if (!empty($year)) {
+                    $where['t1.year'] = $year;
+                }
+
+                $packages = $this->customer->getservicepackage($where, 'all');
+
+                if (!empty($packages)) {
+                    // Get all services for resolving service names
+                    $all_services = $this->master->getservices(['status' => 1]);
+                    $services_map = array();
+                    foreach ($all_services as $svc) {
+                        $services_map[$svc['id']] = $svc;
+                    }
+
+                    // Enrich packages with service details
+                    foreach ($packages as &$pkg) {
+                        $service_ids = !empty($pkg['service_ids']) ? array_filter(array_map('trim', explode(',', $pkg['service_ids']))) : [];
+                        $pkg_services = array();
+                        $opt_ids_map = array();
+
+                        if (!empty($pkg['service_option_ids'])) {
+                            $opt_ids_map = json_decode($pkg['service_option_ids'], true) ?: array();
+                        }
+
+                        foreach ($service_ids as $sid) {
+                            if (isset($services_map[$sid])) {
+                                $svc = $services_map[$sid];
+                                $svc_data = array(
+                                    'id' => $svc['id'],
+                                    'name' => $svc['name'],
+                                    'rate' => $svc['rate'],
+                                    'service_for' => $svc['service_for'] ?? '',
+                                    'debit_date' => $svc['debit_date'] ?? '',
+                                    'type' => $svc['type'] ?? '',
+                                );
+
+                                // Add option details if exists
+                                if (!empty($opt_ids_map[$sid])) {
+                                    $opt = $this->master->getserviceoptions(['id' => $opt_ids_map[$sid], 'status' => 1], 'single');
+                                    if (!empty($opt)) {
+                                        $svc_data['option_id'] = $opt['id'];
+                                        $svc_data['option_name'] = $opt['display_name'];
+                                        $svc_data['option_rate'] = $opt['rate'];
+                                        $svc_data['rate'] = $opt['rate']; // Use option rate
+                                    }
+                                }
+
+                                $pkg_services[] = $svc_data;
+                            }
+                        }
+
+                        $pkg['services'] = $pkg_services;
+
+                        // Calculate days until expiry
+                        $expiry_ts = !empty($pkg['expiry_date']) ? strtotime($pkg['expiry_date']) : 0;
+                        $is_expired = $expiry_ts && $expiry_ts <= time();
+                        $pkg['is_expired'] = $is_expired;
+                        if ($expiry_ts) {
+                            $days = (int)ceil(($expiry_ts - time()) / 86400);
+                            $pkg['days_until_expiry'] = $days;
+                            $pkg['days_text'] = $days > 0
+                                ? "Expires in $days day" . ($days > 1 ? 's' : '')
+                                : abs($days) . ' day' . (abs($days) != 1 ? 's' : '') . ' overdue';
+                        }
+                    }
+
+                    $this->response([
+                        'status' => true,
+                        'packages' => $packages
+                    ], RestController::HTTP_OK);
+                } else {
+                    $this->response([
+                        'status' => true,
+                        'packages' => array(),
+                        'message' => 'No packages found'
+                    ], RestController::HTTP_OK);
+                }
+            } else {
+                $this->response([
+                    'status' => false,
+                    'message' => "Unauthorized Access!"
+                ], RestController::HTTP_OK);
+            }
+        } else {
+            $this->response([
+                'status' => false,
+                'message' => "Please provide all Details!"
+            ], RestController::HTTP_OK);
+        }
+    }
+
     public function requestpackagedelete_post()
     {
         $token = $this->post('token');
         $firm_id = $this->post('firm_id');
         $year = $this->post('year');
+        $package_id = (int)$this->post('package_id');
 
-        if (!empty($token) && !empty($firm_id) && !empty($year)) {
+        if (!empty($token) && (!empty($package_id) || (!empty($firm_id) && !empty($year)))) {
             $user = $this->account->verify_token($token);
             if (!empty($user) && is_array($user) && $user['role'] == 'customer') {
                 // Check if request column exists
@@ -755,8 +901,17 @@ class Profile extends RestController
                     return;
                 }
 
-                $where = array('t1.user_id' => $user['id'], 't1.firm_id' => $firm_id, 't1.year' => $year);
-                $service_package = $this->customer->getservicepackage($where, 'single');
+                // Support deleting a specific package_id via POST, or fall back to first for firm/year
+                if ($package_id > 0) {
+                    $service_package = $this->db->get_where(
+                        'service_packages',
+                        ['id' => $package_id, 'user_id' => $user['id']]
+                    )->unbuffered_row('array');
+                } else {
+                    $where = array('t1.user_id' => $user['id'], 't1.firm_id' => $firm_id, 't1.year' => $year);
+                    $service_package = $this->customer->getservicepackage($where, 'single');
+                }
+
                 if (!empty($service_package)) {
                     // Check if request field exists in the result
                     if (!isset($service_package['request'])) {
@@ -786,6 +941,84 @@ class Profile extends RestController
                     $this->response([
                         'status' => false,
                         'message' => "Package not found!"
+                    ], RestController::HTTP_OK);
+                }
+            } else {
+                $this->response([
+                    'status' => false,
+                    'message' => "Unauthorized Access!"
+                ], RestController::HTTP_OK);
+            }
+        } else {
+            $this->response([
+                'status' => false,
+                'message' => "Please provide all Details!"
+            ], RestController::HTTP_OK);
+        }
+    }
+
+    public function requestdeleteaccountwork_post()
+    {
+        $token = $this->post('token');
+        $package_id = (int)$this->post('package_id');
+        $firm_id = $this->post('firm_id');
+        $year = $this->post('year');
+
+        if (!empty($token) && (!empty($package_id) || (!empty($firm_id) && !empty($year)))) {
+            $user = $this->account->verify_token($token);
+            if (!empty($user) && is_array($user) && $user['role'] == 'customer') {
+                // Check if request column exists
+                $check_column = $this->db->query("SHOW COLUMNS FROM `tf_customer_packages` LIKE 'request'");
+                if ($check_column->num_rows() == 0) {
+                    $this->response([
+                        'status' => false,
+                        'message' => "Delete request feature is not available. Please contact administrator."
+                    ], RestController::HTTP_OK);
+                    return;
+                }
+
+                // Support deleting a specific package_id via POST, or fall back to first for firm/year
+                if ($package_id > 0) {
+                    $account_work_package = $this->db->get_where(
+                        'customer_packages',
+                        ['id' => $package_id, 'user_id' => $user['id'], 'status' => 1]
+                    )->unbuffered_row('array');
+                } else {
+                    $account_work_package = $this->db->get_where(
+                        'customer_packages',
+                        ['user_id' => $user['id'], 'firm_id' => $firm_id, 'year' => $year, 'status' => 1]
+                    )->unbuffered_row('array');
+                }
+
+                if (!empty($account_work_package)) {
+                    // Check if request field exists in the result
+                    if (!isset($account_work_package['request'])) {
+                        $account_work_package['request'] = 0;
+                    }
+                    // Allow request if no request (0) or if rejected (2) - can re-request after rejection
+                    if ($account_work_package['request'] == 0 || $account_work_package['request'] == 2) {
+                        if ($this->db->update('customer_packages', ['request' => 1], ['id' => $account_work_package['id']])) {
+                            $message = $account_work_package['request'] == 2 ? "Account Work Package Delete Request Resubmitted! Admin will review your request." : "Account Work Package Delete Request Saved! Admin will review your request.";
+                            $this->response([
+                                'status' => true,
+                                'message' => $message
+                            ], RestController::HTTP_OK);
+                        } else {
+                            $this->response([
+                                'status' => false,
+                                'message' => "Failed to save delete request!"
+                            ], RestController::HTTP_OK);
+                        }
+                    } else {
+                        $this->response([
+                            'status' => false,
+                            'message' => "Delete Request already submitted!"
+                        ], RestController::HTTP_OK);
+                    }
+                } else {
+                    $this->response([
+                        'status' => false,
+                        'message' => "Account Work Package not found!"
                     ], RestController::HTTP_OK);
                 }
             } else {
@@ -838,6 +1071,461 @@ class Profile extends RestController
                 'status' => false,
                 'message' => "Please provide all Details!"
             ], RestController::HTTP_OK);
+        }
+    }
+
+    /**
+     * Trigger auto-renewal for expired packages
+     * Checks wallet balance and auto-renews if sufficient, otherwise leaves for manual renewal
+     */
+    public function triggerautorenew_post()
+    {
+        $token = $this->post('token');
+
+        if (!empty($token)) {
+            $user = $this->account->verify_token($token);
+            if (!empty($user) && is_array($user) && $user['role'] == 'customer') {
+                try {
+                    // Load required models
+                    $this->load->model('Wallet_model', 'wallet');
+                    $this->load->model('Master_model', 'master');
+                    $this->load->model('Customer_model', 'customer');
+                    $this->load->model('Invoice_model', 'invoice');
+
+                    $today = date('Y-m-d');
+                    $renewed_packages = [];
+                    $renewed_account_work = [];
+                    $insufficient_balance = [];
+
+                    // ── Auto-renew expired service packages ─────────────────────────
+                    $expired = $this->db->query(
+                        "SELECT sp.*, u.name AS user_name
+                         FROM {$this->db->dbprefix('service_packages')} sp
+                         JOIN {$this->db->dbprefix('users')} u ON u.id = sp.user_id
+                         WHERE sp.expiry_date <= '{$today}'
+                           AND sp.payment_status = 0
+                           AND sp.user_id = {$user['id']}"
+                    )->result_array();
+
+                    foreach ($expired as $pkg) {
+                        try {
+                            $user_id    = $pkg['user_id'];
+                            $firm_id    = $pkg['firm_id'];
+                            $year       = $pkg['year'];
+                            $bill       = (float)($pkg['bill_amount'] ?? 0);
+                            $pkg_type   = !empty($pkg['package_type']) ? $pkg['package_type'] : 'Yearly';
+
+                            if ($bill <= 0) continue;
+
+                            // ── Resolve services in the package ────────────────────────────
+                            $s_ids = array_filter(array_map('trim', explode(',', $pkg['service_ids'] ?? '')));
+                            if (empty($s_ids)) continue;
+
+                            $services = $this->master->getservices(
+                                "status='1' AND id IN ('" . implode("','", $s_ids) . "')"
+                            );
+                            if (empty($services)) continue;
+
+                            // ── Check customer GST setting ──────────────────────────────────
+                            $customer = $this->customer->getcustomers(['t1.user_id' => $user_id], 'single');
+                            $gst_enabled = !empty($customer) && !empty($customer['gst_enabled']) && $customer['gst_enabled'] == 1;
+
+                            // For service packages, bill_amount is already total (subtotal + GST included)
+                            // So use bill_amount directly as total_amount
+                            $total_amount = $bill;
+
+                            // Check wallet balance against total amount
+                            $balance = $this->wallet->getwalletbalance($user_id);
+                            if ($balance < $total_amount) {
+                                // Not enough balance — leave for manual renewal
+                                $insufficient_balance[] = [
+                                    'type' => 'service_package',
+                                    'package_id' => $pkg['id'],
+                                    'bill_amount' => $bill, // Total amount (already includes GST)
+                                    'total_amount' => $total_amount,
+                                    'wallet_balance' => $balance,
+                                    'needed' => $total_amount - $balance
+                                ];
+                                continue;
+                            }
+
+                            // ── Create a purchase row per service (deducts from wallet) ────
+                            $opt_data = [];
+                            if (!empty($pkg['service_option_ids'])) {
+                                $opt_data = json_decode($pkg['service_option_ids'], true) ?: [];
+                            }
+                            $datetime = date('Y-m-d H:i:s');
+
+                            // Calculate total base rate (sum of all service rates) for GST distribution
+                            $total_base_rate = 0;
+                            $service_rates = [];
+                            foreach ($services as $svc) {
+                                $rate = (float)$svc['rate'];
+                                if (!empty($opt_data[$svc['id']])) {
+                                    $opt = $this->master->getserviceoptions(
+                                        ['id' => $opt_data[$svc['id']], 'status' => 1],
+                                        'single'
+                                    );
+                                    if (!empty($opt['rate'])) $rate = (float)$opt['rate'];
+                                }
+                                $service_rates[$svc['id']] = $rate;
+                                $total_base_rate += $rate;
+                            }
+
+                            // Calculate GST amounts if enabled
+                            $total_gst = 0;
+                            if ($gst_enabled && $total_base_rate > 0) {
+                                // bill_amount is total (subtotal + GST), extract subtotal and GST
+                                $this->load->helper('dropdown');
+                                $gst_rate = get_gst_rate();
+                                $gst_divisor = 1 + ($gst_rate / 100); // e.g., 1.18 for 18% GST
+                                $subtotal_from_bill = round($bill / $gst_divisor, 2);
+                                $total_gst = round($bill - $subtotal_from_bill, 2);
+                            }
+
+                            foreach ($services as $svc) {
+                                $rate = $service_rates[$svc['id']];
+                                $subtotal = $rate;
+                                $gst_amount = 0;
+
+                                // Distribute GST proportionally across services
+                                if ($gst_enabled && $total_base_rate > 0 && $total_gst > 0) {
+                                    $gst_amount = round(($rate / $total_base_rate) * $total_gst, 2);
+                                }
+
+                                $amount = $subtotal + $gst_amount;
+
+                                $this->db->insert('purchases', [
+                                    'date'       => $today,
+                                    'year'       => $year,
+                                    'type'       => $pkg_type,
+                                    'user_id'    => $user_id,
+                                    'service_id' => $svc['id'],
+                                    'firm_id'    => $firm_id,
+                                    'service'    => $svc['name'] . ' (Package Auto-Renew)',
+                                    'rate'       => $rate,
+                                    'subtotal'   => $subtotal,
+                                    'gst_amount' => $gst_amount,
+                                    'gst_enabled' => $gst_enabled ? 1 : 0,
+                                    'amount'     => $amount,
+                                    'status'     => 0,
+                                    'added_on'   => $datetime,
+                                    'updated_on' => $datetime,
+                                ]);
+                            }
+
+                            // ── Calculate new expiry ───────────────────────────────────────
+                            $new_expiry = $this->_nextExpiry($pkg_type, $today);
+
+                            // ── Update expiry (keep payment_status=0 so next expiry triggers renewal again)
+                            $this->db->update('service_packages', [
+                                'payment_status' => 0,
+                                'purchase_date'  => $today,
+                                'expiry_date'    => $new_expiry,
+                                'updated_on'     => $datetime,
+                            ], ['id' => $pkg['id']]);
+
+                            // ── Generate invoice ───────────────────────────────────────────
+                            $customer  = $this->customer->getcustomers(['t1.user_id' => $user_id], 'single');
+                            $firm_info = $this->customer->getfirms(['t1.id' => $firm_id], 'single');
+                            $gst_on    = !empty($customer['gst_enabled']) && $customer['gst_enabled'] == 1;
+
+                            // Calculate GST - bill is base rate, GST is added on top
+                            $this->load->helper('dropdown');
+                            $gst_rate = $gst_on ? get_gst_rate() : 0.0;
+                            $subtotal  = $bill; // Base rate
+                            $gst_amt   = $gst_on ? round(($bill * $gst_rate) / 100, 2) : 0;
+                            $total_amt = $subtotal + $gst_amt;
+
+                            $svc_names = array_column($services, 'name');
+                            $invoice_id = null;
+                            $invoice_no = null;
+                            try {
+                                $invoice_result = $this->invoice->create_custom_invoice([
+                                    'user_id'        => $user_id,
+                                    'firm_id'        => $firm_id,
+                                    'year'           => $year,
+                                    'invoice_date'   => $today,
+                                    'billing_name'   => !empty($customer['name'])   ? $customer['name']   : ($pkg['user_name'] ?? ''),
+                                    'billing_email'  => !empty($customer['email'])  ? $customer['email']  : '',
+                                    'billing_mobile' => !empty($customer['mobile']) ? $customer['mobile'] : '',
+                                    'firm_name'      => !empty($firm_info['name'])  ? $firm_info['name']  : '',
+                                    'firm_gstin'     => !empty($firm_info['gstin']) ? $firm_info['gstin'] : '',
+                                    'firm_pan'       => !empty($firm_info['pan'])   ? $firm_info['pan']   : '',
+                                    'service_name'   => implode(', ', $svc_names) . ' (Package Renewal)',
+                                    'type'           => $pkg_type,
+                                    'period_value'   => $year,
+                                    'subtotal'       => $subtotal,
+                                    'gst_rate'       => $gst_rate,
+                                    'gst_amount'     => $gst_amt,
+                                    'total_amount'   => $total_amt,
+                                ]);
+                                if (!empty($invoice_result['status']) && !empty($invoice_result['invoice'])) {
+                                    $invoice_id = !empty($invoice_result['invoice']['id']) ? $invoice_result['invoice']['id'] : null;
+                                    $invoice_no = !empty($invoice_result['invoice']['invoice_no']) ? $invoice_result['invoice']['invoice_no'] : null;
+                                }
+                            } catch (Exception $e) {
+                                log_message('error', 'Package auto-renewal invoice error: ' . $e->getMessage());
+                            }
+
+                            $renewed_packages[] = [
+                                'package_id' => $pkg['id'],
+                                'package_type' => $pkg_type,
+                                'bill_amount' => $bill,
+                                'new_expiry_date' => $new_expiry,
+                                'invoice_id' => $invoice_id,
+                                'invoice_no' => $invoice_no,
+                            ];
+                        } catch (Exception $e) {
+                            // Log error but continue processing other packages
+                            log_message('error', 'Auto-renewal error for package #' . ($pkg['id'] ?? 'unknown') . ': ' . $e->getMessage());
+                            // Add to insufficient balance so user knows something went wrong
+                            $insufficient_balance[] = [
+                                'type' => 'service_package',
+                                'package_id' => $pkg['id'] ?? 0,
+                                'bill_amount' => isset($bill) ? $bill : 0,
+                                'wallet_balance' => 0,
+                                'needed' => 0,
+                                'error' => 'Failed to process auto-renewal'
+                            ];
+                        }
+                    }
+
+                    // ── Auto-renew expired Account Work packages ───────────────────
+                    $expired_account_work = $this->db->query(
+                        "SELECT cp.*, u.name AS user_name, s.debit_date AS service_debit_date
+                     FROM {$this->db->dbprefix('customer_packages')} cp
+                     JOIN {$this->db->dbprefix('users')} u ON u.id = cp.user_id
+                     LEFT JOIN {$this->db->dbprefix('services')} s ON s.id = 1
+                     WHERE cp.expiry_date <= '{$today}'
+                       AND cp.payment_status = 0
+                       AND cp.status = 1
+                       AND cp.user_id = {$user['id']}"
+                    )->result_array();
+
+                    foreach ($expired_account_work as $pkg) {
+                        try {
+                            $user_id    = $pkg['user_id'];
+                            $firm_id    = $pkg['firm_id'];
+                            $year       = $pkg['year'];
+                            $pkg_type   = !empty($pkg['package_type']) ? $pkg['package_type'] : 'Turnover';
+
+                            // Always use service rate (₹5,000) for Account Work packages
+                            if ($pkg_type == 'Turnover') {
+                                $account_work_service = $this->master->getservices(['id' => 1, 'status' => 1], 'single');
+                                $bill = !empty($account_work_service['rate']) ? (float)$account_work_service['rate'] : 5000;
+                            } else {
+                                $bill = (float)($pkg['bill_amount'] ?? $pkg['amount'] ?? 0);
+                            }
+
+                            if ($bill <= 0) continue;
+
+                            // ── Check customer GST setting first to calculate total amount ──────────────────────────────────
+                            $customer = $this->customer->getcustomers(['t1.user_id' => $user_id], 'single');
+                            $gst_enabled = !empty($customer) && !empty($customer['gst_enabled']) && $customer['gst_enabled'] == 1;
+
+                            // Calculate total amount with GST (what user will actually pay)
+                            $this->load->helper('dropdown');
+                            $gst_rate = $gst_enabled ? get_gst_rate() : 0.0;
+                            $subtotal = $bill;
+                            $gst_amount = $gst_enabled ? round($bill * $gst_rate / 100, 2) : 0;
+                            $total_amount = $subtotal + $gst_amount;
+
+                            // Check wallet balance against total amount (with GST)
+                            $balance = $this->wallet->getwalletbalance($user_id);
+                            if ($balance < $total_amount) {
+                                $insufficient_balance[] = [
+                                    'type' => 'account_work',
+                                    'package_id' => $pkg['id'],
+                                    'bill_amount' => $bill, // Base amount
+                                    'gst_amount' => $gst_amount, // GST amount
+                                    'total_amount' => $total_amount, // Total with GST (what user needs)
+                                    'wallet_balance' => $balance,
+                                    'needed' => $total_amount - $balance
+                                ];
+                                continue;
+                            }
+
+                            // ── Create purchase row ────────────────────────────────────────
+                            $datetime = date('Y-m-d H:i:s');
+                            $subtotal = $bill;
+                            $this->load->helper('dropdown');
+                            $gst_rate = $gst_enabled ? get_gst_rate() : 0.0;
+                            $gst_amount = $gst_enabled ? round($bill * $gst_rate / 100, 2) : 0;
+                            $total_amount = $subtotal + $gst_amount;
+
+                            $this->db->insert('purchases', [
+                                'date'       => $today,
+                                'year'       => $year,
+                                'type'       => $pkg_type,
+                                'user_id'    => $user_id,
+                                'service_id' => 1,
+                                'firm_id'    => $firm_id,
+                                'service'    => 'Account Work (Auto-Renew)',
+                                'rate'       => $subtotal,
+                                'subtotal'   => $subtotal,
+                                'gst_amount' => $gst_amount,
+                                'gst_enabled' => $gst_enabled ? 1 : 0,
+                                'amount'     => $total_amount,
+                                'status'     => 0,
+                                'added_on'   => $datetime,
+                                'updated_on' => $datetime,
+                            ]);
+
+                            // ── Calculate new expiry ───────────────────────────────────────
+                            $new_expiry = $this->_nextExpiryAccountWork($pkg_type, $today, $pkg['service_debit_date'] ?? null);
+
+                            // ── Update expiry ────────────────────────────────────────────
+                            $this->db->update('customer_packages', [
+                                'payment_status' => 0,
+                                'purchase_date'  => $today,
+                                'expiry_date'    => $new_expiry,
+                                'updated_on'     => $datetime,
+                            ], ['id' => $pkg['id']]);
+
+                            // ── Generate invoice ───────────────────────────────────────────
+                            $customer  = $this->customer->getcustomers(['t1.user_id' => $user_id], 'single');
+                            $firm_info = $this->customer->getfirms(['t1.id' => $firm_id], 'single');
+                            $gst_on    = !empty($customer['gst_enabled']) && $customer['gst_enabled'] == 1;
+
+                            $this->load->helper('dropdown');
+                            $subtotal  = $bill;
+                            $gst_rate = $gst_on ? get_gst_rate() : 0.0;
+                            $gst_amt   = $gst_on ? round(($bill * $gst_rate) / 100, 2) : 0;
+                            $total_amt = $subtotal + $gst_amt;
+
+                            $invoice_id = null;
+                            $invoice_no = null;
+                            try {
+                                $invoice_result = $this->invoice->create_custom_invoice([
+                                    'user_id'        => $user_id,
+                                    'firm_id'        => $firm_id,
+                                    'year'           => $year,
+                                    'invoice_date'   => $today,
+                                    'billing_name'   => !empty($customer['name'])   ? $customer['name']   : ($pkg['user_name'] ?? ''),
+                                    'billing_email'  => !empty($customer['email'])  ? $customer['email']  : '',
+                                    'billing_mobile' => !empty($customer['mobile']) ? $customer['mobile'] : '',
+                                    'firm_name'      => !empty($firm_info['name'])  ? $firm_info['name']  : '',
+                                    'firm_gstin'     => !empty($firm_info['gstin']) ? $firm_info['gstin'] : '',
+                                    'firm_pan'       => !empty($firm_info['pan'])   ? $firm_info['pan']   : '',
+                                    'service_name'   => 'Account Work (Auto-Renew)',
+                                    'type'           => $pkg_type,
+                                    'period_value'   => $year,
+                                    'subtotal'       => $subtotal,
+                                    'gst_rate'       => $gst_rate,
+                                    'gst_amount'     => $gst_amt,
+                                    'total_amount'   => $total_amt,
+                                ]);
+                                if (!empty($invoice_result['status']) && !empty($invoice_result['invoice'])) {
+                                    $invoice_id = !empty($invoice_result['invoice']['id']) ? $invoice_result['invoice']['id'] : null;
+                                    $invoice_no = !empty($invoice_result['invoice']['invoice_no']) ? $invoice_result['invoice']['invoice_no'] : null;
+                                }
+                            } catch (Exception $e) {
+                                log_message('error', 'Account Work auto-renewal invoice error: ' . $e->getMessage());
+                            }
+
+                            $renewed_account_work[] = [
+                                'package_id' => $pkg['id'],
+                                'package_type' => $pkg_type,
+                                'bill_amount' => $bill,
+                                'new_expiry_date' => $new_expiry,
+                                'invoice_id' => $invoice_id,
+                                'invoice_no' => $invoice_no,
+                            ];
+                        } catch (Exception $e) {
+                            // Log error but continue processing other packages
+                            log_message('error', 'Account Work auto-renewal error for package #' . ($pkg['id'] ?? 'unknown') . ': ' . $e->getMessage());
+                            // Add to insufficient balance so user knows something went wrong
+                            $insufficient_balance[] = [
+                                'type' => 'account_work',
+                                'package_id' => $pkg['id'] ?? 0,
+                                'bill_amount' => isset($bill) ? $bill : 0,
+                                'wallet_balance' => 0,
+                                'needed' => 0,
+                                'error' => 'Failed to process auto-renewal'
+                            ];
+                        }
+                    }
+
+                    $this->response([
+                        'status' => true,
+                        'renewed_packages' => $renewed_packages,
+                        'renewed_account_work' => $renewed_account_work,
+                        'insufficient_balance' => $insufficient_balance,
+                        'message' => count($renewed_packages) > 0 || count($renewed_account_work) > 0
+                            ? (count($renewed_packages) + count($renewed_account_work)) . ' package(s) auto-renewed successfully.'
+                            : (count($insufficient_balance) > 0
+                                ? 'Some packages could not be auto-renewed due to insufficient wallet balance. Please add funds to your wallet.'
+                                : 'No expired packages found.')
+                    ], RestController::HTTP_OK);
+                } catch (Exception $e) {
+                    // Catch any unexpected errors and return a safe response
+                    log_message('error', 'Auto-renewal API error: ' . $e->getMessage());
+                    $this->response([
+                        'status' => true,
+                        'renewed_packages' => [],
+                        'renewed_account_work' => [],
+                        'insufficient_balance' => [],
+                        'message' => 'Auto-renewal check completed. Some packages may require manual renewal.'
+                    ], RestController::HTTP_OK);
+                }
+            } else {
+                $this->response([
+                    'status' => false,
+                    'message' => "Unauthorized Access!"
+                ], RestController::HTTP_OK);
+            }
+        } else {
+            $this->response([
+                'status' => false,
+                'message' => "Please provide token!"
+            ], RestController::HTTP_OK);
+        }
+    }
+
+    /**
+     * Calculate the next expiry date for Account Work packages
+     */
+    private function _nextExpiryAccountWork($package_type, $from_date, $debit_date = null)
+    {
+        $ts = strtotime($from_date);
+        switch ($package_type) {
+            case 'Monthly':
+                return date('Y-m-d', strtotime('+1 month', $ts));
+            case 'Turnover':
+            case 'Yearly':
+            default:
+                if (!empty($debit_date)) {
+                    $dm = (int)date('m', strtotime($debit_date));
+                    $dd = (int)date('d', strtotime($debit_date));
+                    $cy = (int)date('Y', $ts);
+
+                    $candidate = sprintf('%04d-%02d-%02d', $cy, $dm, $dd);
+                    if (strtotime($candidate) <= $ts) {
+                        $candidate = sprintf('%04d-%02d-%02d', $cy + 1, $dm, $dd);
+                    }
+                    return $candidate;
+                }
+                return date('Y-m-d', strtotime('+1 year', $ts));
+        }
+    }
+
+    /**
+     * Calculate the next expiry date from a given start date.
+     */
+    private function _nextExpiry($package_type, $from_date)
+    {
+        $ts = strtotime($from_date);
+        switch ($package_type) {
+            case 'Monthly':
+                return date('Y-m-d', strtotime('+1 month', $ts));
+            case 'Quarterly':
+                return date('Y-m-d', strtotime('+3 months', $ts));
+            case 'Once':
+                return date('Y-m-d', strtotime('+1 year', $ts));
+            case 'Yearly':
+            default:
+                return date('Y-m-d', strtotime('+1 year', $ts));
         }
     }
 

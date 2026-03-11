@@ -785,6 +785,8 @@ class Reports extends CI_Controller
                         if (!in_array($service_id, $current_service_ids, true)) {
                             if (!isset($renewal_services[$service_id])) {
                                 // Get service details
+                                // Note: Currently shows all services (web + app). 
+                                // If filtering by platform is needed, add platform field check here.
                                 $service = $this->master->getservices(array('id' => $service_id, 'status' => 1), 'single');
                                 if (!empty($service)) {
                                     $renewal_services[$service_id] = array(
@@ -1317,7 +1319,7 @@ class Reports extends CI_Controller
 
             // Check if GST is enabled for this customer
             $gst_enabled = !empty($customer) && !empty($customer['gst_enabled']) && $customer['gst_enabled'] == 1;
-            
+
             // Calculate GST - last_month_balance is base rate, GST is added on top
             $subtotal = $last_month_balance; // Base rate
             $gst_rate = $gst_enabled ? 18.0 : 0.0;

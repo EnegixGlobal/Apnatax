@@ -458,22 +458,22 @@ class Home extends CI_Controller
 
             if ($bill <= 0) continue;
 
-            // Check wallet balance
-            $balance = $this->wallet->getwalletbalance($user_id);
-            if ($balance < $bill) {
-                // Not enough balance — leave for manual renewal in pending services
-                continue;
-            }
-
-            // ── Check customer GST setting ──────────────────────────────────
+            // ── Check customer GST setting first to calculate total amount ──────────────────────────────────
             $customer = $this->customer->getcustomers(['t1.user_id' => $user_id], 'single');
             $gst_enabled = !empty($customer) && !empty($customer['gst_enabled']) && $customer['gst_enabled'] == 1;
 
-            // Calculate GST - bill is base rate, GST is added on top
-            $subtotal = $bill; // Base rate (e.g., 5000)
+            // Calculate GST - bill is base rate (stored without GST), GST is added on top
+            $subtotal = $bill; // Base rate (e.g., 7000)
             $gst_rate = $gst_enabled ? 18.0 : 0.0;
-            $gst_amount = $gst_enabled ? round(($bill * $gst_rate) / 100, 2) : 0; // 18% of base rate (e.g., 900)
-            $total_amount = $subtotal + $gst_amount; // Total = base + GST (e.g., 5900)
+            $gst_amount = $gst_enabled ? round(($bill * $gst_rate) / 100, 2) : 0; // 18% of base rate (e.g., 1260)
+            $total_amount = $subtotal + $gst_amount; // Total = base + GST (e.g., 8260)
+
+            // Check wallet balance against total amount (including GST)
+            $balance = $this->wallet->getwalletbalance($user_id);
+            if ($balance < $total_amount) {
+                // Not enough balance — leave for manual renewal in pending services
+                continue;
+            }
 
             $datetime = date('Y-m-d H:i:s');
             $service_name = $pkg['package_id'] == 1 ? 'Accountancy Prime' : 'Accountancy Premium';
@@ -498,10 +498,25 @@ class Home extends CI_Controller
             ]);
 
             // ── Calculate new expiry ───────────────────────────────────────
-            $new_expiry = $this->_nextExpiry($pkg_type, $today);
+            $new_expiry = null;
             
+            // For Monthly type, use auto debit date (28th) of next month
+            if ($pkg_type == 'Monthly' && !empty($pkg['service_debit_date'])) {
+                $dd = (int)date('d', strtotime($pkg['service_debit_date'])); // Day from debit_date (e.g., 28)
+                $next_month = strtotime('+1 month', strtotime($today));
+                $nm = (int)date('m', $next_month);
+                $ny = (int)date('Y', $next_month);
+                // Handle months with fewer days
+                $candidate = sprintf('%04d-%02d-%02d', $ny, $nm, $dd);
+                if (!checkdate($nm, $dd, $ny)) {
+                    // If date doesn't exist, use last day of month
+                    $new_expiry = date('Y-m-t', $next_month);
+                } else {
+                    $new_expiry = $candidate;
+                }
+            }
             // For Turnover type, use service debit_date if available
-            if ($pkg_type == 'Turnover' && !empty($pkg['service_debit_date'])) {
+            elseif ($pkg_type == 'Turnover' && !empty($pkg['service_debit_date'])) {
                 $dm = (int)date('m', strtotime($pkg['service_debit_date']));
                 $dd = (int)date('d', strtotime($pkg['service_debit_date']));
                 $cy = (int)date('Y', strtotime($today));
@@ -511,6 +526,10 @@ class Home extends CI_Controller
                     $candidate = sprintf('%04d-%02d-%02d', $cy + 1, $dm, $dd);
                 }
                 $new_expiry = $candidate;
+            }
+            // Fallback: use _nextExpiry for other types
+            else {
+                $new_expiry = $this->_nextExpiry($pkg_type, $today);
             }
 
             // Update bill_amount for Turnover type (calculated based on actual turnover)
