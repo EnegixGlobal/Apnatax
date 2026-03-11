@@ -477,18 +477,6 @@ class Services extends CI_Controller
             return;
         }
 
-        // Check wallet balance
-        $balance = $this->wallet->getwalletbalance($user['id']);
-        if ($balance < $bill) {
-            $needed = $bill - $balance;
-            echo json_encode([
-                'status'   => false,
-                'message'  => 'Insufficient wallet balance. Please add ₹' . number_format($needed, 2) . ' to your wallet first.',
-                'redirect' => base_url('mywallet/')
-            ]);
-            return;
-        }
-
         $pkg_type = !empty($pkg['package_type']) ? $pkg['package_type'] : ($is_account_work ? 'Turnover' : 'Yearly');
         $firm_id  = $pkg['firm_id'];
         $year     = $pkg['year'];
@@ -522,15 +510,27 @@ class Services extends CI_Controller
                 }
             }
             
-            // ── Check customer GST setting ──────────────────────────────────
+            // ── Check customer GST setting first to calculate total amount ──────────────────────────────────
             $customer = $this->customer->getcustomers(['t1.user_id' => $user['id']], 'single');
             $gst_enabled = !empty($customer) && !empty($customer['gst_enabled']) && $customer['gst_enabled'] == 1;
 
-            // Calculate GST - bill is base rate, GST is added on top
-            $subtotal = $bill; // Base rate (e.g., 5000)
+            // Calculate GST - bill is base rate (stored without GST), GST is added on top
+            $subtotal = $bill; // Base rate (e.g., 7000)
             $gst_rate = $gst_enabled ? 18.0 : 0.0;
-            $gst_amount = $gst_enabled ? round(($bill * $gst_rate) / 100, 2) : 0; // 18% of base rate (e.g., 900)
-            $total_amount = $subtotal + $gst_amount; // Total = base + GST (e.g., 5900)
+            $gst_amount = $gst_enabled ? round(($bill * $gst_rate) / 100, 2) : 0; // 18% of base rate (e.g., 1260)
+            $total_amount = $subtotal + $gst_amount; // Total = base + GST (e.g., 8260)
+
+            // Check wallet balance against total amount (including GST)
+            $balance = $this->wallet->getwalletbalance($user['id']);
+            if ($balance < $total_amount) {
+                $needed = $total_amount - $balance;
+                echo json_encode([
+                    'status'   => false,
+                    'message'  => 'Insufficient wallet balance. Please add ₹' . number_format($needed, 2) . ' to your wallet first.',
+                    'redirect' => base_url('mywallet/')
+                ]);
+                return;
+            }
 
             $service_name = $pkg['package_id'] == 1 ? 'Accountancy Prime' : 'Accountancy Premium';
 
@@ -653,7 +653,29 @@ class Services extends CI_Controller
         } else {
             switch ($pkg_type) {
                 case 'Monthly':
-                    $new_expiry = date('Y-m-d', strtotime('+1 month',  $ts));
+                    // For Monthly Account Work, use auto debit date (28th) of next month
+                    if ($is_account_work) {
+                        $service = $this->master->getservices(['id' => 1], 'single');
+                        $debit_date = !empty($service['debit_date']) ? $service['debit_date'] : null;
+                        if ($debit_date) {
+                            $dd = (int)date('d', strtotime($debit_date)); // Day from debit_date (e.g., 28)
+                            $next_month = strtotime('+1 month', $ts);
+                            $nm = (int)date('m', $next_month);
+                            $ny = (int)date('Y', $next_month);
+                            // Handle months with fewer days
+                            $candidate = sprintf('%04d-%02d-%02d', $ny, $nm, $dd);
+                            if (!checkdate($nm, $dd, $ny)) {
+                                // If date doesn't exist, use last day of month
+                                $new_expiry = date('Y-m-t', $next_month);
+                            } else {
+                                $new_expiry = $candidate;
+                            }
+                        } else {
+                            $new_expiry = date('Y-m-d', strtotime('+1 month', $ts));
+                        }
+                    } else {
+                        $new_expiry = date('Y-m-d', strtotime('+1 month', $ts));
+                    }
                     break;
                 case 'Quarterly':
                     $new_expiry = date('Y-m-d', strtotime('+3 months', $ts));
@@ -1315,8 +1337,29 @@ class Services extends CI_Controller
                         $bill_amount = 0;
                         
                         if ($type == "Monthly") {
-                            // Monthly: expiry = purchase_date + 1 month
-                            $expiry_date = date('Y-m-d', strtotime('+1 month', strtotime($purchase_date)));
+                            // Monthly: expiry = next month's auto debit date (28th of next month)
+                            // Always use next month's debit date, regardless of purchase date
+                            // Get Account Work service to get debit_date
+                            $debit_date = !empty($service['debit_date']) ? $service['debit_date'] : null;
+                            if ($debit_date) {
+                                $dd = (int)date('d', strtotime($debit_date)); // Day from debit_date (e.g., 28)
+                                // Always use next month's debit date
+                                $next_month = strtotime('+1 month', strtotime($purchase_date));
+                                $nm = (int)date('m', $next_month);
+                                $ny = (int)date('Y', $next_month);
+                                // Handle months with fewer days (e.g., Feb 28 -> Mar 28, not Feb 31)
+                                $expiry_date = sprintf('%04d-%02d-%02d', $ny, $nm, $dd);
+                                // Validate date exists (e.g., Feb 30 doesn't exist)
+                                if (!checkdate($nm, $dd, $ny)) {
+                                    // If date doesn't exist, use last day of month
+                                    $expiry_date = date('Y-m-t', $next_month);
+                                }
+                            } else {
+                                // Fallback: if no debit_date, use purchase_date + 1 month
+                                $expiry_date = date('Y-m-d', strtotime('+1 month', strtotime($purchase_date)));
+                            }
+                            // For Monthly type, store the entered amount as-is (without GST)
+                            // GST will be calculated only at renewal/payment time
                             $bill_amount = (float)$amount;
                         } else {
                             // Turnover/Yearly: expiry = next year's debit_date or +1 year
@@ -1340,13 +1383,8 @@ class Services extends CI_Controller
                             $bill_amount = 0;
                         }
                         
-                        // Calculate GST if enabled
-                        $customer = $this->customer->getcustomers(['t1.user_id' => $user['id']], 'single');
-                        $gst_enabled = !empty($customer) && !empty($customer['gst_enabled']) && $customer['gst_enabled'] == 1;
-                        if ($gst_enabled && $bill_amount > 0) {
-                            $gst_amount = round($bill_amount * 18 / 100, 2);
-                            $bill_amount = $bill_amount + $gst_amount;
-                        }
+                        // Note: GST is NOT calculated at purchase time
+                        // GST will be calculated only when creating purchase record at renewal/payment time
                         
                         $data = array(
                             'user_id' => $user['id'],

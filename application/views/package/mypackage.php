@@ -939,6 +939,34 @@ if (!empty($service_packages)) {
                             </div>
                         </div>
                     <?php endif; ?>
+                    
+                    <!-- Delete Request Section -->
+                    <div class="mt-3 p-3 bg-light border-top">
+                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                            <div>
+                                <small class="text-muted" style="font-size:.8rem;">
+                                    <i class="fe fe-info me-1"></i>Need to delete this package?
+                                </small>
+                            </div>
+                            <?php 
+                            $request_status = isset($package['request']) ? (int)$package['request'] : 0;
+                            ?>
+                            <?php if ($request_status == 0 || $request_status == 2) : ?>
+                                <form method="post" action="<?= base_url('package/requestdeleteaccountwork') ?>"
+                                    style="display:inline"
+                                    onsubmit="return confirm('Request admin to delete this Account Work package? This action cannot be undone.')">
+                                    <input type="hidden" name="package_id" value="<?= $package['id'] ?>">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                                        <i class="fe fe-trash-2 me-1"></i>Request Delete
+                                    </button>
+                                </form>
+                            <?php elseif ($request_status == 1) : ?>
+                                <span class="badge bg-warning text-dark px-3 py-2">
+                                    <i class="fe fe-clock me-1"></i>Delete request pending
+                                </span>
+                            <?php endif; ?>
+                        </div>
+                    </div>
                 </div>
                 <div class="acct-status-icon">
                     <i class="fe fe-briefcase"></i>
@@ -1026,6 +1054,28 @@ if (!empty($service_packages)) {
                 <?php endif; ?>
 
                 <div class="row g-3 align-items-start">
+                    <!-- Type Selection Dropdown -->
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold" style="font-size:.83rem">Type</label>
+                        <select id="acct-type-select" class="form-select form-select-sm">
+                            <option value="">— Choose Type —</option>
+                            <option value="Turnover">Turnover</option>
+                            <option value="Monthly">Monthly</option>
+                        </select>
+                    </div>
+
+                    <!-- Monthly Amount Input (shown when Monthly is selected) -->
+                    <div class="col-md-4" id="acct-monthly-amount-wrap" style="display:none;">
+                        <label class="form-label fw-semibold" style="font-size:.83rem">Monthly Amount (₹)</label>
+                        <input type="number" id="acct-monthly-amount" class="form-control form-control-sm" 
+                            placeholder="Enter monthly amount" min="1" step="0.01">
+                        <small class="text-muted" style="font-size:.75rem">
+                            <i class="fe fe-info me-1"></i>Amount will be auto-debited from wallet monthly
+                        </small>
+                    </div>
+                </div>
+
+                <div class="row g-3 align-items-start mt-2" id="acct-package-selection-wrap" style="display:none;">
                     <!-- Left: package dropdown -->
                     <div class="col-md-4">
                         <label class="form-label fw-semibold" style="font-size:.83rem">Select Package</label>
@@ -1060,7 +1110,7 @@ if (!empty($service_packages)) {
                     </div>
                 </div>
 
-                <div class="mt-3">
+                <div class="mt-3" id="acct-confirm-wrap" style="display:none;">
                     <button type="button" class="btn btn-success btn-sm px-4 fw-semibold" id="acct-confirm-btn">
                         <i class="fe fe-check me-2"></i>Confirm Selection
                     </button>
@@ -1073,33 +1123,114 @@ if (!empty($service_packages)) {
     <!-- Account Work JS (self-contained, no modal) -->
     <script>
         (function() {
-            // Package dropdown → show rates table
+            var typeSel = document.getElementById('acct-type-select');
+            var monthlyAmountWrap = document.getElementById('acct-monthly-amount-wrap');
+            var monthlyAmountInput = document.getElementById('acct-monthly-amount');
+            var packageSelectionWrap = document.getElementById('acct-package-selection-wrap');
             var pkgSel = document.getElementById('acct-pkg-select');
-            if (pkgSel) {
-                pkgSel.addEventListener('change', function() {
-                    var val = this.value;
+            var ratesWrap = document.getElementById('acct-rates-wrap');
+            var confirmWrap = document.getElementById('acct-confirm-wrap');
+            var confirmBtn = document.getElementById('acct-confirm-btn');
+
+            // Type selection handler
+            if (typeSel) {
+                typeSel.addEventListener('change', function() {
+                    var selectedType = this.value;
+                    
+                    // Reset all dependent fields
+                    monthlyAmountWrap.style.display = 'none';
+                    monthlyAmountInput.value = '';
+                    packageSelectionWrap.style.display = 'none';
+                    pkgSel.value = '';
+                    ratesWrap.style.display = 'none';
+                    confirmWrap.style.display = 'none';
                     document.querySelectorAll('.acct-pkg-row').forEach(function(r) {
                         r.style.display = 'none';
                     });
+
+                    if (selectedType === 'Monthly') {
+                        // Show monthly amount input
+                        monthlyAmountWrap.style.display = 'block';
+                        // Show package selection
+                        packageSelectionWrap.style.display = 'block';
+                    } else if (selectedType === 'Turnover') {
+                        // Show package selection directly (no monthly amount needed)
+                        packageSelectionWrap.style.display = 'block';
+                    }
+                });
+            }
+
+            // Package dropdown → show rates table
+            if (pkgSel) {
+                pkgSel.addEventListener('change', function() {
+                    var val = this.value;
+                    var selectedType = typeSel ? typeSel.value : '';
+                    
+                    document.querySelectorAll('.acct-pkg-row').forEach(function(r) {
+                        r.style.display = 'none';
+                    });
+                    
                     if (val) {
                         document.querySelectorAll('.acct-pkg-row.' + val).forEach(function(r) {
                             r.style.display = '';
                         });
-                        document.getElementById('acct-rates-wrap').style.display = '';
+                        ratesWrap.style.display = '';
+                        
+                        // Show confirm button if all required fields are filled
+                        if (selectedType === 'Monthly') {
+                            if (monthlyAmountInput && monthlyAmountInput.value && parseFloat(monthlyAmountInput.value) > 0) {
+                                confirmWrap.style.display = 'block';
+                            } else {
+                                confirmWrap.style.display = 'none';
+                            }
+                        } else if (selectedType === 'Turnover') {
+                            confirmWrap.style.display = 'block';
+                        }
                     } else {
-                        document.getElementById('acct-rates-wrap').style.display = 'none';
+                        ratesWrap.style.display = 'none';
+                        confirmWrap.style.display = 'none';
+                    }
+                });
+            }
+
+            // Monthly amount input handler
+            if (monthlyAmountInput) {
+                monthlyAmountInput.addEventListener('input', function() {
+                    var amount = parseFloat(this.value);
+                    var selectedType = typeSel ? typeSel.value : '';
+                    var pkgSelected = pkgSel ? pkgSel.value : '';
+                    
+                    if (selectedType === 'Monthly' && amount > 0 && pkgSelected) {
+                        confirmWrap.style.display = 'block';
+                    } else if (selectedType === 'Monthly' && (!amount || amount <= 0)) {
+                        confirmWrap.style.display = 'none';
                     }
                 });
             }
 
             // Confirm button
-            var confirmBtn = document.getElementById('acct-confirm-btn');
             if (confirmBtn) {
                 confirmBtn.addEventListener('click', function() {
-                    var pkg_id = document.getElementById('acct-pkg-select').value;
+                    var selectedType = typeSel ? typeSel.value : '';
+                    var pkg_id = pkgSel ? pkgSel.value : '';
+                    var amount = '';
+                    
+                    if (!selectedType) {
+                        alert('Please select a type (Turnover or Monthly)!');
+                        return;
+                    }
+                    
                     if (!pkg_id) {
                         alert('Please select a package!');
                         return;
+                    }
+                    
+                    if (selectedType === 'Monthly') {
+                        amount = monthlyAmountInput ? monthlyAmountInput.value : '';
+                        if (!amount || parseFloat(amount) <= 0) {
+                            alert('Please enter a valid monthly amount!');
+                            return;
+                        }
                     }
 
                     confirmBtn.disabled = true;
@@ -1107,8 +1238,8 @@ if (!empty($service_packages)) {
 
                     var fd = new FormData();
                     fd.append('id', 1);
-                    fd.append('type', 'Turnover');
-                    fd.append('amount', '');
+                    fd.append('type', selectedType);
+                    fd.append('amount', amount);
                     fd.append('package_id', pkg_id);
 
                     fetch('<?= base_url('services/buyservice/') ?>', {

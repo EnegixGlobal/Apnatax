@@ -260,6 +260,49 @@ class Reports extends RestController
                     $services = array_merge($services, array_values($renewals));
                 }
 
+                // ── 7. Expired Account Work packages (customer_packages) ────────────
+                $expired_account_work = array();
+                $account_work_pkgs = $this->db->get_where('customer_packages', [
+                    'user_id' => $user['id'],
+                    'firm_id' => $firm_id,
+                    'status' => 1
+                ])->result_array();
+                
+                if (!empty($account_work_pkgs)) {
+                    foreach ($account_work_pkgs as $_acpkg) {
+                        $exp = !empty($_acpkg['expiry_date']) ? strtotime($_acpkg['expiry_date']) : 0;
+                        $is_unpaid = empty($_acpkg['payment_status']) || $_acpkg['payment_status'] == 0;
+                        if ($exp && $exp <= time() && $is_unpaid) {
+                            // Calculate bill_amount
+                            if (empty($_acpkg['bill_amount']) || $_acpkg['bill_amount'] == 0) {
+                                $account_work_service = $this->master->getservices(['id' => 1, 'status' => 1], 'single');
+                                $_acpkg['bill_amount'] = !empty($account_work_service['rate']) ? (float)$account_work_service['rate'] : 5000;
+                            }
+                            
+                            $package_id = $_acpkg['package_id'];
+                            $service_name = $package_id == 1 ? 'Accountancy Prime' : 'Accountancy Premium';
+                            
+                            // Add as expired Account Work package
+                            $expired_account_work[] = array(
+                                'id'           => $_acpkg['id'],
+                                'service_id'   => 1, // Account Work service ID
+                                'service_name' => 'Account Work (' . $service_name . ')',
+                                'service_slug' => 'account-work',
+                                'month'        => '',
+                                'amount'       => $_acpkg['bill_amount'],
+                                'is_renewal'   => 1,
+                                'expired_year' => $_acpkg['year'],
+                                'package_source' => 'customer_packages', // Mark as Account Work
+                                'package_id'   => $_acpkg['id'], // Store package ID for renewal
+                            );
+                        }
+                    }
+                }
+
+                if (!empty($expired_account_work)) {
+                    $services = array_merge($services, $expired_account_work);
+                }
+
                 if (!empty($services)) {
                     $this->response([
                         'status'   => true,
@@ -818,7 +861,8 @@ class Reports extends RestController
                     $report = array();
                     if (!empty($accountancy)) {
                         $total_fees = $total_other = $total_paid = $total_penalty = $total_days = 0;
-                        $outstanding = $total = 0;
+                        $outstanding = $total = $balance = 0;
+                        $total_sum = 0;
                         $fees = $total_turnover / $package['turnover'];
                         $fees *= $package['rate'];
                         $count = count($accountancy);
@@ -830,13 +874,14 @@ class Reports extends RestController
                         foreach ($accountancy as $single) {
                             $days = $paid = $penalty = 0;
                             $paid = !empty($single['paid']) ? $single['paid'] : 0;
-                            $outstanding = $total;
+                            // Outstanding should be the previous month's balance (unpaid amount)
+                            $outstanding = $balance;
                             if ($single['date'] != '') {
                                 $acc_fees = $fees / $count;
                             } else {
                                 $acc_fees = 0;
                             }
-                            $other_fee = $single['other_fee'];
+                            $other_fee = $single['other_fee'] ?? 0;
                             $total_other += $other_fee;
                             $balance = $outstanding + $acc_fees + $other_fee;
                             if ($single['due_date'] < $date && $paid < $balance) {
@@ -860,22 +905,27 @@ class Reports extends RestController
                             } else {
                                 $balance -= $paid;
                             }
+                            // Ensure balance doesn't go negative
+                            if ($balance < 0) {
+                                $balance = 0;
+                            }
                             $total = $balance + $penalty;
+                            $total_sum += $total;
                             $total_fees += $acc_fees;
                             $total_paid += $paid;
                             $month = $single['date'] != '' ? date('F-y', strtotime($single['date'])) : '--';
                             $due_date = $single['due_date'] != '' ? date('d-m-Y', strtotime($single['due_date'])) : '--';
                             $row = array(
                                 'month' => $month,
-                                'outstanding' => round($outstanding, 4),
-                                'gto' => round($single['turnover'], 4),
-                                'acc_fees' => round($acc_fees, 4),
-                                'other_fee' => round($other_fee, 4),
-                                'paid' => round($paid, 4),
-                                'balance' => round($balance, 4),
+                                'outstanding' => round($outstanding, 2),
+                                'gto' => round($single['turnover'], 2),
+                                'acc_fees' => round($acc_fees, 2),
+                                'other_fee' => round($other_fee, 2),
+                                'paid' => round($paid, 2),
+                                'balance' => round($balance, 2),
                                 'due_date' => $due_date,
-                                'penalty' => round($penalty, 4),
-                                'total' => round($total, 4),
+                                'penalty' => round($penalty, 2),
+                                'total' => round($total, 2),
                                 'due_days' => $days
                             );
 
@@ -884,21 +934,22 @@ class Reports extends RestController
                         $row = array(
                             'month' => 'Total',
                             'outstanding' => 0,
-                            'gto' => round($total_turnover, 4),
-                            'acc_fees' => round($total_fees, 4),
-                            'other_fee' => round($total_other, 4),
-                            'paid' => round($total_paid, 4),
+                            'gto' => round($total_turnover, 2),
+                            'acc_fees' => round($total_fees, 2),
+                            'other_fee' => round($total_other, 2),
+                            'paid' => round($total_paid, 2),
                             'balance' => 0,
                             'due_date' => '',
-                            'penalty' => round($total_penalty, 4),
-                            'total' => round(($total_fees + $total_penalty - $total_paid), 4),
+                            'penalty' => round($total_penalty, 2),
+                            'total' => round($total_sum, 2), // Use sum of all row totals instead of calculation
                             'due_days' => $total_days
                         );
 
                         $report[] = $row;
                         $this->response([
                             'status' => true,
-                            'report' => $report
+                            'report' => $report,
+                            'package_name' => $name
                         ], RestController::HTTP_OK);
                     } else {
                         $this->response([
@@ -922,6 +973,542 @@ class Reports extends RestController
             $this->response([
                 'status' => false,
                 'message' => "Please provide all Details!"
+            ], RestController::HTTP_OK);
+        }
+    }
+
+    /**
+     * Get payment report data with unpaid months and GST calculation
+     * Similar to Reports::payment() but returns JSON for mobile app
+     */
+    public function getpaymentreport_post()
+    {
+        $token = $this->post('token');
+        $year = $this->post('year');
+        $firm_id = $this->post('firm_id');
+        if (!empty($token) && !empty($year) && !empty($firm_id)) {
+            $user = $this->account->verify_token($token);
+            if (!empty($user) && is_array($user) && $user['role'] == 'customer') {
+                $user_id = $user['id'];
+                $yearval = getyearmonthvalues($year);
+                $year1 = $yearval['year1'];
+                $year2 = $yearval['year2'];
+                $from = "$year1-04-01";
+                $to = "$year2-03-31";
+
+                $user_id_escaped = $this->db->escape($user_id);
+                $firm_id_escaped = $this->db->escape($firm_id);
+                $from_escaped = $this->db->escape($from);
+                $to_escaped = $this->db->escape($to);
+                $where2 = "t1.user_id={$user_id_escaped} AND t1.firm_id={$firm_id_escaped} AND t1.date>={$from_escaped} AND t1.date<={$to_escaped}";
+
+                $accountancy = $this->service->getturnoverswithpayment($where2);
+
+                if (empty($accountancy)) {
+                    $this->response([
+                        'status' => false,
+                        'message' => "No Data Found!"
+                    ], RestController::HTTP_OK);
+                    return;
+                }
+
+                $where = array('user_id' => $user_id, 'status' => 1);
+                $query = $this->db->get_where('customer_packages', $where);
+                if ($query->num_rows() == 0) {
+                    $this->response([
+                        'status' => false,
+                        'message' => "Package not Active!"
+                    ], RestController::HTTP_OK);
+                    return;
+                }
+
+                $cpackage = $query->unbuffered_row('array');
+                $name = $cpackage['package_id'] == 1 ? 'Accountancy Prime' : 'Accountancy Premium';
+                $package = $this->master->getpackages(['name' => $name], 'single');
+
+                $turnovers = !empty($accountancy) ? array_column($accountancy, 'turnover') : array(0);
+                $turnover = array_sum($turnovers);
+                $total_turnover = $turnover;
+
+                $date = date('Y-m-d');
+                $percent = 2 / 100;
+                $unpaid_months = array();
+                $total_balance = 0;
+                $total_fees = 0;
+                $total_penalty = 0;
+                $total_paid = 0;
+                $outstanding = $total = 0;
+
+                $fees = $total_turnover / $package['turnover'];
+                $fees *= $package['rate'];
+                $count = count($accountancy);
+                $last = end($accountancy);
+                if ($last['date'] == '') {
+                    $count--;
+                }
+                $acc_fees = $fees / $count;
+
+                foreach ($accountancy as $single) {
+                    $days = $paid = $penalty = 0;
+                    $paid = !empty($single['paid']) ? $single['paid'] : 0;
+                    $outstanding = $total;
+                    if ($single['date'] != '') {
+                        $acc_fees = $fees / $count;
+                    } else {
+                        $acc_fees = 0;
+                    }
+                    $other_fee = $single['other_fee'] ?? 0;
+                    $balance = $outstanding + $acc_fees + $other_fee;
+
+                    if ($single['due_date'] < $date && $paid < $balance) {
+                        $balance -= $paid;
+                        $date1 = new DateTime($single['due_date']);
+                        $date2 = new DateTime($date);
+                        $interval = $date1->diff($date2);
+                        $days = $interval->days;
+                        $penalty = ($percent * $balance);
+                        if ($days < 30) {
+                            $penalty /= 30;
+                            $penalty *= $days;
+                        }
+                        $penalty = round($penalty);
+                    } else {
+                        $balance -= $paid;
+                    }
+                    $total = $balance + $penalty;
+
+                    // Only include unpaid months
+                    if ($balance > 0) {
+                        $unpaid_months[] = array(
+                            'id' => $single['id'],
+                            'date' => $single['date'],
+                            'month' => $single['date'] != '' ? date('F-y', strtotime($single['date'])) : '--',
+                            'due_date' => $single['due_date'] != '' ? date('d-m-Y', strtotime($single['due_date'])) : '--',
+                            'outstanding' => round($outstanding, 2),
+                            'acc_fees' => round($acc_fees, 2),
+                            'penalty' => round($penalty, 2),
+                            'balance' => round($balance, 2),
+                            'total' => round($total, 2),
+                            'days' => $days
+                        );
+                        $total_balance += $balance;
+                        $total_fees += $acc_fees;
+                        $total_penalty += $penalty;
+                    }
+                    $total_paid += $paid;
+                }
+
+                // Get only the last month's balance for payment
+                $last_month_balance = 0;
+                $last_month_data = null;
+                $first_month_data = null;
+                $payment_month_range = '';
+                if (!empty($unpaid_months)) {
+                    $first_month_data = reset($unpaid_months);
+                    $last_month_data = end($unpaid_months);
+                    $last_month_balance = $last_month_data['balance'];
+
+                    // Create payment month range (FirstMonth-LastMonth)
+                    if (count($unpaid_months) > 1) {
+                        $payment_month_range = $first_month_data['month'] . '-' . $last_month_data['month'];
+                    } else {
+                        $payment_month_range = $last_month_data['month'];
+                    }
+                }
+
+                // Check customer GST setting and calculate GST if enabled
+                $customer = $this->customer->getcustomers(['t1.user_id' => $user_id], 'single');
+                $gst_enabled = !empty($customer) && !empty($customer['gst_enabled']) && $customer['gst_enabled'] == 1;
+                $gst_rate = $gst_enabled ? 18.0 : 0.0;
+                $gst_amount = $gst_enabled ? round(($last_month_balance * $gst_rate) / 100, 2) : 0;
+                $total_with_gst = round($last_month_balance + $gst_amount, 2);
+
+                // Get customer state for SGST/CGST vs IGST calculation
+                $customer_state_id = null;
+                if (!empty($customer) && !empty($customer['parent_id'])) {
+                    $customer_state_id = $customer['parent_id'];
+                }
+
+                // Get admin/company state (from admin user address)
+                $admin_state_id = null;
+                $admin_user = $this->db->select('id')->where_in('role', ['admin', 'superadmin'])->limit(1)->get('users')->row_array();
+                if (!empty($admin_user)) {
+                    $admin_address = $this->customer->getaddresses(['t1.user_id' => $admin_user['id']], 'single');
+                    if (!empty($admin_address) && !empty($admin_address['parent_id'])) {
+                        $admin_state_id = $admin_address['parent_id'];
+                    }
+                }
+
+                // Calculate SGST/CGST or IGST breakdown
+                $sgst_amount = 0;
+                $cgst_amount = 0;
+                $igst_amount = 0;
+                $states_match = false;
+
+                if ($gst_amount > 0 && !empty($customer_state_id) && !empty($admin_state_id)) {
+                    $states_match = ($customer_state_id == $admin_state_id);
+
+                    if ($states_match) {
+                        // Same state: SGST 9% + CGST 9% = 18%
+                        $sgst_amount = round(($last_month_balance * 9) / 100, 2);
+                        $cgst_amount = round(($last_month_balance * 9) / 100, 2);
+                        // Adjust for rounding differences
+                        $total_gst = round($sgst_amount + $cgst_amount, 2);
+                        if (abs($total_gst - $gst_amount) > 0.01) {
+                            $diff = round($gst_amount - $total_gst, 2);
+                            $sgst_amount = round($sgst_amount + round($diff / 2, 2), 2);
+                            $cgst_amount = round($gst_amount - $sgst_amount, 2);
+                        }
+                    } else {
+                        // Different states: IGST 18%
+                        $igst_amount = round($gst_amount, 2);
+                    }
+                } else {
+                    // Fallback: if states not available, use IGST
+                    $igst_amount = $gst_amount;
+                }
+
+                $this->response([
+                    'status' => true,
+                    'unpaid_months' => $unpaid_months,
+                    'last_month_balance' => round($last_month_balance, 2),
+                    'payment_month_range' => $payment_month_range,
+                    'gst_enabled' => $gst_enabled,
+                    'gst_rate' => $gst_rate,
+                    'gst_amount' => round($gst_amount, 2),
+                    'total_with_gst' => round($total_with_gst, 2),
+                    'sgst_amount' => round($sgst_amount, 2),
+                    'cgst_amount' => round($cgst_amount, 2),
+                    'igst_amount' => round($igst_amount, 2),
+                    'states_match' => $states_match,
+                    'package' => $package
+                ], RestController::HTTP_OK);
+            } else {
+                $this->response([
+                    'status' => false,
+                    'message' => "User Not Logged In!"
+                ], RestController::HTTP_OK);
+            }
+        } else {
+            $this->response([
+                'status' => false,
+                'message' => "Please provide all Details!"
+            ], RestController::HTTP_OK);
+        }
+    }
+
+    /**
+     * Process accountancy payment for all unpaid months
+     * Matches Reports::processpayment() logic - processes all unpaid months with incremental amounts
+     */
+    public function processaccountancypayment_post()
+    {
+        $token = $this->post('token');
+        $year = $this->post('year');
+        $firm_id = $this->post('firm_id');
+        $amount = $this->post('amount'); // Total amount including GST
+        
+        if (!empty($token) && !empty($year) && !empty($firm_id) && !empty($amount)) {
+            $user = $this->account->verify_token($token);
+            if (!empty($user) && is_array($user) && $user['role'] == 'customer') {
+                $user_id = $user['id'];
+                $amount = floatval($amount);
+
+                if (empty($year) || empty($firm_id) || empty($amount) || $amount <= 0) {
+                    $this->response([
+                        'status' => false,
+                        'message' => 'Invalid payment data!'
+                    ], RestController::HTTP_OK);
+                    return;
+                }
+
+                // Get unpaid months data (same logic as getpaymentreport)
+                $yearval = getyearmonthvalues($year);
+                $year1 = $yearval['year1'];
+                $year2 = $yearval['year2'];
+                $from = "$year1-04-01";
+                $to = "$year2-03-31";
+
+                $user_id_escaped = $this->db->escape($user_id);
+                $firm_id_escaped = $this->db->escape($firm_id);
+                $from_escaped = $this->db->escape($from);
+                $to_escaped = $this->db->escape($to);
+                $where2 = "t1.user_id={$user_id_escaped} AND t1.firm_id={$firm_id_escaped} AND t1.date>={$from_escaped} AND t1.date<={$to_escaped}";
+
+                $accountancy = $this->service->getturnoverswithpayment($where2);
+
+                if (empty($accountancy)) {
+                    $this->response([
+                        'status' => false,
+                        'message' => 'No Data Found!'
+                    ], RestController::HTTP_OK);
+                    return;
+                }
+
+                $where = array('user_id' => $user_id, 'status' => 1);
+                $query = $this->db->get_where('customer_packages', $where);
+                if ($query->num_rows() == 0) {
+                    $this->response([
+                        'status' => false,
+                        'message' => 'Package not Active!'
+                    ], RestController::HTTP_OK);
+                    return;
+                }
+
+                $cpackage = $query->unbuffered_row('array');
+                $name = $cpackage['package_id'] == 1 ? 'Accountancy Prime' : 'Accountancy Premium';
+                $package = $this->master->getpackages(['name' => $name], 'single');
+
+                $turnovers = !empty($accountancy) ? array_column($accountancy, 'turnover') : array(0);
+                $turnover = array_sum($turnovers);
+                $total_turnover = $turnover;
+
+                $date = date('Y-m-d');
+                $percent = 2 / 100;
+                $unpaid_months = array();
+                $total_balance = 0;
+                $total_fees = 0;
+                $total_penalty = 0;
+                $total_paid = 0;
+                $outstanding = $total = 0;
+
+                $fees = $total_turnover / $package['turnover'];
+                $fees *= $package['rate'];
+                $count = count($accountancy);
+                $last = end($accountancy);
+                if ($last['date'] == '') {
+                    $count--;
+                }
+                $acc_fees = $fees / $count;
+
+                foreach ($accountancy as $single) {
+                    $days = $paid = $penalty = 0;
+                    $paid = !empty($single['paid']) ? $single['paid'] : 0;
+                    $outstanding = $total;
+                    if ($single['date'] != '') {
+                        $acc_fees = $fees / $count;
+                    } else {
+                        $acc_fees = 0;
+                    }
+                    $other_fee = $single['other_fee'] ?? 0;
+                    $balance = $outstanding + $acc_fees + $other_fee;
+
+                    if ($single['due_date'] < $date && $paid < $balance) {
+                        $balance -= $paid;
+                        $date1 = new DateTime($single['due_date']);
+                        $date2 = new DateTime($date);
+                        $interval = $date1->diff($date2);
+                        $days = $interval->days;
+                        $penalty = ($percent * $balance);
+                        if ($days < 30) {
+                            $penalty /= 30;
+                            $penalty *= $days;
+                        }
+                        $penalty = round($penalty);
+                    } else {
+                        $balance -= $paid;
+                    }
+                    $total = $balance + $penalty;
+
+                    if ($balance > 0) {
+                        $unpaid_months[] = array(
+                            'id' => $single['id'],
+                            'date' => $single['date'],
+                            'due_date' => $single['due_date'] != '' ? date('d-m-Y', strtotime($single['due_date'])) : '--',
+                            'balance' => $balance,
+                            'total' => $total,
+                            'acc_fees' => $acc_fees,
+                            'penalty' => $penalty,
+                            'outstanding' => $outstanding
+                        );
+                        $total_balance += $balance;
+                        $total_fees += $acc_fees;
+                        $total_penalty += $penalty;
+                    }
+                    $total_paid += $paid;
+                }
+
+                // Get last month's balance for validation
+                $last_month_balance = 0;
+                $last_month_data = null;
+                if (!empty($unpaid_months)) {
+                    $last_month_data = end($unpaid_months);
+                    $last_month_balance = $last_month_data['balance'];
+                }
+
+                // Check customer GST setting to validate payment amount
+                $customer_check = $this->customer->getcustomers(['t1.user_id' => $user_id], 'single');
+                $gst_enabled_check = !empty($customer_check) && !empty($customer_check['gst_enabled']) && $customer_check['gst_enabled'] == 1;
+                $gst_amount_check = $gst_enabled_check ? round(($last_month_balance * 18) / 100, 2) : 0;
+                $expected_total = $last_month_balance + $gst_amount_check;
+
+                if (abs($amount - $expected_total) > 0.01) {
+                    $this->response([
+                        'status' => false,
+                        'message' => 'Payment amount does not match the expected total! Expected: ₹' . number_format($expected_total, 2) . ($gst_enabled_check ? ' (including GST)' : '')
+                    ], RestController::HTTP_OK);
+                    return;
+                }
+
+                // Check wallet balance
+                $this->load->model('Wallet_model', 'wallet');
+                $wallet_balance = $this->wallet->getwalletbalance($user_id);
+
+                if ($wallet_balance <= 0) {
+                    $this->response([
+                        'status' => false,
+                        'message' => 'Insufficient wallet balance! Your wallet balance is ₹' . number_format($wallet_balance, 2) . '. Please add funds to your wallet first.'
+                    ], RestController::HTTP_OK);
+                    return;
+                }
+
+                $total_amount_needed = $expected_total;
+
+                if ($wallet_balance < $total_amount_needed) {
+                    $needed = round($total_amount_needed - $wallet_balance, 2);
+                    $this->response([
+                        'status' => false,
+                        'message' => 'Insufficient wallet balance! You need ₹' . number_format($needed, 2) . ' more. Current balance: ₹' . number_format(round($wallet_balance, 2), 2) . ', Required: ₹' . number_format($total_amount_needed, 2) . ($gst_enabled_check ? ' (including GST)' : '')
+                    ], RestController::HTTP_OK);
+                    return;
+                }
+
+                // Process payment for ALL unpaid months
+                if (!empty($unpaid_months)) {
+                    $payment_success = true;
+                    $payment_errors = array();
+                    $previous_balance = 0;
+
+                    foreach ($unpaid_months as $month_data) {
+                        // Calculate incremental amount for this month
+                        $month_payment_amount = $month_data['balance'] - $previous_balance;
+
+                        if ($month_payment_amount <= 0) {
+                            continue;
+                        }
+
+                        $previous_balance = $month_data['balance'];
+
+                        // Convert due_date format
+                        $payment_date = date('Y-m-d');
+                        if (!empty($month_data['due_date']) && $month_data['due_date'] != '--') {
+                            $due_date_parts = explode('-', $month_data['due_date']);
+                            if (count($due_date_parts) == 3) {
+                                $payment_date = $due_date_parts[2] . '-' . $due_date_parts[1] . '-' . $due_date_parts[0];
+                            }
+                        }
+
+                        $acc_date = !empty($month_data['date']) ? $month_data['date'] : date('Y-m-d');
+
+                        // Calculate GST for this month
+                        $month_gst = $gst_enabled_check ? round(($month_payment_amount * 18) / 100, 2) : 0;
+                        $month_total = round($month_payment_amount + $month_gst, 2);
+
+                        $payment_data = array(
+                            'user_id' => $user_id,
+                            'firm_id' => $firm_id,
+                            'year' => $year,
+                            'acc_date' => $acc_date,
+                            'date' => $payment_date,
+                            'amount' => $month_total,
+                            'added_by' => $user['id']
+                        );
+
+                        $result = $this->wallet->makeaccountancypayment($payment_data);
+                        if ($result['status'] !== true) {
+                            $payment_success = false;
+                            $payment_errors[] = $result['message'] . ' (Month: ' . (!empty($month_data['date']) ? date('F Y', strtotime($month_data['date'])) : 'N/A') . ', Amount: ₹' . number_format($month_payment_amount, 2) . ')';
+                        }
+                    }
+
+                    if (!$payment_success) {
+                        $this->response([
+                            'status' => false,
+                            'message' => 'Payment partially failed: ' . implode(', ', $payment_errors)
+                        ], RestController::HTTP_OK);
+                        return;
+                    }
+                } else {
+                    $this->response([
+                        'status' => false,
+                        'message' => 'No unpaid month found!'
+                    ], RestController::HTTP_OK);
+                    return;
+                }
+
+                // Generate invoice
+                $customer = $this->customer->getcustomers(['t1.user_id' => $user_id], 'single');
+                $firm = $this->db->get_where('firms', ['id' => $firm_id])->row_array();
+
+                $gst_enabled = !empty($customer) && !empty($customer['gst_enabled']) && $customer['gst_enabled'] == 1;
+                $subtotal = $last_month_balance;
+                $gst_rate = $gst_enabled ? 18.0 : 0.0;
+                $gst_amount = $gst_enabled ? round(($last_month_balance * $gst_rate) / 100, 2) : 0;
+                $total_amount = $subtotal + $gst_amount;
+
+                // Get period value
+                $period_value = '';
+                if (!empty($unpaid_months)) {
+                    $first_month = reset($unpaid_months);
+                    $last_month = end($unpaid_months);
+                    $first_month_name = !empty($first_month['date']) ? strtolower(date('F-y', strtotime($first_month['date']))) : '';
+                    $last_month_name = !empty($last_month['date']) ? strtolower(date('F-y', strtotime($last_month['date']))) : '';
+
+                    if ($first_month_name == $last_month_name) {
+                        $period_value = $first_month_name;
+                    } else {
+                        $period_value = $first_month_name . '/' . $last_month_name;
+                    }
+                }
+
+                $this->load->model('Invoice_model', 'invoice');
+                $invoice_data = array(
+                    'user_id' => $user_id,
+                    'firm_id' => $firm_id,
+                    'type' => 'accountancy',
+                    'year' => $year,
+                    'subtotal' => $subtotal,
+                    'gst_rate' => $gst_rate,
+                    'gst_amount' => $gst_amount,
+                    'total_amount' => $total_amount,
+                    'invoice_date' => date('Y-m-d'),
+                    'billing_name' => !empty($customer['name']) ? $customer['name'] : '',
+                    'billing_email' => !empty($customer['email']) ? $customer['email'] : '',
+                    'billing_mobile' => !empty($customer['mobile']) ? $customer['mobile'] : '',
+                    'firm_name' => !empty($firm['name']) ? $firm['name'] : '',
+                    'firm_gstin' => !empty($firm['gstin']) ? $firm['gstin'] : '',
+                    'firm_pan' => !empty($firm['pan']) ? $firm['pan'] : '',
+                    'service_name' => 'Accountancy Service',
+                    'period_value' => $period_value
+                );
+
+                $invoice_result = $this->invoice->create_custom_invoice($invoice_data);
+                $invoice_no = '';
+                if ($invoice_result['status'] === true && !empty($invoice_result['invoice'])) {
+                    $invoice_no = $invoice_result['invoice']['invoice_no'];
+                }
+
+                $payment_msg = 'Payment of ₹' . number_format($subtotal, 2);
+                if ($gst_enabled && $gst_amount > 0) {
+                    $payment_msg .= ' + GST ₹' . number_format($gst_amount, 2) . ' (Total: ₹' . number_format($total_amount, 2) . ')';
+                }
+                $payment_msg .= ' processed successfully!' . (!empty($invoice_no) ? ' Invoice: ' . $invoice_no : '');
+
+                $this->response([
+                    'status' => true,
+                    'message' => $payment_msg,
+                    'invoice_no' => $invoice_no
+                ], RestController::HTTP_OK);
+            } else {
+                $this->response([
+                    'status' => false,
+                    'message' => 'User Not Logged In!'
+                ], RestController::HTTP_OK);
+            }
+        } else {
+            $this->response([
+                'status' => false,
+                'message' => 'Please provide all Details!'
             ], RestController::HTTP_OK);
         }
     }

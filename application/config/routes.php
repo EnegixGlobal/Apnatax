@@ -113,10 +113,15 @@ $route['api/getservicefields'] = 'api/services/getservicefields';
 $route['api/getservicefieldsfororder'] = 'api/services/getservicefieldsfororder';
 $route['api/saveformdata'] = 'api/services/saveformdata';
 $route['api/formpreview'] = 'api/services/formpreview';
+$route['api/getaccountworkpackagedetails'] = 'api/services/getaccountworkpackagedetails';
+$route['api/renewpackage'] = 'api/services/renewpackage';
 
 $route['api/createpackage'] = 'api/profile/createpackage';
 $route['api/myservicepackage'] = 'api/profile/myservicepackage';
+$route['api/getservicepackages'] = 'api/profile/getservicepackages';
 $route['api/requestpackagedelete'] = 'api/profile/requestpackagedelete';
+$route['api/requestdeleteaccountwork'] = 'api/profile/requestdeleteaccountwork';
+$route['api/triggerautorenew'] = 'api/profile/triggerautorenew';
 
 $route['api/addfirm'] = 'api/profile/addfirm';
 $route['api/myfirms'] = 'api/profile/myfirms';
@@ -135,6 +140,8 @@ $route['api/newchat'] = 'api/chat/newchat';
 $route['api/getreportgroups'] = 'api/reports/getreportgroups';
 $route['api/getreports'] = 'api/reports/getreports';
 $route['api/getaccountancyreports'] = 'api/reports/getaccountancyreports';
+$route['api/getpaymentreport'] = 'api/reports/getpaymentreport';
+$route['api/processaccountancypayment'] = 'api/reports/processaccountancypayment';
 $route['api/getotherfeereport'] = 'api/reports/getotherfeereport';
 
 $route['api/getpurchasedservices'] = 'api/reports/getpurchasedservices';
