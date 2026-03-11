@@ -159,13 +159,50 @@
                     <?php
                     }
                     ?>
+                    <?php
+                    // Check if user has Account Work package and its type
+                    $is_monthly_type = false;
+                    if ($this->session->role == 'customer') {
+                        $user = getuser();
+                        $year = $this->session->year;
+                        $firm_id = $this->session->firm;
+                        if (!empty($user) && !empty($year) && !empty($firm_id)) {
+                            $where = array('user_id' => $user['id'], 'status' => 1, 'firm_id' => $firm_id, 'year' => $year);
+                            $query = $this->db->get_where('customer_packages', $where);
+                            if ($query->num_rows() > 0) {
+                                $cpackage = $query->unbuffered_row('array');
+                                $pkg_type = !empty($cpackage['package_type']) ? $cpackage['package_type'] : 'Turnover';
+                                // Check if Monthly type package
+                                if ($pkg_type == 'Monthly') {
+                                    $is_monthly_type = true;
+                                }
+                            }
+                        }
+                    }
+                    ?>
                     <li class="slide <?= activate_dropdown(['reports'], []) ?>">
                         <a class="side-menu__item <?= activate_dropdown(['reports'], []) ?>" data-bs-toggle="slide" href="javascript:void(0)"><i class="side-menu__icon  fa fa-list-alt"></i><span class="side-menu__label">Fee Report</span><i class="angle fe fe-chevron-right"></i></a>
                         <ul class="slide-menu">
                             <li class="side-menu-label1"><a href="javascript:void(0)">Fee Report</a></li>
-                            <li><a href="<?= base_url('reports/'); ?>" class="slide-item <?= activate_menu('reports'); ?>"> Accounting Fee</a></li>
+                            <li>
+                                <?php if ($is_monthly_type) : ?>
+                                    <a href="javascript:void(0);" class="slide-item text-muted" style="opacity: 0.5; cursor: not-allowed;" onclick="alert('Accounting Fee is not available for Monthly type packages. Monthly packages are auto-debited based on the fixed amount.'); return false;" title="Not available for Monthly type packages">
+                                        <i class="fe fe-lock me-1"></i> Accounting Fee
+                                    </a>
+                                <?php else : ?>
+                                    <a href="<?= base_url('reports/'); ?>" class="slide-item <?= activate_menu('reports'); ?>"> Accounting Fee</a>
+                                <?php endif; ?>
+                            </li>
                             <li><a href="<?= base_url('reports/otherfee/'); ?>" class="slide-item <?= activate_menu('reports/otherfee'); ?>"> Other Fee</a></li>
-                            <li><a href="<?= base_url('reports/payment/'); ?>" class="slide-item <?= activate_menu('reports/payment'); ?>"> Accounting Pay</a></li>
+                            <li>
+                                <?php if ($is_monthly_type) : ?>
+                                    <a href="javascript:void(0);" class="slide-item text-muted" style="opacity: 0.5; cursor: not-allowed;" onclick="alert('Accounting Pay is not available for Monthly type packages. Monthly packages are auto-debited based on the fixed amount.'); return false;" title="Not available for Monthly type packages">
+                                        <i class="fe fe-lock me-1"></i> Accounting Pay
+                                    </a>
+                                <?php else : ?>
+                                    <a href="<?= base_url('reports/payment/'); ?>" class="slide-item <?= activate_menu('reports/payment'); ?>"> Accounting Pay</a>
+                                <?php endif; ?>
+                            </li>
                         </ul>
                     </li>
                     <li class="slide">
