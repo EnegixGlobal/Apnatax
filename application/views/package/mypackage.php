@@ -870,11 +870,18 @@ if (!empty($service_packages)) {
     <div class="pkg-card-wrap mb-4" id="acct-work-card">
 
         <?php if (!empty($package)) :
-            $acct_name = $package['package_id'] == 1 ? 'Accountancy Prime' : 'Accountancy Premium';
+            $pkg_type = !empty($package['package_type']) ? $package['package_type'] : 'Turnover';
+            // For Monthly type, don't show package name (Prime/Premium)
+            // For Turnover type, show package name
+            $acct_name = '';
+            if ($pkg_type == 'Monthly') {
+                $acct_name = 'Account Work Monthly';
+            } else {
+                $acct_name = !empty($package['package_id']) && $package['package_id'] == 1 ? 'Accountancy Prime' : (!empty($package['package_id']) && $package['package_id'] == 2 ? 'Accountancy Premium' : 'Account Work');
+            }
             $expiry_ts = !empty($package['expiry_date']) ? strtotime($package['expiry_date']) : 0;
             $is_expired = $expiry_ts && $expiry_ts <= time();
             $is_unpaid = empty($package['payment_status']) || $package['payment_status'] == 0;
-            $pkg_type = !empty($package['package_type']) ? $package['package_type'] : 'Turnover';
 
             // Determine status
             if ($is_expired && $is_unpaid) {
@@ -901,6 +908,11 @@ if (!empty($service_packages)) {
                         <span class="pkg-type-pill" style="background:#f0f9f1;color:#3a7d44;border:1px solid #b7e0be">
                             <i class="fe fe-trending-up me-1" style="font-size:.68rem"></i><?= htmlspecialchars($pkg_type) ?>
                         </span>
+                        <?php if ($pkg_type == 'Monthly' && !empty($package['amount'])) : ?>
+                            <span class="pkg-type-pill" style="background:#e3f2fd;color:#1976d2;border:1px solid #90caf9">
+                                <i class="fe fe-rupee me-1" style="font-size:.68rem"></i>₹<?= number_format($package['amount'], 2) ?>/month
+                            </span>
+                        <?php endif; ?>
                     </div>
                     <div class="d-flex flex-wrap gap-3" style="font-size:.82rem;color:#555;">
                         <span>
@@ -973,40 +985,42 @@ if (!empty($service_packages)) {
                 </div>
             </div>
 
-            <!-- ── Rate chart for selected package ── -->
-            <?php
-            $acct_slug = $package['package_id'] == 1 ? 'accountancy-prime' : 'accountancy-premium';
-            $acct_rows = [];
-            if (!empty($accountancy_packages)) {
-                foreach ($accountancy_packages as $_ap) {
-                    if (generate_slug($_ap['name']) === $acct_slug) $acct_rows[] = $_ap;
+            <!-- ── Rate chart for selected package (only for Turnover type, not for Monthly) ── -->
+            <?php if ($pkg_type != 'Monthly' && !empty($package['package_id'])) : ?>
+                <?php
+                $acct_slug = $package['package_id'] == 1 ? 'accountancy-prime' : 'accountancy-premium';
+                $acct_rows = [];
+                if (!empty($accountancy_packages)) {
+                    foreach ($accountancy_packages as $_ap) {
+                        if (generate_slug($_ap['name']) === $acct_slug) $acct_rows[] = $_ap;
+                    }
                 }
-            }
-            ?>
-            <?php if (!empty($acct_rows)) : ?>
-                <div class="acct-rate-section">
-                    <div class="rate-title">
-                        <i class="fe fe-bar-chart-2 me-1"></i><?= htmlspecialchars($acct_name) ?> — Rate Chart
-                    </div>
-                    <div class="table-responsive" style="max-width:460px;">
-                        <table class="table table-bordered table-sm mb-0" style="font-size:.8rem;">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Turnover Slab</th>
-                                    <th>Rate</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($acct_rows as $_r) : ?>
+                ?>
+                <?php if (!empty($acct_rows)) : ?>
+                    <div class="acct-rate-section">
+                        <div class="rate-title">
+                            <i class="fe fe-bar-chart-2 me-1"></i><?= htmlspecialchars($acct_name) ?> — Rate Chart
+                        </div>
+                        <div class="table-responsive" style="max-width:460px;">
+                            <table class="table table-bordered table-sm mb-0" style="font-size:.8rem;">
+                                <thead class="table-light">
                                     <tr>
-                                        <td><?= htmlspecialchars($_r['remarks']) ?></td>
-                                        <td><strong class="text-success">₹<?= number_format($_r['rate'], 0) ?></strong></td>
+                                        <th>Turnover Slab</th>
+                                        <th>Rate</th>
                                     </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($acct_rows as $_r) : ?>
+                                        <tr>
+                                            <td><?= htmlspecialchars($_r['remarks']) ?></td>
+                                            <td><strong class="text-success">₹<?= number_format($_r['rate'], 0) ?></strong></td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
-                </div>
+                <?php endif; ?>
             <?php endif; ?>
 
         <?php else : ?>
@@ -1075,6 +1089,15 @@ if (!empty($service_packages)) {
                     </div>
                 </div>
 
+                <!-- Confirm button for Monthly type (shown when amount is entered) -->
+                <div class="row g-3 align-items-start mt-3" id="acct-confirm-wrap-monthly" style="display:none;">
+                    <div class="col-12">
+                        <button type="button" class="btn btn-success btn-sm px-4 fw-semibold" id="acct-confirm-btn-monthly">
+                            <i class="fe fe-check me-2"></i>Confirm & Save Monthly Package
+                        </button>
+                    </div>
+                </div>
+
                 <div class="row g-3 align-items-start mt-2" id="acct-package-selection-wrap" style="display:none;">
                     <!-- Left: package dropdown -->
                     <div class="col-md-4">
@@ -1110,6 +1133,7 @@ if (!empty($service_packages)) {
                     </div>
                 </div>
 
+                <!-- Confirm button for Turnover type (shown when package is selected) -->
                 <div class="mt-3" id="acct-confirm-wrap" style="display:none;">
                     <button type="button" class="btn btn-success btn-sm px-4 fw-semibold" id="acct-confirm-btn">
                         <i class="fe fe-check me-2"></i>Confirm Selection
@@ -1131,6 +1155,8 @@ if (!empty($service_packages)) {
             var ratesWrap = document.getElementById('acct-rates-wrap');
             var confirmWrap = document.getElementById('acct-confirm-wrap');
             var confirmBtn = document.getElementById('acct-confirm-btn');
+            var confirmWrapMonthly = document.getElementById('acct-confirm-wrap-monthly');
+            var confirmBtnMonthly = document.getElementById('acct-confirm-btn-monthly');
 
             // Type selection handler
             if (typeSel) {
@@ -1144,15 +1170,16 @@ if (!empty($service_packages)) {
                     pkgSel.value = '';
                     ratesWrap.style.display = 'none';
                     confirmWrap.style.display = 'none';
+                    confirmWrapMonthly.style.display = 'none';
                     document.querySelectorAll('.acct-pkg-row').forEach(function(r) {
                         r.style.display = 'none';
                     });
 
                     if (selectedType === 'Monthly') {
-                        // Show monthly amount input
+                        // Show monthly amount input only (no package selection for Monthly type)
                         monthlyAmountWrap.style.display = 'block';
-                        // Show package selection
-                        packageSelectionWrap.style.display = 'block';
+                        // Hide package selection for Monthly type
+                        packageSelectionWrap.style.display = 'none';
                     } else if (selectedType === 'Turnover') {
                         // Show package selection directly (no monthly amount needed)
                         packageSelectionWrap.style.display = 'block';
@@ -1160,11 +1187,16 @@ if (!empty($service_packages)) {
                 });
             }
 
-            // Package dropdown → show rates table
+            // Package dropdown → show rates table (only for Turnover type)
             if (pkgSel) {
                 pkgSel.addEventListener('change', function() {
                     var val = this.value;
                     var selectedType = typeSel ? typeSel.value : '';
+                    
+                    // Only process package selection for Turnover type
+                    if (selectedType !== 'Turnover') {
+                        return;
+                    }
                     
                     document.querySelectorAll('.acct-pkg-row').forEach(function(r) {
                         r.style.display = 'none';
@@ -1175,17 +1207,7 @@ if (!empty($service_packages)) {
                             r.style.display = '';
                         });
                         ratesWrap.style.display = '';
-                        
-                        // Show confirm button if all required fields are filled
-                        if (selectedType === 'Monthly') {
-                            if (monthlyAmountInput && monthlyAmountInput.value && parseFloat(monthlyAmountInput.value) > 0) {
-                                confirmWrap.style.display = 'block';
-                            } else {
-                                confirmWrap.style.display = 'none';
-                            }
-                        } else if (selectedType === 'Turnover') {
-                            confirmWrap.style.display = 'block';
-                        }
+                        confirmWrap.style.display = 'block';
                     } else {
                         ratesWrap.style.display = 'none';
                         confirmWrap.style.display = 'none';
@@ -1198,69 +1220,91 @@ if (!empty($service_packages)) {
                 monthlyAmountInput.addEventListener('input', function() {
                     var amount = parseFloat(this.value);
                     var selectedType = typeSel ? typeSel.value : '';
-                    var pkgSelected = pkgSel ? pkgSel.value : '';
                     
-                    if (selectedType === 'Monthly' && amount > 0 && pkgSelected) {
-                        confirmWrap.style.display = 'block';
+                    // For Monthly type, only amount is required (no package selection needed)
+                    if (selectedType === 'Monthly' && amount > 0) {
+                        confirmWrapMonthly.style.display = 'block';
                     } else if (selectedType === 'Monthly' && (!amount || amount <= 0)) {
-                        confirmWrap.style.display = 'none';
+                        confirmWrapMonthly.style.display = 'none';
                     }
                 });
             }
 
-            // Confirm button
-            if (confirmBtn) {
-                confirmBtn.addEventListener('click', function() {
-                    var selectedType = typeSel ? typeSel.value : '';
-                    var pkg_id = pkgSel ? pkgSel.value : '';
-                    var amount = '';
-                    
-                    if (!selectedType) {
-                        alert('Please select a type (Turnover or Monthly)!');
+            // Confirm button handler function (shared for both Monthly and Turnover)
+            function handleConfirmClick(btnElement, isMonthly) {
+                var selectedType = typeSel ? typeSel.value : '';
+                var pkg_id = '';
+                var amount = '';
+                
+                if (!selectedType) {
+                    alert('Please select a type (Turnover or Monthly)!');
+                    return;
+                }
+                
+                if (selectedType === 'Monthly') {
+                    // For Monthly type, only amount is required (no package selection)
+                    amount = monthlyAmountInput ? monthlyAmountInput.value : '';
+                    if (!amount || parseFloat(amount) <= 0) {
+                        alert('Please enter a valid monthly amount!');
                         return;
                     }
-                    
+                    // For Monthly type, set a default package_id (can be empty or use default)
+                    // Backend will handle Monthly type without package_id requirement
+                    pkg_id = ''; // No package selection for Monthly type
+                } else if (selectedType === 'Turnover') {
+                    // For Turnover type, package selection is required
+                    pkg_id = pkgSel ? pkgSel.value : '';
                     if (!pkg_id) {
                         alert('Please select a package!');
                         return;
                     }
-                    
-                    if (selectedType === 'Monthly') {
-                        amount = monthlyAmountInput ? monthlyAmountInput.value : '';
-                        if (!amount || parseFloat(amount) <= 0) {
-                            alert('Please enter a valid monthly amount!');
-                            return;
-                        }
-                    }
+                }
 
-                    confirmBtn.disabled = true;
-                    confirmBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Processing…';
+                btnElement.disabled = true;
+                var originalHtml = btnElement.innerHTML;
+                btnElement.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Processing…';
 
-                    var fd = new FormData();
-                    fd.append('id', 1);
-                    fd.append('type', selectedType);
-                    fd.append('amount', amount);
+                var fd = new FormData();
+                fd.append('id', 1);
+                fd.append('type', selectedType);
+                fd.append('amount', amount);
+                // Only append package_id if it's not empty (for Turnover type)
+                if (pkg_id) {
                     fd.append('package_id', pkg_id);
+                }
 
-                    fetch('<?= base_url('services/buyservice/') ?>', {
-                            method: 'POST',
-                            body: fd
-                        })
-                        .then(function(r) {
-                            return r.text();
-                        })
-                        .then(function(resp) {
-                            if (resp && resp.trim() !== '') {
-                                window.location = resp.trim();
-                            } else {
-                                window.location.reload();
-                            }
-                        })
-                        .catch(function() {
-                            alert('Something went wrong. Please try again.');
-                            confirmBtn.disabled = false;
-                            confirmBtn.innerHTML = '<i class="fe fe-check me-2"></i>Confirm Selection';
-                        });
+                fetch('<?= base_url('services/buyservice/') ?>', {
+                        method: 'POST',
+                        body: fd
+                    })
+                    .then(function(r) {
+                        return r.text();
+                    })
+                    .then(function(resp) {
+                        if (resp && resp.trim() !== '') {
+                            window.location = resp.trim();
+                        } else {
+                            window.location.reload();
+                        }
+                    })
+                    .catch(function() {
+                        alert('Something went wrong. Please try again.');
+                        btnElement.disabled = false;
+                        btnElement.innerHTML = originalHtml;
+                    });
+            }
+
+            // Confirm button for Turnover type
+            if (confirmBtn) {
+                confirmBtn.addEventListener('click', function() {
+                    handleConfirmClick(this, false);
+                });
+            }
+
+            // Confirm button for Monthly type
+            if (confirmBtnMonthly) {
+                confirmBtnMonthly.addEventListener('click', function() {
+                    handleConfirmClick(this, true);
                 });
             }
         })();
@@ -1512,6 +1556,12 @@ if (!empty($service_packages)) {
                             if (in_array('Monthly',   $svc_types)) $primary_type = 'Monthly';
                             if (in_array('Quarterly', $svc_types)) $primary_type = 'Quarterly';
                             if (in_array('Yearly',    $svc_types)) $primary_type = 'Yearly';
+                            
+                            // Skip services with "Once" type - don't show them in package creation
+                            if ($primary_type == 'Once') {
+                                continue;
+                            }
+                            
                             $opts     = $services_with_options[$svc['id']]['options'] ?? [];
                             $row_cls  = $is_locked ? 'row-inpkg' : '';
                             $t_meta   = pkg_type_meta($primary_type);

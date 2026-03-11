@@ -41,6 +41,17 @@ class Reports extends CI_Controller
         $where = array('user_id' => $user_id, 'status' => 1);
         $query = $this->db->get_where('customer_packages', $where);
         if ($query->num_rows() > 0) {
+            $cpackage = $query->unbuffered_row('array');
+            $pkg_type = !empty($cpackage['package_type']) ? $cpackage['package_type'] : 'Turnover';
+
+            // Accounting Fee is only for Turnover type packages
+            // Monthly type packages don't use turnover-based fee calculation
+            if ($pkg_type == 'Monthly') {
+                $this->session->set_flashdata('err_msg', 'Accounting Fee is not available for Monthly type packages. Monthly packages are auto-debited based on the fixed amount.');
+                redirect('package/');
+                return;
+            }
+
             // Use proper escaping for SQL query
             $user_id_escaped = $this->db->escape($user_id);
             $firm_id_escaped = $this->db->escape($firm_id);
@@ -59,7 +70,6 @@ class Reports extends CI_Controller
             $turnovers = !empty($accountancy) ? array_column($accountancy, 'turnover') : array(0);
             $turnover = array_sum($turnovers);
             $total_turnover = $turnover;
-            $cpackage = $query->unbuffered_row('array');
             $name = $cpackage['package_id'] == 1 ? 'Accountancy Prime' : 'Accountancy Premium';
             $package = $this->master->getpackages(['name' => $name, 'turnover>' => $turnover], 'single');
             $date = date('Y-m-d');
@@ -1130,11 +1140,21 @@ class Reports extends CI_Controller
             $query = $this->db->get_where('customer_packages', $where);
             if ($query->num_rows() == 0) {
                 $this->session->set_flashdata('err_msg', 'Package not Active!');
-                redirect('reports/payment/');
+                redirect('reports/');
                 return;
             }
 
             $cpackage = $query->unbuffered_row('array');
+            $pkg_type = !empty($cpackage['package_type']) ? $cpackage['package_type'] : 'Turnover';
+
+            // Accounting Pay is only for Turnover type packages
+            // Monthly type packages don't use turnover-based payment system
+            if ($pkg_type == 'Monthly') {
+                $this->session->set_flashdata('err_msg', 'Accounting Pay is not available for Monthly type packages. Monthly packages are auto-debited based on the fixed amount.');
+                redirect('package/');
+                return;
+            }
+
             $name = $cpackage['package_id'] == 1 ? 'Accountancy Prime' : 'Accountancy Premium';
             $package = $this->master->getpackages(['name' => $name], 'single');
 

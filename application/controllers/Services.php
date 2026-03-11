@@ -532,7 +532,15 @@ class Services extends CI_Controller
                 return;
             }
 
-            $service_name = $pkg['package_id'] == 1 ? 'Accountancy Prime' : 'Accountancy Premium';
+            // For Monthly type, package_id is NULL/0, use generic name
+            // For Turnover type, use package name
+            if ($pkg_type == 'Monthly') {
+                $service_name = 'Account Work Monthly';
+            } else if (!empty($pkg['package_id'])) {
+                $service_name = $pkg['package_id'] == 1 ? 'Accountancy Prime' : 'Accountancy Premium';
+            } else {
+                $service_name = 'Account Work';
+            }
 
             // ── Create purchase row for Account Work ────────────────────────
             $this->db->insert('purchases', [
@@ -704,6 +712,47 @@ class Services extends CI_Controller
         }
         
         $this->db->update($table_name, $update_data, ['id' => $package_id]);
+
+        // ── For Monthly Account Work type, record monthly amount in accountancy other_fee ───────────────────────────────────────────
+        if ($is_account_work && $pkg_type == 'Monthly') {
+            // Get current month's first day (e.g., 2024-04-01)
+            $current_month_start = date('Y-m-01');
+            
+            // Check if accountancy record exists for this month
+            $acc_record = $this->db->get_where('accountancy', [
+                'user_id' => $user['id'],
+                'firm_id' => $firm_id,
+                'date' => $current_month_start
+            ])->unbuffered_row('array');
+            
+            if (!empty($acc_record)) {
+                // Update existing record - add monthly amount to other_fee
+                $existing_other_fee = (float)($acc_record['other_fee'] ?? 0);
+                $new_other_fee = $existing_other_fee + $subtotal; // Use base rate (without GST)
+                $this->db->update('accountancy', [
+                    'other_fee' => $new_other_fee,
+                    'updated_on' => $datetime
+                ], [
+                    'id' => $acc_record['id']
+                ]);
+            } else {
+                // Create new accountancy record for this month
+                $acc_data = [
+                    'user_id' => $user['id'],
+                    'firm_id' => $firm_id,
+                    'year' => $year,
+                    'date' => $current_month_start,
+                    'turnover' => 0,
+                    'other_fee' => $subtotal, // Use base rate (without GST)
+                    'due_date' => date('Y-m-d', strtotime('+1 month', strtotime($current_month_start))), // Due date is next month
+                    'added_by' => $user['id'],
+                    'status' => 1,
+                    'added_on' => $datetime,
+                    'updated_on' => $datetime
+                ];
+                $this->service->saveturnover($acc_data);
+            }
+        }
 
         // ── Generate invoice ───────────────────────────────────────────
         $customer  = $this->customer->getcustomers(['t1.user_id' => $user['id']], 'single');
@@ -1304,28 +1353,51 @@ class Services extends CI_Controller
                 }
 
                 if ($service_id == 1) {
-                    //                    $status=false;
-                    //                    $message="Select Package to Activate ".$service['name'];
-                    //                    if($type=='Monthly'){
-                    //                        $message="Select Package and enter Monthly Debit Amount to Activate ".$service['name'];
-                    //                    }
-                    $package_id = $package_id == 'accountancy-prime' ? 1 : 2;
-                    $name = $package_id == 1 ? 'Accountancy Prime' : 'Accountancy Premium';
                     $autodebit = 1;
-                    $package = $this->master->getpackages(['name' => $name]);
-                    $where = array('user_id' => $user['id'], 'status' => 1, 'firm_id' => $firm_id, 'year' => $year);
-                    $query = $this->db->get_where('customer_packages', $where);
                     $status = true;
-                    $message = $name . " Selected Successfully!";
-                    if ($query->num_rows() > 0) {
-                        $cpackage = $query->unbuffered_row('array');
-                        $p = $cpackage['package_id'] == 1 ? 'Accountancy Prime' : 'Accountancy Premium';
-                        $status = false;
-                        $message = "You have already selected " . $p . "!";
-                    }
-                    if ($type == "Monthly" && empty($amount)) {
-                        $status = false;
-                        $message = "Enter Monthly Debit Amount to Select Package!";
+                    $message = "";
+                    
+                    // For Monthly type, package_id is not required
+                    if ($type == "Monthly") {
+                        if (empty($amount)) {
+                            $status = false;
+                            $message = "Enter Monthly Debit Amount!";
+                        } else {
+                            // Check if user already has an Account Work package for this firm/year
+                            $where = array('user_id' => $user['id'], 'status' => 1, 'firm_id' => $firm_id, 'year' => $year);
+                            $query = $this->db->get_where('customer_packages', $where);
+                            if ($query->num_rows() > 0) {
+                                $cpackage = $query->unbuffered_row('array');
+                                $pkg_type_existing = !empty($cpackage['package_type']) ? $cpackage['package_type'] : 'Turnover';
+                                $status = false;
+                                $message = "You have already selected Account Work package (" . $pkg_type_existing . " type)!";
+                            } else {
+                                $message = "Account Work Monthly package selected successfully!";
+                                // For Monthly type, set a default package_id (can be 1 or null)
+                                // Since package selection is not shown, use default value
+                                $package_id = 1; // Default to Accountancy Prime
+                            }
+                        }
+                    } else {
+                        // For Turnover type, package_id is required
+                        if (empty($package_id)) {
+                            $status = false;
+                            $message = "Select Package to Activate " . $service['name'];
+                        } else {
+                            $package_id = $package_id == 'accountancy-prime' ? 1 : 2;
+                            $name = $package_id == 1 ? 'Accountancy Prime' : 'Accountancy Premium';
+                            $package = $this->master->getpackages(['name' => $name]);
+                            $where = array('user_id' => $user['id'], 'status' => 1, 'firm_id' => $firm_id, 'year' => $year);
+                            $query = $this->db->get_where('customer_packages', $where);
+                            $status = true;
+                            $message = $name . " Selected Successfully!";
+                            if ($query->num_rows() > 0) {
+                                $cpackage = $query->unbuffered_row('array');
+                                $p = $cpackage['package_id'] == 1 ? 'Accountancy Prime' : 'Accountancy Premium';
+                                $status = false;
+                                $message = "You have already selected " . $p . "!";
+                            }
+                        }
                     }
                     if ($status) {
                         $datetime = date('Y-m-d H:i:s');
@@ -1388,7 +1460,6 @@ class Services extends CI_Controller
                         
                         $data = array(
                             'user_id' => $user['id'],
-                            'package_id' => $package_id,
                             'firm_id' => $firm_id,
                             'year' => $year,
                             'status' => 1,
@@ -1401,15 +1472,25 @@ class Services extends CI_Controller
                             'updated_on' => $datetime
                         );
 
+                        // For Monthly type, don't store package_id (set to 0)
+                        // For Turnover type, store the selected package_id
                         if ($type == "Monthly") {
                             $data['amount'] = $amount;
+                            $data['package_id'] = 0; // No package selection for Monthly type
+                        } else {
+                            $data['package_id'] = $package_id; // Store package_id for Turnover type
                         }
                         if (!empty($autodebit) && $autodebit != 0) {
                             $data['autodebit'] = 1;
                         }
                         $result = $this->db->insert("customer_packages", $data);
                         if ($result) {
-                            $this->session->set_flashdata("msg", "Accountancy Package Selected Successfully! Package expires on " . date('d-m-Y', strtotime($expiry_date)) . ".");
+                            if ($type == "Monthly") {
+                                $this->session->set_flashdata("msg", "Account Work Monthly package selected successfully! Package expires on " . date('d-m-Y', strtotime($expiry_date)) . ". Amount ₹" . number_format($amount, 2) . " will be auto-debited monthly.");
+                            } else {
+                                $name = $package_id == 1 ? 'Accountancy Prime' : 'Accountancy Premium';
+                                $this->session->set_flashdata("msg", $name . " Selected Successfully! Package expires on " . date('d-m-Y', strtotime($expiry_date)) . ".");
+                            }
                         } else {
                             $error = $this->db->error();
                             $this->session->set_flashdata("err_msg", $error['message']);

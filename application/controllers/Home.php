@@ -476,7 +476,16 @@ class Home extends CI_Controller
             }
 
             $datetime = date('Y-m-d H:i:s');
-            $service_name = $pkg['package_id'] == 1 ? 'Accountancy Prime' : 'Accountancy Premium';
+            // For Monthly type, package_id is NULL/0, use generic name
+            // For Turnover type, use package name
+            if ($pkg_type == 'Monthly') {
+                $service_name = 'Account Work Monthly';
+            } else if (!empty($pkg['package_id'])) {
+                $service_name = $pkg['package_id'] == 1 ? 'Accountancy Prime' : 'Accountancy Premium';
+            } else {
+                // Fallback
+                $service_name = 'Account Work';
+            }
 
             // ── Create purchase row for Account Work ────────────────────────
             $this->db->insert('purchases', [
@@ -546,6 +555,48 @@ class Home extends CI_Controller
 
             // ── Update expiry (keep payment_status=0 so next expiry triggers renewal again)
             $this->db->update('customer_packages', $update_data, ['id' => $pkg['id']]);
+
+            // ── For Monthly type, record monthly amount in accountancy other_fee ───────────────────────────────────────────
+            if ($pkg_type == 'Monthly') {
+                // Get current month's first day (e.g., 2024-04-01)
+                $current_month_start = date('Y-m-01');
+                
+                // Check if accountancy record exists for this month
+                $acc_record = $this->db->get_where('accountancy', [
+                    'user_id' => $user_id,
+                    'firm_id' => $firm_id,
+                    'date' => $current_month_start
+                ])->unbuffered_row('array');
+                
+                if (!empty($acc_record)) {
+                    // Update existing record - add monthly amount to other_fee
+                    $existing_other_fee = (float)($acc_record['other_fee'] ?? 0);
+                    $new_other_fee = $existing_other_fee + $subtotal; // Use base rate (without GST)
+                    $this->db->update('accountancy', [
+                        'other_fee' => $new_other_fee,
+                        'updated_on' => $datetime
+                    ], [
+                        'id' => $acc_record['id']
+                    ]);
+                } else {
+                    // Create new accountancy record for this month
+                    $this->load->model('Service_model', 'service');
+                    $acc_data = [
+                        'user_id' => $user_id,
+                        'firm_id' => $firm_id,
+                        'year' => $year,
+                        'date' => $current_month_start,
+                        'turnover' => 0,
+                        'other_fee' => $subtotal, // Use base rate (without GST)
+                        'due_date' => date('Y-m-d', strtotime('+1 month', strtotime($current_month_start))), // Due date is next month
+                        'added_by' => $user_id,
+                        'status' => 1,
+                        'added_on' => $datetime,
+                        'updated_on' => $datetime
+                    ];
+                    $this->service->saveturnover($acc_data);
+                }
+            }
 
             // ── Generate invoice ───────────────────────────────────────────
             $firm_info = $this->customer->getfirms(['t1.id' => $firm_id], 'single');
