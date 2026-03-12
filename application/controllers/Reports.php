@@ -909,6 +909,22 @@ class Reports extends CI_Controller
         $from = "$year1-04-01";
         $to = "$year2-03-31";
 
+        // Check package type first - Accounting Pay is only for Turnover type packages
+        $where = array('user_id' => $user_id, 'status' => 1);
+        $query = $this->db->get_where('customer_packages', $where);
+        if ($query->num_rows() > 0) {
+            $cpackage = $query->unbuffered_row('array');
+            $pkg_type = !empty($cpackage['package_type']) ? $cpackage['package_type'] : 'Turnover';
+
+            // Accounting Pay is only for Turnover type packages
+            // Monthly type packages don't use turnover-based payment calculation
+            if ($pkg_type == 'Monthly') {
+                $this->session->set_flashdata('err_msg', 'Accounting Pay is not applicable for Monthly Account Work packages.');
+                redirect('reports/');
+                return;
+            }
+        }
+
         $user_id_escaped = $this->db->escape($user_id);
         $firm_id_escaped = $this->db->escape($firm_id);
         $from_escaped = $this->db->escape($from);
@@ -922,9 +938,6 @@ class Reports extends CI_Controller
             redirect('reports/');
             return;
         }
-
-        $where = array('user_id' => $user_id, 'status' => 1);
-        $query = $this->db->get_where('customer_packages', $where);
         if ($query->num_rows() == 0) {
             $this->session->set_flashdata('err_msg', 'Package not Active!');
             redirect('reports/');

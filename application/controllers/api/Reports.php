@@ -267,7 +267,7 @@ class Reports extends RestController
                     'firm_id' => $firm_id,
                     'status' => 1
                 ])->result_array();
-                
+
                 if (!empty($account_work_pkgs)) {
                     foreach ($account_work_pkgs as $_acpkg) {
                         $exp = !empty($_acpkg['expiry_date']) ? strtotime($_acpkg['expiry_date']) : 0;
@@ -278,10 +278,10 @@ class Reports extends RestController
                                 $account_work_service = $this->master->getservices(['id' => 1, 'status' => 1], 'single');
                                 $_acpkg['bill_amount'] = !empty($account_work_service['rate']) ? (float)$account_work_service['rate'] : 5000;
                             }
-                            
+
                             $package_id = $_acpkg['package_id'];
                             $service_name = $package_id == 1 ? 'Accountancy Prime' : 'Accountancy Premium';
-                            
+
                             // Add as expired Account Work package
                             $expired_account_work[] = array(
                                 'id'           => $_acpkg['id'],
@@ -848,6 +848,18 @@ class Reports extends RestController
                 $where = array('user_id' => $user_id, 'status' => 1);
                 $query = $this->db->get_where('customer_packages', $where);
                 if ($query->num_rows() > 0) {
+                    $cpackage = $query->unbuffered_row('array');
+                    $pkg_type = !empty($cpackage['package_type']) ? $cpackage['package_type'] : 'Turnover';
+
+                    // Accounting Fee is only for Turnover type packages
+                    // Monthly type packages don't use turnover-based fee calculation
+                    if ($pkg_type == 'Monthly') {
+                        $this->response([
+                            'status' => false,
+                            'message' => 'Accounting Fee is not applicable for Monthly Account Work packages.'
+                        ], RestController::HTTP_OK);
+                        return;
+                    }
                     $where2 = "t1.user_id='$user_id' and t1.firm_id='$firm_id' and t1.date>='$from' and t1.date<='$to'";
                     $accountancy = $this->service->getturnoverswithpayment($where2);
                     $turnovers = !empty($accountancy) ? array_column($accountancy, 'turnover') : array(0);
@@ -1023,6 +1035,18 @@ class Reports extends RestController
                 }
 
                 $cpackage = $query->unbuffered_row('array');
+                $pkg_type = !empty($cpackage['package_type']) ? $cpackage['package_type'] : 'Turnover';
+
+                // Accounting Pay is only for Turnover type packages
+                // Monthly type packages don't use turnover-based payment calculation
+                if ($pkg_type == 'Monthly') {
+                    $this->response([
+                        'status' => false,
+                        'message' => 'Accounting Pay is not applicable for Monthly Account Work packages.'
+                    ], RestController::HTTP_OK);
+                    return;
+                }
+
                 $name = $cpackage['package_id'] == 1 ? 'Accountancy Prime' : 'Accountancy Premium';
                 $package = $this->master->getpackages(['name' => $name], 'single');
 
@@ -1207,7 +1231,7 @@ class Reports extends RestController
         $year = $this->post('year');
         $firm_id = $this->post('firm_id');
         $amount = $this->post('amount'); // Total amount including GST
-        
+
         if (!empty($token) && !empty($year) && !empty($firm_id) && !empty($amount)) {
             $user = $this->account->verify_token($token);
             if (!empty($user) && is_array($user) && $user['role'] == 'customer') {

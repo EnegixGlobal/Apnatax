@@ -356,7 +356,7 @@ class Home extends CI_Controller
             $customer  = $this->customer->getcustomers(['t1.user_id' => $user_id], 'single');
             $firm_info = $this->customer->getfirms(['t1.id' => $firm_id], 'single');
             $gst_on    = !empty($customer['gst_enabled']) && $customer['gst_enabled'] == 1;
-            
+
             // Calculate GST - bill is base rate, GST is added on top
             $subtotal  = $bill; // Base rate
             $gst_rate = $gst_on ? 18.0 : 0.0;
@@ -445,7 +445,7 @@ class Home extends CI_Controller
             $firm_id    = $pkg['firm_id'];
             $year       = $pkg['year'];
             $pkg_type   = !empty($pkg['package_type']) ? $pkg['package_type'] : 'Turnover';
-            
+
             // Always use service rate (₹5,000) for Account Work packages
             if ($pkg_type == 'Turnover') {
                 // Use the base service rate from services table
@@ -508,7 +508,7 @@ class Home extends CI_Controller
 
             // ── Calculate new expiry ───────────────────────────────────────
             $new_expiry = null;
-            
+
             // For Monthly type, use auto debit date (28th) of next month
             if ($pkg_type == 'Monthly' && !empty($pkg['service_debit_date'])) {
                 $dd = (int)date('d', strtotime($pkg['service_debit_date'])); // Day from debit_date (e.g., 28)
@@ -529,7 +529,7 @@ class Home extends CI_Controller
                 $dm = (int)date('m', strtotime($pkg['service_debit_date']));
                 $dd = (int)date('d', strtotime($pkg['service_debit_date']));
                 $cy = (int)date('Y', strtotime($today));
-                
+
                 $candidate = sprintf('%04d-%02d-%02d', $cy, $dm, $dd);
                 if (strtotime($candidate) <= strtotime($today)) {
                     $candidate = sprintf('%04d-%02d-%02d', $cy + 1, $dm, $dd);
@@ -548,7 +548,7 @@ class Home extends CI_Controller
                 'expiry_date'    => $new_expiry,
                 'updated_on'     => $datetime,
             ];
-            
+
             if ($pkg_type == 'Turnover') {
                 $update_data['bill_amount'] = $bill;
             }
@@ -560,14 +560,14 @@ class Home extends CI_Controller
             if ($pkg_type == 'Monthly') {
                 // Get current month's first day (e.g., 2024-04-01)
                 $current_month_start = date('Y-m-01');
-                
+
                 // Check if accountancy record exists for this month
                 $acc_record = $this->db->get_where('accountancy', [
                     'user_id' => $user_id,
                     'firm_id' => $firm_id,
                     'date' => $current_month_start
                 ])->unbuffered_row('array');
-                
+
                 if (!empty($acc_record)) {
                     // Update existing record - add monthly amount to other_fee
                     $existing_other_fee = (float)($acc_record['other_fee'] ?? 0);
@@ -748,7 +748,6 @@ class Home extends CI_Controller
                     $this->session->set_flashdata('err_msg', $error);
                 }
             } else {
-                $error = $result['message'];
                 $this->session->set_flashdata('err_msg', "Password Do not Match!");
             }
         }
@@ -822,60 +821,67 @@ class Home extends CI_Controller
         echo "Webhook received successfully.";
     }
 
-    public function razorpay_callback()
+    public function payu_success()
     {
-        // Handle Razorpay payment completion
-        $razorpay_payment_id = $this->input->post('razorpay_payment_id');
-        $razorpay_order_id   = $this->input->post('razorpay_order_id');
-        $razorpay_signature  = $this->input->post('razorpay_signature');
-
-        if (empty($razorpay_payment_id) || empty($razorpay_order_id) || empty($razorpay_signature)) {
-            $this->session->set_flashdata('err_msg', 'Payment failed or cancelled. Please try again.');
-            redirect('wallet/mywallet/');
+        // Handle PayU payment success callback - No login required
+        $this->load->library('Payu_lib');
+        $this->load->model('Wallet_model', 'wallet');
+        
+        $post_data = $this->input->post();
+        
+        if (empty($post_data)) {
+            // Store message in URL parameter instead of session
+            redirect(base_url('wallet/mywallet/?msg=' . urlencode('Invalid payment response. Please contact support.')));
+            return;
         }
 
-        $this->load->library('Razorpay_lib');
-
-        // Verify signature
-        $is_valid = $this->razorpay_lib->verify_signature($razorpay_order_id, $razorpay_payment_id, $razorpay_signature);
-
+        // Verify hash
+        $is_valid = $this->payu_lib->verify_hash($post_data);
+        
         if (!$is_valid) {
-            $this->session->set_flashdata('err_msg', 'Payment verification failed. Please contact support.');
-            redirect('wallet/mywallet/');
+            redirect(base_url('wallet/mywallet/?err_msg=' . urlencode('Payment verification failed. Please contact support.')));
+            return;
         }
 
-        // Fetch order to get receipt (merchant_transaction_id)
-        $orderResponse = $this->razorpay_lib->fetch_order($razorpay_order_id);
-        if (empty($orderResponse['success']) || empty($orderResponse['data']['receipt'])) {
-            $this->session->set_flashdata('err_msg', 'Unable to verify payment order. Please contact support.');
-            redirect('wallet/mywallet/');
-        }
+        $status = isset($post_data['status']) ? strtolower($post_data['status']) : '';
+        $txnid = isset($post_data['txnid']) ? $post_data['txnid'] : '';
+        $merchant_transaction_id = $txnid;
 
-        $orderData = $orderResponse['data'];
-        $merchant_transaction_id = $orderData['receipt'];
-
-        // Update wallet payment status
-        $payment_details = json_encode([
-            'razorpay_payment_id' => $razorpay_payment_id,
-            'razorpay_order_id'   => $razorpay_order_id,
-            'razorpay_signature'  => $razorpay_signature,
-        ]);
-
-        $wallet = $this->wallet->getwallet(['merchant_transaction_id' => $merchant_transaction_id], 'single');
-
-        if (!empty($wallet)) {
-            $data = ['status' => 1, 'payment_details' => $payment_details];
-            $result = $this->wallet->updatepayment($data, ['id' => $wallet['id']]);
-            if (!empty($result['status'])) {
-                $this->session->set_flashdata('msg', !empty($result['message']) ? $result['message'] : 'Wallet recharged successfully.');
+        if ($status == 'success') {
+            // Payment successful
+            $payment_details = json_encode($post_data);
+            
+            $wallet = $this->wallet->getwallet(['merchant_transaction_id' => $merchant_transaction_id], 'single');
+            
+            if (!empty($wallet)) {
+                $data = ['status' => 1, 'payment_details' => $payment_details];
+                $result = $this->wallet->updatepayment($data, ['id' => $wallet['id']]);
+                
+                if (!empty($result['status'])) {
+                    $message = !empty($result['message']) ? $result['message'] : 'Wallet recharged successfully.';
+                    redirect(base_url('wallet/mywallet/?msg=' . urlencode($message)));
+                } else {
+                    $error_msg = !empty($result['message']) ? $result['message'] : 'Payment captured but wallet update failed. Please contact support.';
+                    redirect(base_url('wallet/mywallet/?err_msg=' . urlencode($error_msg)));
+                }
             } else {
-                $this->session->set_flashdata('err_msg', !empty($result['message']) ? $result['message'] : 'Payment captured but wallet update failed. Please contact support.');
+                redirect(base_url('wallet/mywallet/?err_msg=' . urlencode('Payment captured but transaction not found. Please contact support.')));
             }
         } else {
-            $this->session->set_flashdata('err_msg', 'Payment captured but transaction not found. Please contact support.');
+            redirect(base_url('wallet/mywallet/?err_msg=' . urlencode('Payment failed or cancelled. Please try again.')));
         }
+    }
 
-        redirect('wallet/mywallet/');
+    public function payu_failure()
+    {
+        // Handle PayU payment failure callback - No login required
+        $post_data = $this->input->post();
+        
+        $status = isset($post_data['status']) ? strtolower($post_data['status']) : '';
+        $error_msg = isset($post_data['error_Message']) ? $post_data['error_Message'] : 'Payment failed or cancelled. Please try again.';
+        
+        // Store message in URL parameter instead of session
+        redirect(base_url('wallet/mywallet/?err_msg=' . urlencode($error_msg)));
     }
 
     public function redirecturl2()

@@ -129,6 +129,17 @@ defined('RAZORPAY_KEY_SECRET')    or define('RAZORPAY_KEY_SECRET', '6Fq6oGGBt3N7
 defined('RAZORPAY_CURRENCY')      or define('RAZORPAY_CURRENCY', 'INR');
 
 /////////////////////////////////////////////
+// PayU Configuration
+defined('PAYU_MERCHANT_KEY')      or define('PAYU_MERCHANT_KEY', 'RWJEZb');
+defined('PAYU_SALT')              or define('PAYU_SALT', '5zRO1ziP75t2ypUnxDCqihPJZwzpOsba');
+defined('PAYU_ENV')               or define('PAYU_ENV', 'test'); // 'test' or 'production'
+// PayU API URLs
+defined('PAYU_TEST_URL')          or define('PAYU_TEST_URL', 'https://test.payu.in/_payment');
+defined('PAYU_PRODUCTION_URL')   or define('PAYU_PRODUCTION_URL', 'https://secure.payu.in/_payment');
+defined('PAYU_TEST_STATUS_URL')  or define('PAYU_TEST_STATUS_URL', 'https://test.payu.in/merchant/postservice?form=2');
+defined('PAYU_PRODUCTION_STATUS_URL') or define('PAYU_PRODUCTION_STATUS_URL', 'https://info.payu.in/merchant/postservice?form=2');
+
+/////////////////////////////////////////////
 
 if (isset($_SERVER['HTTP_HOST']) && $_SERVER['HTTP_HOST'] == 'localhost') {
 	defined('DB_HOST')		? null : define('DB_HOST', 'localhost');

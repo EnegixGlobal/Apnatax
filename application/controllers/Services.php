@@ -766,8 +766,14 @@ class Services extends CI_Controller
         $total_amt = $subtotal + $gst_amt; // Total = base + GST (e.g., 5900)
 
         if ($is_account_work) {
-            $service_name = $pkg['package_id'] == 1 ? 'Accountancy Prime' : 'Accountancy Premium';
-            $svc_names = ['Account Work (' . $service_name . ')'];
+            // For Monthly type, use generic name
+            // For Turnover type, use package name
+            if ($pkg_type == 'Monthly') {
+                $service_name = 'Account Work Monthly';
+            } else {
+                $service_name = $pkg['package_id'] == 1 ? 'Accountancy Prime' : 'Accountancy Premium';
+            }
+            $svc_names = ['Account Work' . ($pkg_type == 'Monthly' ? ' Monthly' : ' (' . $service_name . ')')];
         } else {
             $svc_names = array_column($services, 'name');
         }

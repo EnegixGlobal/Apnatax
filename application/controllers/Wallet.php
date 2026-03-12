@@ -80,6 +80,16 @@ class Wallet extends CI_Controller
         $data['security_deposit'] = $this->wallet->getsecuritydeposit($user['id']);
         $data['available_balance'] = getwalletbalance();
 
+        // Handle URL parameters for payment callbacks (when user returns from PayU)
+        $msg = $this->input->get('msg');
+        $err_msg = $this->input->get('err_msg');
+        if (!empty($msg)) {
+            $this->session->set_flashdata('msg', urldecode($msg));
+        }
+        if (!empty($err_msg)) {
+            $this->session->set_flashdata('err_msg', urldecode($err_msg));
+        }
+
         $this->template->load('wallet', 'wallet', $data);
     }
 
@@ -151,39 +161,42 @@ class Wallet extends CI_Controller
             }
             $result = $this->wallet->addtowallet($data);
             if ($result['status'] === true) {
-                // Create Razorpay order for wallet top-up
-                $this->load->library('Razorpay_lib');
-
                 $merchant_transaction_id = $result['merchant_transaction_id'];
-                $notes = [
-                    'user_id'  => $user['id'],
-                    'purpose'  => 'wallet_topup',
-                    'wallet_txn_id' => $merchant_transaction_id,
+
+                // Use PayU for wallet top-up
+                $this->load->library('Payu_lib');
+
+                // Get customer details
+                $customer = $this->customer->getcustomers(['t1.user_id' => $user['id']], 'single');
+                $firstname = !empty($customer['name']) ? $customer['name'] : 'Customer';
+                $email = !empty($customer['email']) ? $customer['email'] : $user['email'];
+                $phone = !empty($customer['mobile']) ? $customer['mobile'] : '';
+
+                $udf = [
+                    'udf1' => $user['id'],
+                    'udf2' => 'wallet_topup',
+                    'udf3' => $merchant_transaction_id,
+                    'udf4' => 'web',
                 ];
 
-                $orderResponse = $this->razorpay_lib->create_order($amount, $merchant_transaction_id, $notes);
+                $paymentParams = $this->payu_lib->prepare_payment_params(
+                    $amount,
+                    $merchant_transaction_id,
+                    'Wallet Top-up',
+                    $firstname,
+                    $email,
+                    $phone,
+                    $udf
+                );
 
-                if (!empty($orderResponse['success']) && !empty($orderResponse['data']['id'])) {
-                    $order = $orderResponse['data'];
+                // Load PayU payment view
+                $viewData = [
+                    'payment_url' => $this->payu_lib->get_payment_url(),
+                    'payment_params' => $paymentParams,
+                    'amount' => $amount,
+                ];
 
-                    // Load Razorpay Checkout view
-                    $viewData = [
-                        'razorpay_key_id'   => RAZORPAY_KEY_ID,
-                        'order_id'          => $order['id'],
-                        'amount_paise'      => $order['amount'],
-                        'currency'          => $order['currency'],
-                        'user'              => $user,
-                        'merchant_txn_id'   => $merchant_transaction_id,
-                        'callback_url'      => base_url('home/razorpay_callback'),
-                        'display_amount'    => $amount,
-                    ];
-
-                    $this->load->view('razorpay', $viewData);
-                } else {
-                    $error_message = !empty($orderResponse['error']['description']) ? $orderResponse['error']['description'] : 'Unable to initiate payment. Please try again.';
-                    $this->session->set_flashdata("err_msg", $error_message);
-                    redirect('wallet/mywallet/');
-                }
+                $this->load->view('payu', $viewData);
             } else {
                 $this->session->set_flashdata("err_msg", $result['message']);
                 redirect('wallet/mywallet/');
