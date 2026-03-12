@@ -613,6 +613,70 @@ class Profile extends RestController
                         }
                         $package_type = !empty($type_groups) ? array_key_first($type_groups) : 'Yearly';
 
+                        // ── Validate same-type constraint ──────────────────────────────────
+                        if (count($type_groups) > 1) {
+                            $detail = '';
+                            foreach ($type_groups as $t => $names) {
+                                $detail .= $t . ': ' . implode(', ', $names) . '; ';
+                            }
+                            $this->response([
+                                'status' => false,
+                                'message' => 'A package can only contain services of the same billing type. Found mixed types – ' . rtrim($detail, '; ')
+                            ], RestController::HTTP_OK);
+                            return;
+                        }
+
+                        // ── Check if any service is already in a DIFFERENT type package ────
+                        $conflict = array();
+                        foreach ($s_ids as $sid) {
+                            $check = $this->customer->getservicepackage(
+                                ['t1.user_id' => $user['id'], 't1.firm_id' => $firm_id, 't1.year' => $year],
+                                'all'
+                            );
+                            if (!empty($check)) {
+                                foreach ($check as $pkg) {
+                                    // Skip if same type (user is editing/extending this package type)
+                                    if (!empty($pkg['package_type']) && $pkg['package_type'] === $package_type) continue;
+                                    if (!empty($pkg['service_ids'])) {
+                                        $existing_ids = array_filter(array_map('trim', explode(',', $pkg['service_ids'])));
+                                        if (in_array((string)$sid, $existing_ids)) {
+                                            $svc = $this->master->getservices(['id' => $sid], 'single');
+                                            $conflict[] = (!empty($svc['name']) ? $svc['name'] : "Service #$sid") .
+                                                " (already in {$pkg['package_type']} package)";
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        if (!empty($conflict)) {
+                            $this->response([
+                                'status' => false,
+                                'message' => 'Some services are already in another package type: ' . implode(', ', $conflict)
+                            ], RestController::HTTP_OK);
+                            return;
+                        }
+
+                        // ── Check if any service was already purchased directly ────────────
+                        $this->load->model('Service_model', 'service');
+                        $conflict_direct = array();
+                        foreach ($s_ids as $sid) {
+                            $existing_purchase = $this->service->getpurchases(
+                                "t1.user_id='{$user['id']}' AND t1.firm_id='{$firm_id}' AND t1.year='{$year}' AND t1.service_id='{$sid}'"
+                            );
+                            if (!empty($existing_purchase)) {
+                                $svc = $this->master->getservices(['id' => $sid], 'single');
+                                $conflict_direct[] = !empty($svc['name']) ? $svc['name'] : "Service #$sid";
+                            }
+                        }
+                        if (!empty($conflict_direct)) {
+                            $this->response([
+                                'status' => false,
+                                'message' => 'The following service(s) are already purchased directly and cannot be added to a package: ' .
+                                    implode(', ', $conflict_direct)
+                            ], RestController::HTTP_OK);
+                            return;
+                        }
+
                         // ── Calculate bill amount ────────────────────────────────────────────
                         $subtotal = 0.0;
                         foreach ($services as $svc) {
@@ -1387,14 +1451,14 @@ class Profile extends RestController
                             if ($pkg_type == 'Monthly') {
                                 // Get current month's first day (e.g., 2024-04-01)
                                 $current_month_start = date('Y-m-01');
-                                
+
                                 // Check if accountancy record exists for this month
                                 $acc_record = $this->db->get_where('accountancy', [
                                     'user_id' => $user_id,
                                     'firm_id' => $firm_id,
                                     'date' => $current_month_start
                                 ])->unbuffered_row('array');
-                                
+
                                 if (!empty($acc_record)) {
                                     // Update existing record - add monthly amount to other_fee
                                     $existing_other_fee = (float)($acc_record['other_fee'] ?? 0);

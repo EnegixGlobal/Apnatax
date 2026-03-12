@@ -160,6 +160,9 @@ $route['api/getolddata'] = 'api/profile/getolddata';
 
 $route['api/initiatepayment'] = 'api/wallet/initiatepayment';
 
+$route['payu/success'] = 'home/payu_success';
+$route['payu/failure'] = 'home/payu_failure';
+
 $route['api/getinvoices'] = 'api/invoices/getinvoices';
 $route['api/getinvoicedetails'] = 'api/invoices/getinvoicedetails';
 $route['api/downloadinvoice'] = 'api/invoices/downloadinvoice';

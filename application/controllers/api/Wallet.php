@@ -75,39 +75,44 @@ class Wallet extends RestController
         $token = $this->post('token');
         $amount = $this->post('amount');
         $merchant_transaction_id = $this->post('merchant_transaction_id');
+
         if (!empty($token) && !empty($amount) && !empty($merchant_transaction_id)) {
             $user = $this->account->verify_token($token);
             if (!empty($user) && is_array($user) && $user['role'] == 'customer') {
-                // Use Razorpay for initiating payment (mobile / API clients)
-                $this->load->library('Razorpay_lib');
+                // Use PayU for initiating payment
+                $this->load->library('Payu_lib');
 
-                $notes = [
-                    'user_id'        => $user['id'],
-                    'purpose'        => 'wallet_topup',
-                    'wallet_txn_id'  => $merchant_transaction_id,
-                    'source'         => 'api',
+                // Get user details
+                $customer = $this->customer->getcustomers(['t1.user_id' => $user['id']], 'single');
+                $firstname = !empty($customer['name']) ? $customer['name'] : 'Customer';
+                $email = !empty($customer['email']) ? $customer['email'] : $user['email'];
+                $phone = !empty($customer['mobile']) ? $customer['mobile'] : '';
+
+                $udf = [
+                    'udf1' => $user['id'],
+                    'udf2' => 'wallet_topup',
+                    'udf3' => $merchant_transaction_id,
+                    'udf4' => 'api',
                 ];
 
-                $orderResponse = $this->razorpay_lib->create_order($amount, $merchant_transaction_id, $notes);
+                $paymentParams = $this->payu_lib->prepare_payment_params(
+                    $amount,
+                    $merchant_transaction_id,
+                    'Wallet Top-up',
+                    $firstname,
+                    $email,
+                    $phone,
+                    $udf
+                );
 
-                if (!empty($orderResponse['success']) && !empty($orderResponse['data']['id'])) {
-                    $order = $orderResponse['data'];
-                    $this->response([
-                        'status'                 => true,
-                        'gateway'                => 'razorpay',
-                        'razorpay_key_id'        => RAZORPAY_KEY_ID,
-                        'razorpay_order_id'      => $order['id'],
-                        'merchant_transaction_id' => $merchant_transaction_id,
-                        'amount'                 => $order['amount'],
-                        'currency'               => $order['currency'],
-                    ], RestController::HTTP_OK);
-                } else {
-                    $message = !empty($orderResponse['error']['description']) ? $orderResponse['error']['description'] : "Payment Initiation Failed!";
-                    $this->response([
-                        'status' => false,
-                        'message' => $message
-                    ], RestController::HTTP_OK);
-                }
+                $this->response([
+                    'status'                 => true,
+                    'gateway'                => 'payu',
+                    'payment_url'            => $this->payu_lib->get_payment_url(),
+                    'payment_params'         => $paymentParams,
+                    'merchant_transaction_id' => $merchant_transaction_id,
+                    'amount'                 => $amount,
+                ], RestController::HTTP_OK);
             } else {
                 $this->response([
                     'status' => false,
