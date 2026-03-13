@@ -407,6 +407,18 @@ class Account_model extends CI_Model{
     }
     
     public function savekyc($data){
+        // Map new logical keys to actual DB columns for backward compatibility
+        // Views/controllers use: audit_report, income_tax_certificate
+        // Table columns are: company_registration_certificate, din_certificate
+        if (isset($data['audit_report'])) {
+            $data['company_registration_certificate'] = $data['audit_report'];
+            unset($data['audit_report']);
+        }
+        if (isset($data['income_tax_certificate'])) {
+            $data['din_certificate'] = $data['income_tax_certificate'];
+            unset($data['income_tax_certificate']);
+        }
+
         // Build where clause for checking existing KYC
         $this->db->where('user_id', $data['user_id']);
         // If firm_id is provided, check for firm-specific KYC, otherwise check for user-level KYC
@@ -444,13 +456,23 @@ class Account_model extends CI_Model{
     }
     
     public function getkyc($where, $type = 'single'){
-        $columns="t1.pan,case when t1.pan_image='' then '' else concat('".file_url()."',t1.pan_image) end as pan_image,";
-        $columns.="t1.aadhar,case when t1.aadhar_image='' then '' else concat('".file_url()."',t1.aadhar_image) end as aadhar_image,";
-        $columns.="case when t1.aadhar_back='' then '' else concat('".file_url()."',t1.aadhar_back) end as aadhar_back,";
-        $columns.="case when t1.tds_certificate='' then '' else concat('".file_url()."',t1.tds_certificate) end as tds_certificate,";
-        $columns.="case when t1.gst_certificate='' then '' else concat('".file_url()."',t1.gst_certificate) end as gst_certificate,";
-        $columns.="case when t1.audit_report='' then '' else concat('".file_url()."',t1.audit_report) end as audit_report,";
-        $columns.="case when t1.income_tax_certificate='' then '' else concat('".file_url()."',t1.income_tax_certificate) end as income_tax_certificate,t1.status,t1.firm_id";
+        // Build columns list, mapping actual DB columns to logical names
+        // DB: company_registration_certificate  -> audit_report
+        // DB: din_certificate                    -> income_tax_certificate
+        $base_url = file_url();
+
+        $columns  = "t1.pan,";
+        $columns .= "case when t1.pan_image='' then '' else concat('".$base_url."',t1.pan_image) end as pan_image,";
+        $columns .= "t1.aadhar,";
+        $columns .= "case when t1.aadhar_image='' then '' else concat('".$base_url."',t1.aadhar_image) end as aadhar_image,";
+        $columns .= "case when t1.aadhar_back='' then '' else concat('".$base_url."',t1.aadhar_back) end as aadhar_back,";
+        $columns .= "case when t1.tds_certificate='' then '' else concat('".$base_url."',t1.tds_certificate) end as tds_certificate,";
+        $columns .= "case when t1.gst_certificate='' then '' else concat('".$base_url."',t1.gst_certificate) end as gst_certificate,";
+        $columns .= "case when t1.company_registration_certificate='' then '' else concat('".$base_url."',t1.company_registration_certificate) end as audit_report,";
+        $columns .= "case when t1.din_certificate='' then '' else concat('".$base_url."',t1.din_certificate) end as income_tax_certificate,";
+
+        $columns .= "t1.status,t1.firm_id";
+
         $this->db->select($columns);
         
         // Handle where clause - support both array and string formats

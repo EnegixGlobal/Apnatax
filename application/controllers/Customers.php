@@ -149,7 +149,9 @@ class Customers extends CI_Controller
             }
 
             // Get existing KYC data with raw file paths (without file_url conversion)
-            $existing_kyc = $this->db->select('tds_certificate, gst_certificate, audit_report, income_tax_certificate')
+            // Map logical names (audit_report, income_tax_certificate) to actual DB columns
+            $existing_kyc = $this->db
+                ->select('tds_certificate, gst_certificate, company_registration_certificate as audit_report, din_certificate as income_tax_certificate')
                 ->where('user_id', $customer['user_id'])
                 ->get('kyc')
                 ->row_array();
@@ -251,8 +253,17 @@ class Customers extends CI_Controller
             redirect('customers/kycdetails/' . $id);
         }
 
+        // Map logical type to actual DB column for backward compatibility
+        if ($type === 'audit_report') {
+            $db_column = 'company_registration_certificate as audit_report';
+        } elseif ($type === 'income_tax_certificate') {
+            $db_column = 'din_certificate as income_tax_certificate';
+        } else {
+            $db_column = $type;
+        }
+
         // Get KYC data with raw file path (without file_url conversion)
-        $kyc = $this->db->select($type)->where('user_id', $customer['user_id'])->get('kyc')->row_array();
+        $kyc = $this->db->select($db_column)->where('user_id', $customer['user_id'])->get('kyc')->row_array();
 
         if (empty($kyc) || empty($kyc[$type])) {
             $this->session->set_flashdata("err_msg", "Certificate not found!");
@@ -326,8 +337,17 @@ class Customers extends CI_Controller
             redirect('customers/kycdetails/' . $id);
         }
 
+        // Map logical type to actual DB column for backward compatibility
+        if ($type === 'audit_report') {
+            $db_column = 'company_registration_certificate as audit_report';
+        } elseif ($type === 'income_tax_certificate') {
+            $db_column = 'din_certificate as income_tax_certificate';
+        } else {
+            $db_column = $type;
+        }
+
         // Get existing certificate file path
-        $kyc = $this->db->select($type)
+        $kyc = $this->db->select($db_column)
             ->where('user_id', $customer['user_id'])
             ->get('kyc')
             ->row_array();
