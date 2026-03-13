@@ -348,7 +348,7 @@ $button='';
                                             <div class="col-md-6 mb-3">
                                                 <div class="card">
                                                     <div class="card-body">
-                                                        <h6 class="card-title mb-3">Audit Report</h6>
+                                                        <h6 class="card-title mb-3">Company Registration Certificate</h6>
                                                         <?php if(!empty($kyc) && !empty($kyc['audit_report'])){ ?>
                                                             <div class="mb-3">
                                                                 <a href="<?= $kyc['audit_report'] ?>" target="_blank" class="btn btn-sm btn-info">
@@ -368,7 +368,7 @@ $button='';
                                                         <?php } ?>
                                                         <?php 
                                                             $attributes=array("id"=>"audit_report","accept"=>"image/*|application/pdf");
-                                                            echo create_form_input("file","audit_report","Upload Audit Report",false,'',$attributes); 
+                                                            echo create_form_input("file","audit_report","Upload Company Registration Certificate",false,'',$attributes); 
                                                         ?>
                                                     </div>
                                                 </div>
@@ -377,7 +377,7 @@ $button='';
                                             <div class="col-md-6 mb-3">
                                                 <div class="card">
                                                     <div class="card-body">
-                                                        <h6 class="card-title mb-3">Income Tax Certificate</h6>
+                                                        <h6 class="card-title mb-3">DIN Certificate</h6>
                                                         <?php if(!empty($kyc) && !empty($kyc['income_tax_certificate'])){ ?>
                                                             <div class="mb-3">
                                                                 <a href="<?= $kyc['income_tax_certificate'] ?>" target="_blank" class="btn btn-sm btn-info">
@@ -397,7 +397,7 @@ $button='';
                                                         <?php } ?>
                                                         <?php 
                                                             $attributes=array("id"=>"income_tax_certificate","accept"=>"image/*|application/pdf");
-                                                            echo create_form_input("file","income_tax_certificate","Upload Income Tax Certificate",false,'',$attributes); 
+                                                            echo create_form_input("file","income_tax_certificate","Upload DIN Certificate",false,'',$attributes); 
                                                         ?>
                                                     </div>
                                                 </div>
