@@ -92,8 +92,17 @@ class Profile extends CI_Controller
             redirect('profile/certificates');
         }
 
+        // Map logical type to actual DB column for backward compatibility
+        if ($type === 'audit_report') {
+            $db_column = 'company_registration_certificate as audit_report';
+        } elseif ($type === 'income_tax_certificate') {
+            $db_column = 'din_certificate as income_tax_certificate';
+        } else {
+            $db_column = $type;
+        }
+
         // Get KYC data with raw file path (without file_url conversion)
-        $kyc = $this->db->select($type)->where('user_id', $user['id'])->get('kyc')->row_array();
+        $kyc = $this->db->select($db_column)->where('user_id', $user['id'])->get('kyc')->row_array();
 
         if (empty($kyc) || empty($kyc[$type])) {
             $this->session->set_flashdata("err_msg", "Certificate not found!");
