@@ -364,10 +364,20 @@ class Customer_model extends CI_Model
         $this->db->join('users t4', 't1.uploaded_by=t4.id', 'left');
         $this->db->order_by('t1.added_on', 'DESC');
         $query = $this->db->get();
+        
+        // Check if query was successful
+        if ($query === false) {
+            return ($type == 'all') ? array() : null;
+        }
+        
         if ($type == 'all') {
             $array = $query->result_array();
         } else {
-            $array = $query->unbuffered_row('array');
+            if ($query->num_rows() > 0) {
+                $array = $query->unbuffered_row('array');
+            } else {
+                $array = null;
+            }
         }
         return $array;
     }
