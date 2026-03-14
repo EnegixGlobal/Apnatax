@@ -474,7 +474,7 @@ class Profile extends CI_Controller
         $data['breadcrumb'] = array("active" => "Old Data");
         $data['datatable'] = true;
 
-        // Get old data for this customer
+        // Get old datas for this customer
         $where = array('t1.user_id' => $user['id'], 't1.status' => 1);
         $data['old_data'] = $this->customer->getoldclientdata($where);
 
