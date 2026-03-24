@@ -5,6 +5,7 @@
                                                     <tr>
                                                         <th>Sl.No.</th>
                                                         <th>Name</th>
+                                                        <th>Firm</th>
                                                         <th>Mobile</th>
                                                         <th>Email</th>
                                                         <th>Service Purchased</th>
@@ -40,6 +41,7 @@
                                                     <tr>
                                                         <td><?= ++$i; ?></td>
                                                         <td><?= $single['name']; ?></td>
+                                                        <td><?= !empty($single['firm_name']) ? $single['firm_name'] : '-'; ?></td>
                                                         <td><?= $single['mobile']; ?></td>
                                                         <td><?= $single['email']; ?></td>
                                                         <td><?= $single['service_name']; ?></td>

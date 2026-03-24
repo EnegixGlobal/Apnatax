@@ -1549,7 +1549,14 @@ class Services extends RestController
                                 $newslug = '';
                                 if ($document['file'] > 0) {
                                     $upload_path = './assets/service/documents/';
-                                    $allowed_types = $document['file_type'];
+                                    // Ensure these formats are always allowed for mobile uploads
+                                    $allowed_types = 'pdf|jpg|jpeg|png|csv|xlsx';
+                                    if (!empty($document['file_type'])) {
+                                        $db_types = explode('|', $document['file_type']);
+                                        $required_types = ['pdf', 'jpg', 'jpeg', 'png', 'csv', 'xlsx'];
+                                        $merged_types = array_unique(array_merge($required_types, $db_types));
+                                        $allowed_types = implode('|', $merged_types);
+                                    }
                                     if ($document['file'] == 1) {
                                         $newslug = $slug . '-file';
                                         if (isset($_FILES[$newslug]['tmp_name'])) {
@@ -1559,7 +1566,6 @@ class Services extends RestController
                                                     'date' => $date,
                                                     'user_id' => $user['id'],
                                                     'order_id' => $order['id'],
-
                                                     'service_id' => $order['service_id'],
                                                     'field' => $newslug,
                                                     'field_id' => $document['id'],
