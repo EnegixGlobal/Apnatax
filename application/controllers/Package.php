@@ -99,6 +99,7 @@ class Package extends CI_Controller
         // Old-style accountancy package (service_id=1)
         $acctpkg = $this->db->get_where('customer_packages', ['user_id' => $user['id'], 'firm_id' => $firm_id, 'year' => $year, 'status' => 1]);
         $data['package'] = ($acctpkg->num_rows() > 0) ? $acctpkg->unbuffered_row('array') : null;
+        $data['has_account_work_package'] = !empty($data['package']);
 
         // Calculate bill_amount for expired Account Work packages if needed
         if (!empty($data['package'])) {
@@ -189,6 +190,19 @@ class Package extends CI_Controller
         $user    = getuser();
         $firm_id = $this->session->firm;
         $year    = $this->session->year;
+
+        // Prerequisite: Account Work package must be active before creating service packages
+        $account_work_pkg = $this->db->get_where('customer_packages', [
+            'user_id' => $user['id'],
+            'firm_id' => $firm_id,
+            'year'    => $year,
+            'status'  => 1
+        ])->unbuffered_row('array');
+        if (empty($account_work_pkg)) {
+            $this->session->set_flashdata('err_msg', 'Please activate Account Work package first. Then you can create Service Package.');
+            redirect($_SERVER['HTTP_REFERER']);
+            return;
+        }
 
         // Validate firm
         $firm = $this->customer->getfirms(
