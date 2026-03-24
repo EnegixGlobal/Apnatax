@@ -994,6 +994,11 @@ class Services extends CI_Controller
                     $data['finaldocuments'] = $finaldocuments;
                     $where = "t1.user_id='$user[id]' and t1.id='$order_id' and t1.firm_id='$firm_id'";
                     $data['order'] = $this->service->getpurchasedservices($where, 'single');
+                    if (empty($data['order'])) {
+                        $message = "Service order not found for the selected firm. Please switch firm or try another order.";
+                        $this->session->set_flashdata("err_msg", $message);
+                        redirect('services/purchasedservices/');
+                    }
 
                     // Get period_value (quarter/month) for pre-selecting dropdown
                     $data['selected_period'] = '';
@@ -1162,12 +1167,12 @@ class Services extends CI_Controller
                             $newslug = '';
                             if ($document['file'] > 0) {
                                 $upload_path = './assets/service/documents/';
-                                // Ensure PDF, JPG, JPEG, PNG are always allowed
-                                $allowed_types = 'pdf|jpg|jpeg|png';
+                                // Ensure PDF, JPG, JPEG, PNG, CSV, XLSX are always allowed
+                                $allowed_types = 'pdf|jpg|jpeg|png|csv|xlsx';
                                 // If document has specific file types, merge them with required types
                                 if (!empty($document['file_type'])) {
                                     $db_types = explode('|', $document['file_type']);
-                                    $required_types = ['pdf', 'jpg', 'jpeg', 'png'];
+                                    $required_types = ['pdf', 'jpg', 'jpeg', 'png', 'csv', 'xlsx'];
                                     $merged_types = array_unique(array_merge($required_types, $db_types));
                                     $allowed_types = implode('|', $merged_types);
                                 }
