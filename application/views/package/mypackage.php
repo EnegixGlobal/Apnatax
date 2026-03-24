@@ -1509,6 +1509,13 @@ if (!empty($service_packages)) {
     </div>
 
     <div class="create-panel card mb-4">
+        <?php if (empty($has_account_work_package)) : ?>
+            <div class="alert alert-warning mx-3 mt-3 mb-0">
+                <i class="fe fe-alert-triangle me-2"></i>
+                Please activate <strong>Account Work</strong> package first. After that, you can create a Service Package.
+            </div>
+        <?php endif; ?>
+
         <!-- Panel header -->
         <div class="panel-header">
             <h5><i class="fe fe-package me-2"></i>Select Services</h5>
@@ -1592,7 +1599,8 @@ if (!empty($service_packages)) {
                                                 value="<?= $svc['id'] ?>"
                                                 data-primary-type="<?= $primary_type ?>"
                                                 data-rate="<?= $svc['rate'] ?>"
-                                                data-svc-id="<?= $svc['id'] ?>">
+                                                data-svc-id="<?= $svc['id'] ?>"
+                                                <?= empty($has_account_work_package) ? 'disabled' : '' ?>>
                                         </div>
                                     <?php endif; ?>
                                 </td>
@@ -1664,7 +1672,7 @@ if (!empty($service_packages)) {
                     <span class="bar-type d-none" id="bar-type-label"></span>
                     <span class="text-white-50" style="font-size:.75rem" id="bar-gst-note"></span>
                 </div>
-                <button type="submit" form="pkg-form" name="savepackage" class="btn btn-success px-4 fw-semibold" id="save-pkg-btn">
+                <button type="submit" form="pkg-form" name="savepackage" class="btn btn-success px-4 fw-semibold" id="save-pkg-btn" <?= empty($has_account_work_package) ? 'disabled' : '' ?>>
                     <i class="fe fe-save me-2"></i>Save Package
                 </button>
             </div>

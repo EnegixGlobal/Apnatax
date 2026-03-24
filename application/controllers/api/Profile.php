@@ -578,6 +578,21 @@ class Profile extends RestController
                 $data = array("t1.user_id" => $user['id'], 't1.id' => $firm_id);
                 $firm = $this->customer->getfirms($data, 'single');
                 if (!empty($firm)) {
+                    // Prerequisite: Account Work package must be active before creating service package
+                    $account_work_pkg = $this->db->get_where('customer_packages', [
+                        'user_id' => $user['id'],
+                        'firm_id' => $firm_id,
+                        'year'    => $year,
+                        'status'  => 1
+                    ])->unbuffered_row('array');
+                    if (empty($account_work_pkg)) {
+                        $this->response([
+                            'status' => false,
+                            'message' => 'Please activate Account Work package first. Then you can create Service Package.'
+                        ], RestController::HTTP_OK);
+                        return;
+                    }
+
                     $s_ids = explode(',', $service_ids);
                     $where = "status='1' and id in ('" . implode("','", $s_ids) . "')";
                     $services = $this->master->getservices($where);
