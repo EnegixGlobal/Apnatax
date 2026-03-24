@@ -93,9 +93,9 @@
                         </ul>
                     </li>
                     <?php if ($this->session->role == 'superadmin' || $this->session->role == 'admin' || $this->session->role == 'employee') { ?>
-                    <li class="slide">
-                        <a class="side-menu__item <?= activate_menu('reports/pendingpackagerenewals'); ?>" data-bs-toggle="slide" href="<?= base_url('reports/pendingpackagerenewals/'); ?>"><i class="side-menu__icon fa fa-refresh"></i><span class="side-menu__label">Pending Package Renewals</span></a>
-                    </li>
+                        <li class="slide">
+                            <a class="side-menu__item <?= activate_menu('reports/pendingpackagerenewals'); ?>" data-bs-toggle="slide" href="<?= base_url('reports/pendingpackagerenewals/'); ?>"><i class="side-menu__icon fa fa-refresh"></i><span class="side-menu__label">Pending Package Renewals</span></a>
+                        </li>
                     <?php } ?>
                     <li class="slide">
                         <a class="side-menu__item <?= activate_menu('chat'); ?>" data-bs-toggle="slide" href="<?= base_url('chat/'); ?>"><i class="side-menu__icon fa fa-comments"></i><span class="side-menu__label">Chat</span></a>

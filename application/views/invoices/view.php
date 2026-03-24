@@ -2,7 +2,6 @@
 // Simple printable invoice layout based on provided GST example
 $invoice_no   = !empty($invoice['invoice_no']) ? $invoice['invoice_no'] : '';
 $invoice_date = !empty($invoice['invoice_date']) ? date('d/m/Y', strtotime($invoice['invoice_date'])) : date('d/m/Y');
-$billing_name = !empty($invoice['billing_name']) ? $invoice['billing_name'] : '';
 $firm_name    = !empty($invoice['firm_name']) ? $invoice['firm_name'] : '';
 $firm_gstin   = !empty($invoice['firm_gstin']) ? $invoice['firm_gstin'] : '';
 $firm_pan     = !empty($invoice['firm_pan']) ? $invoice['firm_pan'] : '';
@@ -274,7 +273,9 @@ $amount_words = amount_in_words($total);
                 </td>
                 <td>
                     <strong>Bill To:</strong><br>
-                    <?php echo htmlspecialchars($billing_name); ?><br>
+                    <?php if (!empty($firm_name)) : ?>
+                        <?php echo htmlspecialchars($firm_name); ?><br>
+                    <?php endif; ?>
                     <?php if (!empty($invoice['billing_mobile'])) : ?>
                         Mobile: <?php echo htmlspecialchars($invoice['billing_mobile']); ?><br>
                     <?php endif; ?>
