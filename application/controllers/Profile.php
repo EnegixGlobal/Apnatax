@@ -218,9 +218,9 @@ class Profile extends CI_Controller
                     if (extension_loaded('gd')) {
                         try {
                             $this->load->library('imager');
-                            $path = $this->imager->processimage('.' . $upload['path'], 'cropscale', 80, ['width' => 300, 'height' => 300]);
+                            $path = $this->imager->processimage(upload_disk_path($upload['path']), 'cropscale', 80, ['width' => 300, 'height' => 300]);
+                            $path = upload_path_for_db($path);
                         } catch (Exception $e) {
-                            // If image processing fails, use original uploaded file
                             $path = $upload['path'];
                         }
                     }

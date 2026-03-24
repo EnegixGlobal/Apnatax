@@ -68,9 +68,13 @@ class Profile extends RestController
                     $allowed_types = 'gif|jpg|jpeg|png|svg';
                     $upload = upload_file('photo', $upload_path, $allowed_types, generate_slug($user['name']));
                     if ($upload['status'] === true) {
-                        $this->load->library('imager');
-                        $path = $this->imager->processimage('.' . $upload['path'], 'cropscale', 80, ['width' => 300, 'height' => 300]);
-                        $data['photo'] = $path;
+                        try {
+                            $this->load->library('imager');
+                            $path = $this->imager->processimage(upload_disk_path($upload['path']), 'cropscale', 80, ['width' => 300, 'height' => 300]);
+                            $data['photo'] = upload_path_for_db($path);
+                        } catch (Exception $e) {
+                            $data['photo'] = $upload['path'];
+                        }
                     }
                 }
 

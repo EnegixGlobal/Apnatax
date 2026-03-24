@@ -87,3 +87,38 @@ if (!function_exists('upload_file')) {
 		return $return;
 	}
 }
+
+if (!function_exists('upload_disk_path')) {
+	/**
+	 * Absolute path for a stored upload path like assets/images/profile/file.jpg (works on any CWD).
+	 */
+	function upload_disk_path($relative_path)
+	{
+		$relative_path = ltrim(str_replace('\\', '/', (string) $relative_path), '/');
+		if (!defined('FCPATH')) {
+			return './' . $relative_path;
+		}
+		return rtrim(FCPATH, '/\\') . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relative_path);
+	}
+}
+
+if (!function_exists('upload_path_for_db')) {
+	/**
+	 * After Imager, path may be absolute; normalize to assets/... for DB and file_url().
+	 */
+	function upload_path_for_db($path)
+	{
+		if (!is_string($path) || $path === '') {
+			return $path;
+		}
+		$norm = str_replace('\\', '/', $path);
+		$norm = ltrim(preg_replace('#^\./#', '', $norm), '/');
+		if (defined('FCPATH')) {
+			$root = str_replace('\\', '/', rtrim(FCPATH, '/\\')) . '/';
+			if (strpos($norm, $root) === 0) {
+				return substr($norm, strlen($root));
+			}
+		}
+		return $norm;
+	}
+}
