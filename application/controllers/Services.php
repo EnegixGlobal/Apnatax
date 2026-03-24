@@ -16,6 +16,52 @@ class Services extends CI_Controller
         $this->load->model('Invoice_model', 'invoice');
     }
 
+    /**
+     * Normalize stored period value to dropdown key + human label.
+     * Handles both canonical IDs (e.g. 202504 / 2025Q1) and older text values.
+     */
+    private function normalizePeriodValue($period_value, $type, $year)
+    {
+        $result = array('id' => '', 'label' => '');
+        if (empty($period_value)) {
+            return $result;
+        }
+
+        $period_value = trim((string) $period_value);
+
+        // Preferred/canonical format: helper can decode it directly.
+        $period_info = getyearmonthvalues($period_value);
+        if (!empty($period_info) && !empty($period_info['value'])) {
+            $result['id'] = $period_value;
+            $result['label'] = $period_info['value'];
+            return $result;
+        }
+
+        // Backward compatibility: stored as text label on some environments.
+        $options = array();
+        if ($type === 'Monthly') {
+            $options = month_dropdown($year);
+        } elseif ($type === 'Quarterly') {
+            $options = quarter_dropdown($year);
+        }
+        if (!empty($options)) {
+            foreach ($options as $id => $label) {
+                if ($id === '') {
+                    continue;
+                }
+                if (strcasecmp(trim((string) $label), $period_value) === 0 || strcasecmp(trim((string) $id), $period_value) === 0) {
+                    $result['id'] = (string) $id;
+                    $result['label'] = (string) $label;
+                    return $result;
+                }
+            }
+        }
+
+        // Last fallback: show raw value so table never shows just "Pending" for period column.
+        $result['label'] = $period_value;
+        return $result;
+    }
+
     public function index()
     {
         $data = ['title' => 'Services'];
@@ -844,9 +890,9 @@ class Services extends CI_Controller
                 } elseif ($service['purchased_type'] == 'Monthly') {
                     // First check period_value from purchase record
                     if (!empty($service['period_value'])) {
-                        $period_info = getyearmonthvalues($service['period_value']);
-                        if (!empty($period_info['value'])) {
-                            $name = $period_info['value'];
+                        $period_meta = $this->normalizePeriodValue($service['period_value'], 'Monthly', $year);
+                        if (!empty($period_meta['label'])) {
+                            $name = $period_meta['label'];
                         }
                     }
                     // Fall back to formdata if period_value not available
@@ -863,9 +909,9 @@ class Services extends CI_Controller
                 } elseif ($service['purchased_type'] == 'Quarterly') {
                     // First check period_value from purchase record
                     if (!empty($service['period_value'])) {
-                        $period_info = getyearmonthvalues($service['period_value']);
-                        if (!empty($period_info['value'])) {
-                            $name = $period_info['value'];
+                        $period_meta = $this->normalizePeriodValue($service['period_value'], 'Quarterly', $year);
+                        if (!empty($period_meta['label'])) {
+                            $name = $period_meta['label'];
                         }
                     }
                     // Fall back to formdata if period_value not available
@@ -952,7 +998,8 @@ class Services extends CI_Controller
                     // Get period_value (quarter/month) for pre-selecting dropdown
                     $data['selected_period'] = '';
                     if (!empty($data['order']['period_value'])) {
-                        $data['selected_period'] = $data['order']['period_value'];
+                        $period_meta = $this->normalizePeriodValue($data['order']['period_value'], $type, $year);
+                        $data['selected_period'] = !empty($period_meta['id']) ? $period_meta['id'] : $data['order']['period_value'];
                     }
 
                     $data['firm'] = $this->customer->getfirms(array("t1.id" => $firm_id), "single");
