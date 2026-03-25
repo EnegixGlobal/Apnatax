@@ -626,6 +626,24 @@ class Package extends CI_Controller
         $firm_id = $this->session->firm;
         $year    = $this->session->year;
 
+        // Sync behavior with website rule:
+        // Account Work can be deleted only if user has NO service packages
+        // for the same firm/year.
+        $where_pkg = array(
+            't1.user_id' => $user['id'],
+            't1.firm_id' => $firm_id,
+            't1.year'    => $year
+        );
+        $existing_service_packages = $this->customer->getservicepackage($where_pkg, 'all');
+        if (!empty($existing_service_packages)) {
+            $this->session->set_flashdata(
+                "err_msg",
+                "You already have a Service Package. Delete/resolve your Service Packages first, then you can request Account Work deletion."
+            );
+            redirect($_SERVER['HTTP_REFERER']);
+            return;
+        }
+
         // Support deleting a specific package_id via POST, or fall back to first for firm/year
         $package_id = (int)$this->input->post('package_id');
 

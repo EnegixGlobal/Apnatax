@@ -964,14 +964,21 @@ if (!empty($service_packages)) {
                             $request_status = isset($package['request']) ? (int)$package['request'] : 0;
                             ?>
                             <?php if ($request_status == 0 || $request_status == 2) : ?>
-                                <form method="post" action="<?= base_url('package/requestdeleteaccountwork') ?>"
-                                    style="display:inline"
-                                    onsubmit="return confirm('Request admin to delete this Account Work package? This action cannot be undone.')">
-                                    <input type="hidden" name="package_id" value="<?= $package['id'] ?>">
-                                    <button type="submit" class="btn btn-sm btn-outline-danger">
-                                        <i class="fe fe-trash-2 me-1"></i>Request Delete
-                                    </button>
-                                </form>
+                                <?php if (empty($service_packages)) : ?>
+                                    <form method="post" action="<?= base_url('package/requestdeleteaccountwork') ?>"
+                                        style="display:inline"
+                                        onsubmit="return confirm('Request admin to delete this Account Work package? This action cannot be undone.')">
+                                        <input type="hidden" name="package_id" value="<?= $package['id'] ?>">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">
+                                            <i class="fe fe-trash-2 me-1"></i>Request Delete
+                                        </button>
+                                    </form>
+                                <?php else : ?>
+                                    <span class="badge bg-secondary text-white px-3 py-2">
+                                        <i class="fe fe-info me-1"></i>
+                                        Delete Service Packages first to request Account Work deletion
+                                    </span>
+                                <?php endif; ?>
                             <?php elseif ($request_status == 1) : ?>
                                 <span class="badge bg-warning text-dark px-3 py-2">
                                     <i class="fe fe-clock me-1"></i>Delete request pending
