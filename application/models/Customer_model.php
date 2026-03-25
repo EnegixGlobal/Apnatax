@@ -247,6 +247,41 @@ class Customer_model extends CI_Model
         return $array;
     }
 
+    /**
+     * Return only firms/customers who have active Account Work in Turnover basis.
+     * Used by orders/monthlyturnover page to avoid showing Monthly-basis customers.
+     */
+    public function customerwithfirm_accountwork_turnover($where = array(), $type = "all")
+    {
+        $prefix = $this->db->dbprefix;
+        $columns = "t1.id as firm_id,t1.user_id,t1.name as firm_name,COALESCE(t2.name, t3.name) as customer_name";
+
+        $this->db->select($columns);
+        $this->db->where($where);
+
+        // Only include firms where an active Account Work package exists for this firm.
+        // customer_packages.package_type is expected to be 'Turnover' or 'Monthly'.
+        $this->db->where(
+            "EXISTS (SELECT 1 FROM {$prefix}customer_packages cp WHERE cp.user_id = t1.user_id AND cp.firm_id = t1.id AND cp.status = '1' AND cp.package_type = 'Turnover')",
+            NULL,
+            FALSE
+        );
+
+        $this->db->from('firms t1');
+        $this->db->join('customers t2', 't1.user_id=t2.user_id', 'left');
+        $this->db->join('users t3', 't1.user_id=t3.id', 'left');
+        $this->db->order_by('customer_name', 'ASC');
+        $this->db->order_by('t1.name', 'ASC');
+
+        $query = $this->db->get();
+
+        if ($type == 'all') {
+            return $query->result_array();
+        }
+
+        return $query->unbuffered_row('array');
+    }
+
     public function createpackage($data)
     {
         $this->db->trans_start();

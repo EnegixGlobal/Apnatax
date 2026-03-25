@@ -164,7 +164,8 @@ class Orders extends CI_Controller
         $data['customers'] = customer_dropdown();
         $data['years'] = year_dropdown();
         $data['months'] = month_dropdown();
-        $data['allcustomers'] = $this->customer->customerwithfirm();
+        // Show only firms/customers who bought Account Work in Turnover basis
+        $data['allcustomers'] = $this->customer->customerwithfirm_accountwork_turnover();
 
         $this->template->load('orders', 'monthlyturnover', $data);
     }
