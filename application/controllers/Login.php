@@ -63,12 +63,25 @@ class Login extends CI_Controller {
                 if($smsresult['status']===false){
 
                 }
+                // Send OTP on user's email (do not pass OTP in URL)
+                $otp = $smsresult['message'] ?? '';
+                if (!empty($otp) && !empty($data['email'])) {
+                    $this->load->helper('email');
+                    $subject = 'OTP for Registration - ' . PROJECT_NAME;
+                    $message  = '<p>Hi ' . htmlspecialchars($data['name'] ?? '', ENT_QUOTES, 'UTF-8') . ',</p>';
+                    $message .= '<p>Your OTP for ' . PROJECT_NAME . ' registration is: <b>' . htmlspecialchars($otp, ENT_QUOTES, 'UTF-8') . '</b>.</p>';
+                    $message .= '<p>OTP is valid for 30 minutes.</p>';
+                    $message .= '<p>Regards,</p>';
+                    $message .= '<p>' . htmlspecialchars(PROJECT_NAME, ENT_QUOTES, 'UTF-8') . '</p>';
+                    sendemail($data['email'], $subject, $message);
+                }
                 unset($data['username'],$data['role'],$data['password']);
                 $data['user_id']=$result['user_id'];
                 $data['old']=$result['old'];
                 $result=$this->customer->savecustomer($data);
                 $this->session->set_userdata('mobile',$mobile);
-                redirect('enterotp.php?otp='.$smsresult['message']);
+                $this->session->set_userdata('otp_purpose','register');
+                redirect('enterotp.php');
             }
             else{
                 $this->session->set_flashdata('logerr',$result['message']);
@@ -77,6 +90,55 @@ class Login extends CI_Controller {
         }
         redirect($redirect);
 	}
+
+    public function sendforgototp(){
+        if($this->input->post('sendotp')!==NULL){
+            $email = trim((string)$this->input->post('email'));
+            if(empty($email)){
+                $this->session->set_flashdata('logerr','Please enter email address.');
+                redirect('forgotpassword.php');
+            }
+
+            $where = array("email"=>$email, "role"=>"customer");
+            $check = $this->account->getuser($where);
+            if($check['status']!==true){
+                $this->session->set_flashdata('logerr','Email not registered.');
+                redirect('forgotpassword.php');
+            }
+
+            $user = $check['user'];
+            $mobile = $user['mobile'] ?? '';
+            if(empty($mobile)){
+                $this->session->set_flashdata('logerr','No mobile linked with this email.');
+                redirect('forgotpassword.php');
+            }
+
+            $result = $this->sendotp(array("username"=>$mobile));
+            if($result['status']===true){
+                if(!empty($user['email'])){
+                    $otp = $result['message'] ?? '';
+                    if(!empty($otp)){
+                        $this->load->helper('email');
+                        $subject = 'OTP for Password Reset - ' . PROJECT_NAME;
+                        $name = !empty($user['name']) ? $user['name'] : $user['email'];
+                        $message  = '<p>Hi ' . htmlspecialchars($name, ENT_QUOTES, 'UTF-8') . ',</p>';
+                        $message .= '<p>Your OTP to reset password for ' . PROJECT_NAME . ' account is: <b>' . htmlspecialchars((string)$otp, ENT_QUOTES, 'UTF-8') . '</b>.</p>';
+                        $message .= '<p>OTP is valid for 30 minutes.</p>';
+                        $message .= '<p>Regards,</p>';
+                        $message .= '<p>' . htmlspecialchars(PROJECT_NAME, ENT_QUOTES, 'UTF-8') . '</p>';
+                        @sendemail($user['email'], $subject, $message);
+                    }
+                }
+                $this->session->set_userdata('mobile',$mobile);
+                $this->session->set_userdata('otp_purpose','forgot');
+                redirect('enterotp.php');
+            }
+
+            $this->session->set_flashdata('logerr',$result['message'] ?? 'Failed to send OTP.');
+            redirect('forgotpassword.php');
+        }
+        redirect('forgotpassword.php');
+    }
     
     public function verifyotp(){
         if($this->input->post('verifyotp')!==NULL){
@@ -87,9 +149,17 @@ class Login extends CI_Controller {
             $result=$this->account->verifyotp($otp,$where);
             if($result['status']===true){
                 $result=$result['result'];
-                $this->startsession($result);
-                $this->session->unset_userdata('mobile');
-                redirect('home/');
+                $otpPurpose = $this->session->otp_purpose;
+                if($otpPurpose==='forgot'){
+                    $this->session->set_userdata('forgot_verified_mobile',$username);
+                    $this->session->unset_userdata(array('mobile','otp_purpose'));
+                    redirect('resetpassword.php');
+                }
+                else{
+                    $this->startsession($result);
+                    $this->session->unset_userdata(array('mobile','otp_purpose'));
+                    redirect('home/');
+                }
             }
             else{
                 $error=$result['message'];
@@ -97,6 +167,40 @@ class Login extends CI_Controller {
             }
         }
         redirect('enterotp.php');
+    }
+
+    public function resetpassword(){
+        if($this->input->post('updatepassword')!==NULL){
+            $mobile = $this->session->forgot_verified_mobile;
+            $password = (string)$this->input->post('password');
+            $repassword = (string)$this->input->post('repassword');
+            if(empty($mobile)){
+                $this->session->set_flashdata('logerr','Session expired. Please verify OTP again.');
+                redirect('forgotpassword.php');
+            }
+            if(empty($password) || empty($repassword)){
+                $this->session->set_flashdata('logerr','Please enter password and confirm password.');
+                redirect('resetpassword.php');
+            }
+            if($password!==$repassword){
+                $this->session->set_flashdata('logerr','Password and confirm password do not match.');
+                redirect('resetpassword.php');
+            }
+
+            $result = $this->account->updatepassword(array("password"=>$password),array("username"=>$mobile,"role"=>"customer"));
+            if($result['status']===true){
+                $this->session->unset_userdata('forgot_verified_mobile');
+                $this->session->set_flashdata('logerr','Password updated successfully. Please login.');
+                redirect('login.php');
+            }
+            $this->session->set_flashdata('logerr',$result['message'] ?? 'Failed to update password.');
+            redirect('resetpassword.php');
+        }
+
+        if(empty($this->session->forgot_verified_mobile)){
+            redirect('forgotpassword.php');
+        }
+        redirect('resetpassword.php');
     }
 	public function logout(){
         $url='login/';

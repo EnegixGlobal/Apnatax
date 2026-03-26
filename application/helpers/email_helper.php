@@ -11,19 +11,20 @@
 				$CI->load->helper('upload');
 			} 
 			$from="";
-			if(isset($_SERVER['HTTP_HOST']) && $_SERVER['HTTP_HOST']=='localhost'){
-				ini_set('smtp','localhost');
-				ini_set('smtp_port',25);
-				
-				$config['protocol']='smtp';
-				$config['smtp_host']='';
-				$config['smtp_port']='465';
-				$config['smtp_timeout']='30';
-				$config['smtp_user']='';
-				$config['smtp_pass']='';
-				$from=$config['smtp_user'];
-			}
-            elseif($CI->input->get('test')=='test'){
+			$mailFromName = getenv('MAIL_FROM_NAME') ?: SITE_SALT;
+			$httpHost = isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : '';
+			$isLocal = in_array($httpHost, array('localhost','127.0.0.1'));
+
+			// SMTP settings (set these in server/local env)
+			$smtpHost = getenv('SMTP_HOST') ?: '';
+			$smtpPort = getenv('SMTP_PORT') ?: '';
+			$smtpUser = getenv('SMTP_USER') ?: '';
+			$smtpPass = getenv('SMTP_PASS') ?: '';
+			$smtpCrypto = getenv('SMTP_CRYPTO') ?: '';
+			$mailFromEmail = getenv('MAIL_FROM_EMAIL') ?: '';
+			$protocolEnv = getenv('MAIL_PROTOCOL') ?: '';
+
+			if($CI->input->get('test')=='test'){
                 $config['mailpath']= "/usr/bin/sendmail";
                 $config['protocol'] = 'smtp';
                 $config['smtp_host'] = 'smtp.gmail.com';
@@ -34,7 +35,37 @@
                 $config['smtp_pass'] = '';
                 $config['charset'] = 'iso-8859-1';
                 $config['smtp_timeout'] = 15;
-				$from=$config['smtp_user'];
+				$from = $mailFromEmail !== '' ? $mailFromEmail : ($config['smtp_user'] ?: 'no-reply@example.com');
+			}
+			elseif($isLocal){
+				$config['protocol'] = 'smtp';
+				$config['smtp_host'] = 'smtp.gmail.com';
+				$config['smtp_port'] = '587';
+				$config['smtp_timeout'] = '30';
+				$config['smtp_crypto'] = 'tls';
+				$config['smtp_user'] = 'apnotax@gmail.com';
+				$config['smtp_pass'] = 'spcidtkyxyxvucvq';
+				$config['_smtp_auth'] = true;
+			
+				$from = 'apnotax@gmail.com';
+				$mailFromName = 'ApnoTax';
+			}
+			else{
+				// Production: use SMTP env if provided; otherwise fall back to PHP mail().
+				if(!empty($smtpHost) || $protocolEnv === 'smtp'){
+					$config['protocol'] = $protocolEnv !== '' ? $protocolEnv : 'smtp';
+					$config['smtp_host'] = $smtpHost;
+					$config['smtp_port'] = $smtpPort !== '' ? $smtpPort : '587';
+					$config['smtp_timeout'] = getenv('SMTP_TIMEOUT') ?: '30';
+					$config['smtp_user'] = $smtpUser;
+					$config['smtp_pass'] = $smtpPass;
+					$config['smtp_crypto'] = $smtpCrypto;
+					$config['_smtp_auth'] = !empty($smtpUser) || !empty($smtpPass);
+				}else{
+					$config['protocol'] = 'mail';
+				}
+
+				$from = $mailFromEmail !== '' ? $mailFromEmail : ($smtpUser !== '' ? $smtpUser : 'no-reply@example.com');
 			}
 			
 			$config['newline']="\r\n";
@@ -53,7 +84,7 @@
             //$CI->email->set_mailtype('html'); // Set mailtype to HTML
 			//print_pre($config,true);
 			$CI->email->initialize($config);
-			$CI->email->from($from,SITE_SALT);
+			$CI->email->from($from,$mailFromName);
             $CI->email->set_newline("\r\n");
             $CI->email->set_header('Return-Path', $from);
 			$CI->email->to($email);

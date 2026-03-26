@@ -40,11 +40,12 @@ class Service_model extends CI_Model
                 $order_id = $this->db->insert_id();
                 $parent_id = $parent_id === NULL ? $order_id : $parent_id;
 
+                $amt = isset($single['amount']) ? (float) $single['amount'] : 0;
                 $notifydata = array(
-                    "type" => "New",
+                    "type" => "order",
                     "user_id" => $single['user_id'],
                     'order_id' => $order_id,
-                    'message' => $name . ' has Purchased ' . $service_name . ' Service',
+                    'message' => 'Your order for "' . $service_name . '" is placed. ₹' . number_format($amt, 2) . ' debited from wallet.',
                     'added_on' => $datetime,
                     'updated_on' => $datetime
                 );

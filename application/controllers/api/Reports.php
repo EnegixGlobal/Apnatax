@@ -412,11 +412,10 @@ class Reports extends RestController
             ]);
         }
 
-        // Save notification for admin
         $notify_data = array(
             'user_id' => $user['id'],
-            'type'    => 'Service Renewed',
-            'message' => $user['name'] . ' has renewed service "' . $service['name'] . '" for firm ID ' . $firm_id . ' and year ' . $year . '.',
+            'type'    => 'package',
+            'message' => 'Your service "' . $service['name'] . '" has been renewed for year ' . $year . '.',
         );
         $this->common->savenotification($notify_data);
 
@@ -457,6 +456,13 @@ class Reports extends RestController
         if ($inv_result['status'] && !empty($inv_result['invoice'])) {
             $invoice_no = $inv_result['invoice']['invoice_no'];
             $invoice_id = (int)$inv_result['invoice']['id'];
+            if (strpos($inv_result['message'], 'already exists') === false) {
+                $this->common->savenotification(array(
+                    'user_id' => (int) $user['id'],
+                    'type' => 'invoice',
+                    'message' => 'Invoice ' . $invoice_no . ' generated for your renewal.',
+                ));
+            }
         }
 
         $this->response([
@@ -1517,6 +1523,12 @@ class Reports extends RestController
                     $payment_msg .= ' + GST ₹' . number_format($gst_amount, 2) . ' (Total: ₹' . number_format($total_amount, 2) . ')';
                 }
                 $payment_msg .= ' processed successfully!' . (!empty($invoice_no) ? ' Invoice: ' . $invoice_no : '');
+
+                $this->common->savenotification(array(
+                    'user_id' => $user_id,
+                    'type' => 'payment',
+                    'message' => $payment_msg,
+                ));
 
                 $this->response([
                     'status' => true,

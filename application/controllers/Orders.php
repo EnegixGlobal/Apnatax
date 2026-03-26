@@ -210,6 +210,12 @@ class Orders extends CI_Controller
         );
         if ($this->db->insert('order_assign', $data)) {
             $this->db->update('purchases', ['status' => 3], ['id' => $order['id']]);
+            $this->common->savenotification(array(
+                'type' => 'order',
+                'user_id' => (int) $order['user_id'],
+                'order_id' => (int) $order['id'],
+                'message' => 'Your order for "' . (!empty($order['service_name']) ? $order['service_name'] : 'service') . '" is now under assessment.',
+            ));
             $this->session->set_flashdata(['msg' => 'Accepted for Assessment']);
         } else {
             $error = $this->db->error();
@@ -235,6 +241,15 @@ class Orders extends CI_Controller
             $data['added_on'] = $data['updated_on'] = date('Y-m-d H:i:s');
             if ($this->db->insert('order_assign', $data)) {
                 $this->db->update('purchases', ['status' => 3], ['id' => $data['order_id']]);
+                $ord = $this->service->getpurchases(array('t1.id' => (int) $data['order_id']), 'single');
+                if (!empty($ord)) {
+                    $this->common->savenotification(array(
+                        'type' => 'order',
+                        'user_id' => (int) $ord['user_id'],
+                        'order_id' => (int) $ord['id'],
+                        'message' => 'Your order for "' . (!empty($ord['service_name']) ? $ord['service_name'] : 'service') . '" is now under assessment.',
+                    ));
+                }
                 $this->session->set_flashdata(['msg' => 'Employee Assigned Successfully!']);
             } else {
                 $error = $this->db->error();
@@ -267,6 +282,12 @@ class Orders extends CI_Controller
                     $data['added_on'] = $data['updated_on'] = date('Y-m-d H:i:s');
                     if ($this->db->insert('assessments', $data)) {
                         $this->db->update('purchases', ['status' => 4], ['id' => $data['order_id']]);
+                        $this->common->savenotification(array(
+                            'type' => 'order',
+                            'user_id' => (int) $order['user_id'],
+                            'order_id' => (int) $order['id'],
+                            'message' => 'Your assessment report for "' . (!empty($order['service_name']) ? $order['service_name'] : 'service') . '" is ready to view.',
+                        ));
                         $this->session->set_flashdata(['msg' => 'Assessment Uploaded Successfully!']);
                     } else {
                         $error = $this->db->error();

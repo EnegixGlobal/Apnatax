@@ -59,7 +59,7 @@
                             </div>
                             <form action="login/verifyotp/" method="post" class="login100-form validate-form">
                                 <div class="form-floating mb-3">
-                                    <input type="password" name="otp" id="otp" placeholder="OTP" class="input100 border-start-0 form-control ms-0" required value="<?= $this->input->get('otp'); ?>"/>
+                                    <input type="text" name="otp" id="otp" placeholder="OTP" class="input100 border-start-0 form-control ms-0" required inputmode="numeric" pattern="[0-9]{6}" maxlength="6" />
                                     <label for="otp">OTP</label>
                                 </div>
                                 <div class="text-center text-danger"><?= $this->session->flashdata('err_msg'); ?></div>

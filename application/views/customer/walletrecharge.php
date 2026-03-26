@@ -43,17 +43,19 @@
                             $payment_method = '';
                             $payment_options = array(
                                 '' => 'Select Payment Method',
-                                'RTGS' => 'RTGS',
-                                'NEFT' => 'NEFT',
-                                'IMPS' => 'IMPS',
-                                'Bank Transfer' => 'Bank Transfer',
-                                'Cash Deposit' => 'Cash Deposit',
-                                'Other' => 'Other'
+                                                // Keep PayU only (other payment modes commented out)
+                                'PayU' => 'PayU'
+                                // 'RTGS' => 'RTGS',
+                                // 'NEFT' => 'NEFT',
+                                // 'IMPS' => 'IMPS',
+                                // 'Bank Transfer' => 'Bank Transfer',
+                                // 'Cash Deposit' => 'Cash Deposit',
+                                // 'Other' => 'Other'
                             );
                             $attributes = array("id" => "payment_method", "class" => "form-control");
                             echo create_form_input('select', 'payment_method', "Payment Method", false, $payment_method, $attributes, $payment_options);
                             ?>
-                            <small class="text-muted">Select the payment method used (RTGS/NEFT/etc.)</small>
+                            <small class="text-muted">Select the payment method used (PayU only)</small>
                         </div>
                     </div>
                 </div>

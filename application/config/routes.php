@@ -60,6 +60,8 @@ $route['logout'] = 'login/logout';
 $route['login.php'] = 'website/login';
 $route['register.php'] = 'website/register';
 $route['enterotp.php'] = 'website/enterotp';
+$route['forgotpassword.php'] = 'website/forgotpassword';
+$route['resetpassword.php'] = 'website/resetpassword';
 $route['unsubscribe'] = 'home/unsubscribe';
 
 $route['defaultimage'] = 'home/image';
@@ -74,6 +76,7 @@ $route['bankstatement'] = 'profile/bankstatement';
 $route['api/register'] = 'api/account/register';
 $route['api/verifyotp'] = 'api/account/verifyotp';
 $route['api/login'] = 'api/account/login';
+$route['api/resetpassword'] = 'api/account/resetpassword';
 $route['api/changepassword'] = 'api/account/changepassword';
 
 $route['api/getstates'] = 'api/common/getstates';

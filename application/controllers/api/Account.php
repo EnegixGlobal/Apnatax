@@ -28,15 +28,28 @@ class Account extends RestController{
                 $verify=$this->account->addtoken($tokendata);
                 $where=array("username"=>$data['mobile']);
                 $smsresult=$this->sendotp($where);
-                if($smsresult['status']===false){
-
+                if($smsresult['status']===true && !empty($data['email'])){
+                    // Email OTP so user can manually enter it in the mobile/web OTP screen.
+                    $otp = $smsresult['message'] ?? '';
+                    if(!empty($otp)){
+                        $this->load->helper('email');
+                        $subject = 'OTP for Registration - ' . PROJECT_NAME;
+                        $name = !empty($data['name']) ? $data['name'] : $data['email'];
+                        $message  = '<p>Hi ' . htmlspecialchars($name, ENT_QUOTES, 'UTF-8') . ',</p>';
+                        $message .= '<p>Your OTP for ' . PROJECT_NAME . ' registration is: <b>' . htmlspecialchars((string)$otp, ENT_QUOTES, 'UTF-8') . '</b>.</p>';
+                        $message .= '<p>OTP is valid for 30 minutes.</p>';
+                        $message .= '<p>Regards,</p>';
+                        $message .= '<p>' . htmlspecialchars(PROJECT_NAME, ENT_QUOTES, 'UTF-8') . '</p>';
+                        // Don't block registration if email sending fails
+                        @sendemail($data['email'], $subject, $message);
+                    }
                 }
                 unset($data['username'],$data['role'],$data['password']);
                 $data['user_id']=$result['user_id'];
                 $data['old']=$result['old'];
                 $result=$this->customer->savecustomer($data);
                 $response=array("name"=>$data['name'],"mobile"=>$data['mobile'],"email"=>$data['email'],
-                                "token"=>$token,'otp'=>$smsresult['message']);
+                                "token"=>$token,'otp'=>'');
                 $this->response(['status'=>TRUE,'response'=>$response], RestController::HTTP_OK);
             }
             else{
@@ -133,26 +146,50 @@ class Account extends RestController{
 	}	
 
 	public function sendotptomobile_post(){
-        $where['username']=$this->post('mobile');
-        $regid=$this->post('regid');
+        $mobile=$this->post('mobile');
+        $email=$this->post('email');
+        $where=array();
         $device_id=$this->post('device_id');
         $device_name=$this->post('device_name');
         
-        if(!empty($where['username']) && !empty($regid) && !empty($device_id) && !empty($device_name)){
+        if(!empty($device_id) && !empty($device_name) && (!empty($mobile) || !empty($email))){
+            if(!empty($email)){
+                $where = array('email'=>$email, 'role'=>'customer');
+            }
+            else{
+                $where = array('username'=>$mobile);
+            }
 
             $result=$this->account->getuser($where);
             if($result['status']===true){
                 $user=$result['user'];
                 $token=md5($user['id'].'.'.time().'.'.$user['username']);
                 $tokendata=array("user_id"=>$user['id'],"token"=>$token,"device_id"=>$device_id,
-                                 "device_name"=>$device_name,"regid"=>$regid);
+                                 "device_name"=>$device_name,"regid"=>$this->post('regid'));
                 $verify=$this->account->addtoken($tokendata);
 
-                $result=$this->sendotp($where);
+                $result=$this->sendotp(array('username'=>$user['mobile']));
                 if($result['status']===true){
+                    // Email OTP so user can manually enter it in the mobile/web OTP screen.
+                    if(!empty($user['email'])){
+                        $otp = $result['message'] ?? '';
+                        if(!empty($otp)){
+                            $this->load->helper('email');
+                            $subject = 'OTP for Password Reset - ' . PROJECT_NAME;
+                            $name = !empty($user['name']) ? $user['name'] : $user['email'];
+                            $message  = '<p>Hi ' . htmlspecialchars($name, ENT_QUOTES, 'UTF-8') . ',</p>';
+                            $message .= '<p>Your OTP to reset password for ' . PROJECT_NAME . ' account is: <b>' . htmlspecialchars((string)$otp, ENT_QUOTES, 'UTF-8') . '</b>.</p>';
+                            $message .= '<p>OTP is valid for 30 minutes.</p>';
+                            $message .= '<p>Regards,</p>';
+                            $message .= '<p>' . htmlspecialchars(PROJECT_NAME, ENT_QUOTES, 'UTF-8') . '</p>';
+                            @sendemail($user['email'], $subject, $message);
+                        }
+                    }
                     $this->response([
                         'status' => true,
-                        'result' => $result['message'],"token"=>$token], RestController::HTTP_OK);
+                        // Keep token under response key so mobile app can navigate properly.
+                        'response' => ['token' => $token]
+                    ], RestController::HTTP_OK);
                 }
                 else{
                     $error=$result['message'];
@@ -174,6 +211,62 @@ class Account extends RestController{
 				'message' => "Please provide all Details!"], RestController::HTTP_OK);
         }
 	}	
+
+    public function resetpassword_post(){
+        $token=$this->post('token');
+        $otp=$this->post('otp');
+        $new_password=$this->post('new_password');
+        $repassword=$this->post('repassword');
+
+        if(empty($token) || empty($otp) || empty($new_password) || empty($repassword)){
+            $this->response([
+                'status' => false,
+                'message' => "Please provide all Details!"
+            ], RestController::HTTP_OK);
+            return;
+        }
+
+        if($new_password!=$repassword){
+            $this->response([
+                'status' => false,
+                'message' => "New Password and Confirm Password do not Match!"
+            ], RestController::HTTP_OK);
+            return;
+        }
+
+        $user=$this->account->verify_token($token);
+        if(empty($user) || !is_array($user)){
+            $this->response([
+                'status' => false,
+                'message' => "Token Invalid"
+            ], RestController::HTTP_OK);
+            return;
+        }
+
+        $where=array("username"=>$user['mobile']);
+        $verifyOtpResult=$this->account->verifyotp($otp,$where);
+        if($verifyOtpResult['status']!==true){
+            $this->response([
+                'status' => false,
+                'message' => $verifyOtpResult['message'] ?? 'Invalid OTP!'
+            ], RestController::HTTP_OK);
+            return;
+        }
+
+        $update=$this->account->updatepassword(array("password"=>$new_password),array("id"=>$user['id']));
+        if($update['status']===true){
+            $this->response([
+                'status' => true,
+                'message' => $update['message']
+            ], RestController::HTTP_OK);
+        }
+        else{
+            $this->response([
+                'status' => false,
+                'message' => $update['message'] ?? 'Failed to reset password'
+            ], RestController::HTTP_OK);
+        }
+    }
 
     public function sendotp($where){
         $array=$this->account->createotp($where);

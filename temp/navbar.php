@@ -88,7 +88,16 @@ if (!function_exists('base_url')) {
                <a class="nav-link <?php echo strpos($_SERVER['PHP_SELF'], "login.php") !== FALSE ? 'active' : ''; ?>" aria-current="page" href="login.php">CUSTOMER LOGIN</a>
             </li>
             <li class="nav-item">
-               <a class="nav-link <?php echo strpos($_SERVER['PHP_SELF'], "login/") !== FALSE ? 'active' : ''; ?>" aria-current="page" href="login/">EMPLOYEE LOGIN</a>
+               <?php
+                  $scriptName = isset($_SERVER['SCRIPT_NAME']) ? $_SERVER['SCRIPT_NAME'] : '';
+                  $basePath = rtrim(str_replace('\\','/', dirname($scriptName)), '/');
+                  if ($basePath === '.' || $basePath === '' || $basePath === '/') {
+                      $basePath = '';
+                  }
+               ?>
+               <a class="nav-link <?php echo strpos($_SERVER['REQUEST_URI'], "/login/") !== FALSE || strpos($_SERVER['REQUEST_URI'], "/login.php") !== FALSE ? 'active' : ''; ?>"
+                  aria-current="page"
+                  href="<?= $basePath; ?>/login/">EMPLOYEE LOGIN</a>
             </li>
             <li class="nav-item">
                <a class="nav-link <?php echo strpos($_SERVER['PHP_SELF'], "contact.php") !== FALSE ? 'active' : ''; ?>" aria-current="page" href="contact.php">CONTACT US</a>

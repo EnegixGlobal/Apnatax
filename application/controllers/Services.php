@@ -447,12 +447,11 @@ class Services extends CI_Controller
                 log_message('error', 'Renewal invoice unexpected error: ' . $e->getMessage());
             }
 
-            // Send notification to admin that user has renewed a service in package
+            // Customer notification: package / subscription renewal
             $notifydata = array(
-                "type"    => "Service Renewed",
+                "type"    => "package",
                 "user_id" => $user['id'],
-                // No specific order_id here, this is a package-level renewal
-                "message" => $user['name'] . ' has renewed service "' . $service['name'] . '" for firm ID ' . $firm_id . ' and year ' . $year . '.'
+                "message" => 'Your service "' . $service['name'] . '" has been renewed for year ' . $year . '.',
             );
             if (isset($this->common) && method_exists($this->common, 'savenotification')) {
                 $this->common->savenotification($notifydata);
@@ -1288,10 +1287,10 @@ class Services extends CI_Controller
                             $result = $this->service->saveformdata($data);
                             if ($result['status'] === true) {
                                 $notifydata = array(
-                                    "type" => "Documents Uploaded",
+                                    "type" => "form",
                                     "user_id" => $user['id'],
                                     'order_id' => $order['id'],
-                                    'message' => $user['name'] . ' has Successfully Uploaded the documents for ' . $order['service_name'] . '.',
+                                    'message' => 'Documents submitted for "' . $order['service_name'] . '". We will review shortly.',
                                     'added_on' => date('Y-m-d H:i:s'),
                                     'updated_on' => date('Y-m-d H:i:s')
                                 );
@@ -1808,6 +1807,14 @@ class Services extends CI_Controller
                                 if (!empty($order)) {
                                     $invoice_result = $this->invoice->create_for_order($order);
                                     if ($invoice_result['status'] === true) {
+                                        if (strpos($invoice_result['message'], 'already exists') === false) {
+                                            $this->common->savenotification(array(
+                                                'user_id' => (int) $user['id'],
+                                                'type' => 'invoice',
+                                                'order_id' => (int) $result['order_id'],
+                                                'message' => 'Invoice ' . $invoice_result['invoice']['invoice_no'] . ' generated for your order.',
+                                            ));
+                                        }
                                         $this->session->set_flashdata("msg", $result['message'] . ' Invoice No: ' . $invoice_result['invoice']['invoice_no']);
                                     } else {
                                         // If invoice fails, still keep purchase but log error

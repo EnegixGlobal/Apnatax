@@ -142,6 +142,12 @@ class Wallet extends RestController
                     if (!empty($wallet)) {
                         $result = $this->wallet->updatepayment($data, $where);
                         if ($result['status'] === true) {
+                            $amt = isset($wallet['amount']) ? (float) $wallet['amount'] : 0;
+                            $this->common->savenotification(array(
+                                'user_id' => (int) $user['id'],
+                                'type' => 'payment',
+                                'message' => 'Wallet top-up of ₹' . number_format($amt, 2) . ' was successful.',
+                            ));
                             $this->response($result, RestController::HTTP_OK);
                         } else {
                             $message = $result['message'];
@@ -157,6 +163,11 @@ class Wallet extends RestController
                         ], RestController::HTTP_OK);
                     }
                 } else {
+                    $this->common->savenotification(array(
+                        'user_id' => (int) $user['id'],
+                        'type' => 'payment',
+                        'message' => 'Wallet payment could not be completed. Please try again.',
+                    ));
                     $this->response([
                         'status' => false,
                         'message' => "Payment Failed! Try Again!"
@@ -416,6 +427,11 @@ class Wallet extends RestController
                             );
                             $result = $this->wallet->makeaccountancypayment($data);
                             if ($result['status'] == true) {
+                                $this->common->savenotification(array(
+                                    'user_id' => (int) $user_id,
+                                    'type' => 'payment',
+                                    'message' => 'Accountancy payment of ₹' . number_format((float) $amount, 2) . ' was successful.',
+                                ));
                                 $this->response([
                                     'status' => true,
                                     'message' => $result['message']
