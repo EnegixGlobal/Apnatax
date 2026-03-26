@@ -315,6 +315,14 @@ class Services extends RestController
                                         if ($inv_result['status'] && !empty($inv_result['invoice'])) {
                                             $invoice_no = $inv_result['invoice']['invoice_no'];
                                             $invoice_id = (int)$inv_result['invoice']['id'];
+                                            if (strpos($inv_result['message'], 'already exists') === false) {
+                                                $this->common->savenotification(array(
+                                                    'user_id' => (int) $user['id'],
+                                                    'type' => 'invoice',
+                                                    'order_id' => (int) $result['order_id'],
+                                                    'message' => 'Invoice ' . $invoice_no . ' generated for your order.',
+                                                ));
+                                            }
                                         }
                                     }
                                 }
@@ -1668,10 +1676,10 @@ class Services extends RestController
                                 $result = $this->service->saveformdata($data);
                                 if ($result['status'] === true) {
                                     $notifydata = array(
-                                        "type" => "Documents Uploaded",
+                                        "type" => "form",
                                         "user_id" => $user['id'],
                                         'order_id' => $order['id'],
-                                        'message' => $user['name'] . ' has Successfully Uploaded the documents for ' . $order['service_name'] . '.',
+                                        'message' => 'Documents submitted for "' . $order['service_name'] . '". We will review shortly.',
                                         'added_on' => date('Y-m-d H:i:s'),
                                         'updated_on' => date('Y-m-d H:i:s')
                                     );

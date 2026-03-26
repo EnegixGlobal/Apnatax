@@ -48,3 +48,8 @@ webhook_log.txt
 /lib_updater.php
 /mylib/
 pull.php
+
+# Firebase / FCM service account secrets (HTTP v1)
+*fcm*service-account*.json
+application/config/*fcm*service-account*.json
+application/config/*firebase*service-account*.json

@@ -885,6 +885,11 @@ class Customers extends CI_Controller
             // Add wallet recharge
             $result = $this->wallet->adminrecharge($data);
             if ($result['status'] === true) {
+                $this->common->savenotification(array(
+                    'user_id' => (int) $user_id,
+                    'type' => 'payment',
+                    'message' => '₹' . number_format((float) $amount, 2) . ' credited to your wallet.',
+                ));
                 $this->session->set_flashdata("msg", $result['message']);
             } else {
                 $this->session->set_flashdata("err_msg", $result['message']);

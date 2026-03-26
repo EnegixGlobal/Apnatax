@@ -23,15 +23,63 @@ class Common_model extends CI_Model{
         return $array;
     }
     
-    public function savenotification($data){
+    public function savenotification($data, $send_push = true){
         $data['added_on']=$data['updated_on']=date('Y-m-d H:i:s');
+        if(!isset($data['status'])){
+            $data['status']=0;
+        }
         if($this->db->insert("notify",$data)){
+            $nid = (int) $this->db->insert_id();
+            if ($send_push && !empty($data['user_id'])) {
+                $this->_send_push_after_save(
+                    (int) $data['user_id'],
+                    $nid,
+                    isset($data['type']) ? $data['type'] : 'Notification',
+                    isset($data['message']) ? $data['message'] : '',
+                    !empty($data['order_id']) ? (int) $data['order_id'] : 0
+                );
+            }
             return array("status"=>true,"message"=>"Notification Added Successfully!");
         }
         else{
             $error=$this->db->error();
             return array("status"=>false,"message"=>$error['message']);
         }
+    }
+
+    /**
+     * Short title for FCM (and mobile tray).
+     */
+    public function notification_title_for_type($type)
+    {
+        $map = array(
+            'order'               => 'Order update',
+            'New'                 => 'New order',
+            'form'                => 'Documents',
+            'Documents Uploaded'  => 'Documents',
+            'payment'             => 'Payment',
+            'kyc'                 => 'KYC',
+            'invoice'             => 'Invoice',
+            'package'             => 'Package',
+            'Service Renewed'     => 'Subscription',
+            'admin'               => 'Announcement',
+        );
+        return isset($map[$type]) ? $map[$type] : 'Notification';
+    }
+
+    private function _send_push_after_save($user_id, $notification_id, $type, $message, $order_id)
+    {
+        if ($user_id < 1) {
+            return;
+        }
+        $this->load->library('fcm');
+        $title = $this->notification_title_for_type($type);
+        $plain = strip_tags($message);
+        $this->fcm->send_to_user($user_id, $title, $plain, array(
+            'type'              => (string) $type,
+            'notification_id'   => (string) $notification_id,
+            'order_id'          => (string) $order_id,
+        ));
     }
     
     public function getnotifications($where=array(),$type="all"){

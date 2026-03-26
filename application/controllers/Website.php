@@ -41,6 +41,16 @@ class Website extends CI_Controller {
         //$this->load->library('CI_Debugger/Debugger');
 		$this->load->view('website/pages/enterotp');
 	}
+
+	public function forgotpassword()
+	{
+		$this->load->view('website/pages/forgotpassword');
+	}
+
+	public function resetpassword()
+	{
+		$this->load->view('website/pages/resetpassword');
+	}
     
     public function alldata($token=''){
 		$this->load->library('alldata');

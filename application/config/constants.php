@@ -130,6 +130,10 @@ defined('RAZORPAY_CURRENCY')      or define('RAZORPAY_CURRENCY', 'INR');
 
 /////////////////////////////////////////////
 // PayU Configuration
+// defined('PAYU_MERCHANT_KEY')      or define('PAYU_MERCHANT_KEY', 'jAWu4T');
+// defined('PAYU_SALT')              or define('PAYU_SALT', '2uOdfihzWVTGLoDLTJfaF4ntiVdEYc77');
+// defined('PAYU_ENV')               or define('PAYU_ENV', 'production'); // 'test' or 'production'
+
 defined('PAYU_MERCHANT_KEY')      or define('PAYU_MERCHANT_KEY', 'RWJEZb');
 defined('PAYU_SALT')              or define('PAYU_SALT', '5zRO1ziP75t2ypUnxDCqihPJZwzpOsba');
 defined('PAYU_ENV')               or define('PAYU_ENV', 'test'); // 'test' or 'production'

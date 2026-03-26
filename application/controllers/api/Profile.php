@@ -300,6 +300,11 @@ class Profile extends RestController
                     if ($status) {
                         $result = $this->account->savekyc($data);
                         if ($result['status'] === true) {
+                            $this->common->savenotification(array(
+                                'user_id' => (int) $user['id'],
+                                'type' => 'kyc',
+                                'message' => 'Your KYC documents were submitted successfully. Verification may take some time.',
+                            ));
                             $this->response([
                                 'status' => true,
                                 'message' => $result['message']
