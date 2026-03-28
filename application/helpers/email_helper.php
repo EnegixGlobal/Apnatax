@@ -1,7 +1,7 @@
 <?php 
 	if(!defined('BASEPATH')) exit('No direct script access allowed');
 	if(!function_exists('sendemail')) {
-  		function sendemail($email,$subject,$message,$fieldname=false,$upload_path=false,$allowed_types=false,$file_name=false) {
+  		function sendemail($email,$subject,$message,$fieldname=false,$upload_path=false,$allowed_types=false,$file_name=false,$reply_to=false) {
     		// Getting CI class instance.
     		$CI = get_instance();
 			if(!$CI->load->is_loaded('email')){
@@ -85,6 +85,9 @@
 			//print_pre($config,true);
 			$CI->email->initialize($config);
 			$CI->email->from($from,$mailFromName);
+			if ($reply_to !== false && is_string($reply_to) && filter_var($reply_to, FILTER_VALIDATE_EMAIL)) {
+				$CI->email->reply_to($reply_to);
+			}
             $CI->email->set_newline("\r\n");
             $CI->email->set_header('Return-Path', $from);
 			$CI->email->to($email);
