@@ -19,8 +19,22 @@
 				$c = $CI->config->item($key, 'email_smtp');
 				return ($c !== null && $c !== '') ? $c : $default;
 			};
-			$envOrCfg = function($envKey, $cfgKey, $default = '') use ($cfgVal) {
-				$v = getenv($envKey);
+			// PHP-FPM pool env[] is usually visible via getenv(); some stacks only mirror into $_SERVER / $_ENV.
+			$envFirst = function($key) {
+				$v = getenv($key);
+				if ($v !== false && $v !== '') {
+					return $v;
+				}
+				if (isset($_SERVER[$key]) && $_SERVER[$key] !== '') {
+					return (string) $_SERVER[$key];
+				}
+				if (isset($_ENV[$key]) && $_ENV[$key] !== '') {
+					return (string) $_ENV[$key];
+				}
+				return false;
+			};
+			$envOrCfg = function($envKey, $cfgKey, $default = '') use ($cfgVal, $envFirst) {
+				$v = $envFirst($envKey);
 				if ($v !== false && $v !== '') {
 					return $v;
 				}
@@ -34,7 +48,7 @@
 			$smtpCrypto = $envOrCfg('SMTP_CRYPTO', 'smtp_crypto', '');
 			$mailFromEmail = $envOrCfg('MAIL_FROM_EMAIL', 'mail_from_email', '');
 			$protocolEnv = $envOrCfg('MAIL_PROTOCOL', 'mail_protocol', '');
-			$mailFromName = getenv('MAIL_FROM_NAME');
+			$mailFromName = $envFirst('MAIL_FROM_NAME');
 			if ($mailFromName === false || $mailFromName === '') {
 				$mailFromName = $cfgVal('mail_from_name', '');
 			}
@@ -76,9 +90,10 @@
 					$config['smtp_user'] = $smtpUser;
 					$config['smtp_pass'] = $smtpPass;
 					$config['smtp_crypto'] = $smtpCrypto !== '' ? $smtpCrypto : 'tls';
-					$config['_smtp_auth'] = !empty($smtpUser) || !empty($smtpPass);
+					$config['_smtp_auth'] = !empty($smtpUser) && !empty($smtpPass);
 				}else{
 					$config['protocol'] = 'mail';
+					log_message('error', 'sendemail: SMTP not configured (empty SMTP_HOST). Set env in php-fpm pool or application/config/email_smtp.php / email_smtp_local.php. Using PHP mail() which usually fails.');
 				}
 
 				$from = $mailFromEmail !== '' ? $mailFromEmail : ($smtpUser !== '' ? $smtpUser : 'no-reply@example.com');
@@ -99,6 +114,7 @@
             //$CI->email->set_wordwrap(TRUE); // Enable word wrapping
             //$CI->email->set_mailtype('html'); // Set mailtype to HTML
 			//print_pre($config,true);
+			$CI->email->clear(TRUE);
 			$CI->email->initialize($config);
 			$CI->email->from($from,$mailFromName);
 			if ($reply_to !== false && is_string($reply_to) && filter_var($reply_to, FILTER_VALIDATE_EMAIL)) {
