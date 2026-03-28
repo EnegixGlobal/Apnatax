@@ -106,7 +106,33 @@ class Account extends RestController{
 				'status' => false,
 				'message' =>  "Please provide all Details!"], RestController::HTTP_OK);
         }
-	}	
+	}
+
+	public function updateregid_post()
+	{
+		$token = $this->post('token');
+		$regid = $this->post('regid');
+		if (empty($token)) {
+			$this->response([
+				'status' => false,
+				'message' => 'Please provide token!',
+			], RestController::HTTP_OK);
+			return;
+		}
+		$verify = $this->account->verify_token($token);
+		if (empty($verify) || !is_array($verify)) {
+			$this->response([
+				'status' => false,
+				'message' => 'User Not Logged In!',
+			], RestController::HTTP_OK);
+			return;
+		}
+		$this->account->updateregid_for_session_token($token, (string) $regid);
+		$this->response([
+			'status' => true,
+			'message' => 'Device registration updated',
+		], RestController::HTTP_OK);
+	}
 
 	public function verifyotp_post(){
         $token=$this->post('token');

@@ -286,7 +286,8 @@ class Common extends RestController
         if (!empty($token)) {
             $user = $this->account->verify_token($token);
             if (!empty($user) && is_array($user)) {
-                $where = array('t1.user_id' => $user['id'], 't1.status' => 0);
+                // Return all notifications so the app can show read vs unread and badge counts.
+                $where = array('t1.user_id' => $user['id']);
                 $notifications = $this->common->getnotifications($where);
                 if (!empty($notifications)) {
                     $this->response([

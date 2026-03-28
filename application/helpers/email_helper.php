@@ -11,18 +11,36 @@
 				$CI->load->helper('upload');
 			} 
 			$from="";
-			$mailFromName = getenv('MAIL_FROM_NAME') ?: SITE_SALT;
 			$httpHost = isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : '';
 			$isLocal = in_array($httpHost, array('localhost','127.0.0.1'));
 
-			// SMTP settings (set these in server/local env)
-			$smtpHost = getenv('SMTP_HOST') ?: '';
-			$smtpPort = getenv('SMTP_PORT') ?: '';
-			$smtpUser = getenv('SMTP_USER') ?: '';
-			$smtpPass = getenv('SMTP_PASS') ?: '';
-			$smtpCrypto = getenv('SMTP_CRYPTO') ?: '';
-			$mailFromEmail = getenv('MAIL_FROM_EMAIL') ?: '';
-			$protocolEnv = getenv('MAIL_PROTOCOL') ?: '';
+			$CI->config->load('email_smtp', TRUE);
+			$cfgVal = function($key, $default = '') use ($CI) {
+				$c = $CI->config->item($key, 'email_smtp');
+				return ($c !== null && $c !== '') ? $c : $default;
+			};
+			$envOrCfg = function($envKey, $cfgKey, $default = '') use ($cfgVal) {
+				$v = getenv($envKey);
+				if ($v !== false && $v !== '') {
+					return $v;
+				}
+				return $cfgVal($cfgKey, $default);
+			};
+
+			$smtpHost = $envOrCfg('SMTP_HOST', 'smtp_host', '');
+			$smtpPort = $envOrCfg('SMTP_PORT', 'smtp_port', '');
+			$smtpUser = $envOrCfg('SMTP_USER', 'smtp_user', '');
+			$smtpPass = $envOrCfg('SMTP_PASS', 'smtp_pass', '');
+			$smtpCrypto = $envOrCfg('SMTP_CRYPTO', 'smtp_crypto', '');
+			$mailFromEmail = $envOrCfg('MAIL_FROM_EMAIL', 'mail_from_email', '');
+			$protocolEnv = $envOrCfg('MAIL_PROTOCOL', 'mail_protocol', '');
+			$mailFromName = getenv('MAIL_FROM_NAME');
+			if ($mailFromName === false || $mailFromName === '') {
+				$mailFromName = $cfgVal('mail_from_name', '');
+			}
+			if ($mailFromName === '') {
+				$mailFromName = SITE_SALT;
+			}
 
 			if($CI->input->get('test')=='test'){
                 $config['mailpath']= "/usr/bin/sendmail";
@@ -39,16 +57,14 @@
 			}
 			elseif($isLocal){
 				$config['protocol'] = 'smtp';
-				$config['smtp_host'] = 'smtp.gmail.com';
-				$config['smtp_port'] = '587';
-				$config['smtp_timeout'] = '30';
-				$config['smtp_crypto'] = 'tls';
-				$config['smtp_user'] = 'apnotax@gmail.com';
-				$config['smtp_pass'] = 'spcidtkyxyxvucvq';
-				$config['_smtp_auth'] = true;
-			
-				$from = 'apnotax@gmail.com';
-				$mailFromName = 'ApnoTax';
+				$config['smtp_host'] = $smtpHost !== '' ? $smtpHost : 'smtp.gmail.com';
+				$config['smtp_port'] = $smtpPort !== '' ? $smtpPort : '587';
+				$config['smtp_timeout'] = $envOrCfg('SMTP_TIMEOUT', 'smtp_timeout', '30');
+				$config['smtp_crypto'] = $smtpCrypto !== '' ? $smtpCrypto : 'tls';
+				$config['smtp_user'] = $smtpUser;
+				$config['smtp_pass'] = $smtpPass;
+				$config['_smtp_auth'] = !empty($smtpUser) && !empty($smtpPass);
+				$from = $mailFromEmail !== '' ? $mailFromEmail : ($smtpUser !== '' ? $smtpUser : 'no-reply@localhost');
 			}
 			else{
 				// Production: use SMTP env if provided; otherwise fall back to PHP mail().
@@ -56,10 +72,10 @@
 					$config['protocol'] = $protocolEnv !== '' ? $protocolEnv : 'smtp';
 					$config['smtp_host'] = $smtpHost;
 					$config['smtp_port'] = $smtpPort !== '' ? $smtpPort : '587';
-					$config['smtp_timeout'] = getenv('SMTP_TIMEOUT') ?: '30';
+					$config['smtp_timeout'] = $envOrCfg('SMTP_TIMEOUT', 'smtp_timeout', '30');
 					$config['smtp_user'] = $smtpUser;
 					$config['smtp_pass'] = $smtpPass;
-					$config['smtp_crypto'] = $smtpCrypto;
+					$config['smtp_crypto'] = $smtpCrypto !== '' ? $smtpCrypto : 'tls';
 					$config['_smtp_auth'] = !empty($smtpUser) || !empty($smtpPass);
 				}else{
 					$config['protocol'] = 'mail';
@@ -140,6 +156,7 @@
                 if($CI->input->get('test')=='test'){
                     print_pre($CI->email);
                 }
+				log_message('error', 'sendemail failed for: '.$email.' — '.$CI->email->print_debugger(array('headers')));
 				return false;
 			}
 		}  
