@@ -40,8 +40,10 @@ class Account extends RestController{
                         $message .= '<p>OTP is valid for 30 minutes.</p>';
                         $message .= '<p>Regards,</p>';
                         $message .= '<p>' . htmlspecialchars(PROJECT_NAME, ENT_QUOTES, 'UTF-8') . '</p>';
-                        // Don't block registration if email sending fails
-                        @sendemail($data['email'], $subject, $message);
+                        $mailOk = sendemail($data['email'], $subject, $message);
+                        if (!$mailOk) {
+                            log_message('error', 'OTP registration email failed for: '.$data['email'].' (see previous sendemail line in log)');
+                        }
                     }
                 }
                 unset($data['username'],$data['role'],$data['password']);
@@ -197,18 +199,25 @@ class Account extends RestController{
                 $result=$this->sendotp(array('username'=>$user['mobile']));
                 if($result['status']===true){
                     // Email OTP so user can manually enter it in the mobile/web OTP screen.
-                    if(!empty($user['email'])){
-                        $otp = $result['message'] ?? '';
-                        if(!empty($otp)){
-                            $this->load->helper('email');
-                            $subject = 'OTP for Password Reset - ' . PROJECT_NAME;
-                            $name = !empty($user['name']) ? $user['name'] : $user['email'];
-                            $message  = '<p>Hi ' . htmlspecialchars($name, ENT_QUOTES, 'UTF-8') . ',</p>';
-                            $message .= '<p>Your OTP to reset password for ' . PROJECT_NAME . ' account is: <b>' . htmlspecialchars((string)$otp, ENT_QUOTES, 'UTF-8') . '</b>.</p>';
-                            $message .= '<p>OTP is valid for 30 minutes.</p>';
-                            $message .= '<p>Regards,</p>';
-                            $message .= '<p>' . htmlspecialchars(PROJECT_NAME, ENT_QUOTES, 'UTF-8') . '</p>';
-                            @sendemail($user['email'], $subject, $message);
+                    $otp = $result['message'] ?? '';
+                    $mailTo = '';
+                    if (!empty($email)) {
+                        $mailTo = trim($email);
+                    } elseif (!empty($user['email'])) {
+                        $mailTo = trim((string) $user['email']);
+                    }
+                    if($mailTo !== '' && !empty($otp)){
+                        $this->load->helper('email');
+                        $subject = 'OTP for Password Reset - ' . PROJECT_NAME;
+                        $name = !empty($user['name']) ? $user['name'] : $mailTo;
+                        $message  = '<p>Hi ' . htmlspecialchars($name, ENT_QUOTES, 'UTF-8') . ',</p>';
+                        $message .= '<p>Your OTP to reset password for ' . PROJECT_NAME . ' account is: <b>' . htmlspecialchars((string)$otp, ENT_QUOTES, 'UTF-8') . '</b>.</p>';
+                        $message .= '<p>OTP is valid for 30 minutes.</p>';
+                        $message .= '<p>Regards,</p>';
+                        $message .= '<p>' . htmlspecialchars(PROJECT_NAME, ENT_QUOTES, 'UTF-8') . '</p>';
+                        $mailOk = sendemail($mailTo, $subject, $message);
+                        if (!$mailOk) {
+                            log_message('error', 'OTP forgot-password email failed for: '.$mailTo.' (see previous sendemail line in log)');
                         }
                     }
                     $this->response([

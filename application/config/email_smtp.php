@@ -18,3 +18,8 @@ $config['mail_from_email'] = '';
 $config['mail_from_name'] = '';
 /** Set to 'smtp' to force SMTP even if smtp_host were empty (not recommended). */
 $config['mail_protocol'] = '';
+
+// Optional overrides on server only (add to .gitignore if it contains secrets)
+if (is_readable(APPPATH . 'config/email_smtp_local.php')) {
+	include APPPATH . 'config/email_smtp_local.php';
+}
