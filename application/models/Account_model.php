@@ -177,12 +177,35 @@ class Account_model extends CI_Model{
 		}
 		$data['added_on']=$data['updated_on']=date("Y-m-d H:i:s");
 		if($this->db->insert("tokens",$data)){
+			// Drop superseded sessions so tf_tokens does not grow by one row on every login.
+			// The new row is status=1; all others for this user are status=0 after the update above.
+			if ($type !== 'multiple') {
+				$this->db->where('user_id', $data['user_id']);
+				$this->db->where('status', 0);
+				$this->db->delete('tokens');
+			}
 			return true;
 		}
 		else{
 			$err=$this->db->error();
 			return $err['message'];
 		}
+	}
+
+	/**
+	 * Update FCM registration id for the active API session (tokens.regid).
+	 */
+	public function updateregid_for_session_token($session_token, $regid)
+	{
+		if (empty($session_token)) {
+			return false;
+		}
+		$this->db->where('token', $session_token);
+		$this->db->where('status', 1);
+		return $this->db->update('tokens', array(
+			'regid' => (string) $regid,
+			'updated_on' => date('Y-m-d H:i:s'),
+		));
 	}
 	
 	public function verify_token($token){

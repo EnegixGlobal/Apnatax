@@ -76,6 +76,7 @@ $route['bankstatement'] = 'profile/bankstatement';
 $route['api/register'] = 'api/account/register';
 $route['api/verifyotp'] = 'api/account/verifyotp';
 $route['api/login'] = 'api/account/login';
+$route['api/updateregid'] = 'api/account/updateregid';
 $route['api/resetpassword'] = 'api/account/resetpassword';
 $route['api/changepassword'] = 'api/account/changepassword';
 
