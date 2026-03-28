@@ -1,3 +1,8 @@
+<?php
+$__dir = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? ''));
+$__dir = ($__dir === '/' || $__dir === '.' || $__dir === '') ? '' : rtrim($__dir, '/');
+$submit_contact_url = $__dir . '/website/submit_contact';
+?>
 <!DOCTYPE html>
 <html lang="en">
 
@@ -46,7 +51,7 @@
                                     <div class="col-md-6">
                                         <div class="form-group mb-3">
                                             <label for="email">Email</label>
-                                            <input type="email" class="form-control" id="email" name="email" placeholder="jane@framer.com" required>
+                                            <input type="email" class="form-control" id="email" name="email" placeholder="jane@gmail.com" required>
                                         </div>
                                     </div>
                                 </div>
@@ -95,7 +100,7 @@
                                     <label for="message">How Can I Help You?</label>
                                     <textarea class="form-control" id="message" name="message" rows="4" placeholder="I need help with..."></textarea>
                                 </div>
-                                <button type="submit" class="btn btn-submit-form">
+                                <button type="submit" class="btn-submit-form">
                                     Submit Form
                                     <i class="fa-solid fa-arrow-right"></i>
                                 </button>
@@ -110,10 +115,10 @@
     <?php include "./temp/vendor.php" ?>
     <script>
         $(document).ready(function() {
+            var submitUrl = <?php echo json_encode($submit_contact_url, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
             $('#contactForm').on('submit', function(e) {
                 e.preventDefault();
-                
-                // Get form data
+                var $btn = $(this).find('button[type="submit"]');
                 var formData = {
                     full_name: $('#fullName').val(),
                     email: $('#email').val(),
@@ -123,31 +128,36 @@
                     service_interest: $('#serviceInterest').val(),
                     message: $('#message').val()
                 };
-                
-                // Basic validation
                 if (!formData.full_name || !formData.email || !formData.phone || !formData.select_date || !formData.service_interest) {
                     alert('Please fill in all required fields.');
                     return;
                 }
-                
-                // Here you can add AJAX call to submit the form
-                // Example:
-                // $.ajax({
-                //     url: 'api/contact',
-                //     method: 'POST',
-                //     data: formData,
-                //     success: function(response) {
-                //         alert('Thank you! Your message has been sent.');
-                //         $('#contactForm')[0].reset();
-                //     },
-                //     error: function() {
-                //         alert('Sorry, there was an error. Please try again.');
-                //     }
-                // });
-                
-                // For now, just show a success message
-                alert('Thank you! Your message has been received. We will contact you soon.');
-                $('#contactForm')[0].reset();
+                $btn.prop('disabled', true);
+                $.ajax({
+                    url: submitUrl,
+                    method: 'POST',
+                    data: formData,
+                    dataType: 'json',
+                    success: function(response) {
+                        if (response && response.status) {
+                            alert(response.message || 'Thank you! Your message has been sent.');
+                            $('#contactForm')[0].reset();
+                        } else {
+                            alert((response && response.message) ? response.message : 'Sorry, something went wrong.');
+                        }
+                    },
+                    error: function(xhr) {
+                        var msg = 'Sorry, there was an error. Please try again.';
+                        try {
+                            var j = xhr.responseJSON;
+                            if (j && j.message) { msg = j.message; }
+                        } catch (err) {}
+                        alert(msg);
+                    },
+                    complete: function() {
+                        $btn.prop('disabled', false);
+                    }
+                });
             });
         });
     </script>

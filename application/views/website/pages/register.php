@@ -47,7 +47,8 @@
                                 </div>
                                 <div class="text-center text-danger mb-3"><?= $this->session->flashdata('logerr'); ?></div>
                                 <input type="hidden" name="role" value="customer">
-                                <button type="submit" name="register" class="auth-submit-btn">Register</button>
+                                <input type="hidden" name="register" value="1">
+                                <button type="submit" class="auth-submit-btn" id="registerSubmitBtn">Register</button>
                                 <p class="auth-link-text">Already have account? <a href="login.php">Login here</a></p>
                             </form>
                         </div>
@@ -60,6 +61,20 @@
     <?php include "./temp/vendor.php" ?>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            const registerForm = document.querySelector('.auth-form');
+            const registerSubmitBtn = document.getElementById('registerSubmitBtn');
+            if (registerForm && registerSubmitBtn) {
+                registerForm.addEventListener('submit', function() {
+                    if (registerSubmitBtn.disabled) {
+                        return;
+                    }
+                    registerSubmitBtn.disabled = true;
+                    registerSubmitBtn.setAttribute('aria-busy', 'true');
+                    registerSubmitBtn.classList.add('is-loading');
+                    registerSubmitBtn.innerHTML = '<span class="auth-submit-spinner" aria-hidden="true"></span>Registering…';
+                });
+            }
+
             const togglePassword = document.getElementById('togglePassword');
             const passwordInput = document.getElementById('password');
             const eyeIcon = document.getElementById('eyeIcon');

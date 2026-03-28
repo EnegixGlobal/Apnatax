@@ -5,6 +5,30 @@ if (!function_exists('base_url')) {
       return "https://apnotax.com/" . $uri;
    }
 }
+// Single active nav item from REQUEST_URI (PHP_SELF is always index.php in CI — never use it for HOME).
+$navPath = '';
+if (!empty($_SERVER['REQUEST_URI'])) {
+   $navPath = strtok($_SERVER['REQUEST_URI'], '?');
+}
+$navActive = '';
+if (preg_match('#/(?:login|register|enterotp|forgotpassword|resetpassword)\.php$#i', $navPath)) {
+   $navActive = 'customer_login';
+} elseif (preg_match('#(?:/index\.php)?/login/?$#i', $navPath) && !preg_match('#login\.php$#i', $navPath)) {
+   $navActive = 'employee_login';
+} elseif (preg_match('#about\.php$#i', $navPath)) {
+   $navActive = 'about';
+} elseif (preg_match('#contact\.php$#i', $navPath)) {
+   $navActive = 'contact';
+} elseif (preg_match('#(?:gst-accountancy|premium|prime)\.php$#i', $navPath)) {
+   $navActive = 'accountancy';
+} elseif ($navPath === '/' || preg_match('#/index\.php/?$#i', $navPath) || preg_match('#^/[^/]+/?$#', rtrim($navPath, '/'))) {
+   $navActive = 'home';
+}
+$scriptName = isset($_SERVER['SCRIPT_NAME']) ? $_SERVER['SCRIPT_NAME'] : '';
+$basePath = rtrim(str_replace('\\', '/', dirname($scriptName)), '/');
+if ($basePath === '.' || $basePath === '' || $basePath === '/') {
+   $basePath = '';
+}
 ?>
 <header>
    <div class="header-bg">
@@ -54,13 +78,13 @@ if (!function_exists('base_url')) {
       <div class="collapse navbar-collapse" id="navbarNav">
          <ul class="navbar-nav mx-auto mb-2 mb-lg-0 nav-taxefi">
             <li class="nav-item">
-               <a class="nav-link <?php echo strpos($_SERVER['PHP_SELF'], "index.php") !== FALSE || strpos($_SERVER['PHP_SELF'], "home.php") !== FALSE ? 'active' : ''; ?>" aria-current="page" href="index.php">HOME</a>
+               <a class="nav-link <?php echo $navActive === 'home' ? 'active' : ''; ?>" <?php echo $navActive === 'home' ? 'aria-current="page"' : ''; ?> href="index.php">HOME</a>
             </li>
             <li class="nav-item">
-               <a class="nav-link <?php echo strpos($_SERVER['PHP_SELF'], "about.php") !== FALSE ? 'active' : ''; ?>" aria-current="page" href="about.php">ABOUT</a>
+               <a class="nav-link <?php echo $navActive === 'about' ? 'active' : ''; ?>" <?php echo $navActive === 'about' ? 'aria-current="page"' : ''; ?> href="about.php">ABOUT</a>
             </li>
             <li class="nav-item dropdown">
-               <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+               <a class="nav-link dropdown-toggle <?php echo $navActive === 'accountancy' ? 'active' : ''; ?>" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false" <?php echo $navActive === 'accountancy' ? 'aria-current="page"' : ''; ?>>
                   ACCOUNTANCY
                </a>
                <ul class="dropdown-menu taxefi-dropdown">
@@ -85,22 +109,15 @@ if (!function_exists('base_url')) {
                </ul>
             </li>
             <li class="nav-item">
-               <a class="nav-link <?php echo strpos($_SERVER['PHP_SELF'], "login.php") !== FALSE ? 'active' : ''; ?>" aria-current="page" href="login.php">CUSTOMER LOGIN</a>
+               <a class="nav-link <?php echo $navActive === 'customer_login' ? 'active' : ''; ?>" <?php echo $navActive === 'customer_login' ? 'aria-current="page"' : ''; ?> href="login.php">CUSTOMER LOGIN</a>
             </li>
             <li class="nav-item">
-               <?php
-                  $scriptName = isset($_SERVER['SCRIPT_NAME']) ? $_SERVER['SCRIPT_NAME'] : '';
-                  $basePath = rtrim(str_replace('\\','/', dirname($scriptName)), '/');
-                  if ($basePath === '.' || $basePath === '' || $basePath === '/') {
-                      $basePath = '';
-                  }
-               ?>
-               <a class="nav-link <?php echo strpos($_SERVER['REQUEST_URI'], "/login/") !== FALSE || strpos($_SERVER['REQUEST_URI'], "/login.php") !== FALSE ? 'active' : ''; ?>"
-                  aria-current="page"
+               <a class="nav-link <?php echo $navActive === 'employee_login' ? 'active' : ''; ?>"
+                  <?php echo $navActive === 'employee_login' ? 'aria-current="page"' : ''; ?>
                   href="<?= $basePath; ?>/login/">EMPLOYEE LOGIN</a>
             </li>
             <li class="nav-item">
-               <a class="nav-link <?php echo strpos($_SERVER['PHP_SELF'], "contact.php") !== FALSE ? 'active' : ''; ?>" aria-current="page" href="contact.php">CONTACT US</a>
+               <a class="nav-link <?php echo $navActive === 'contact' ? 'active' : ''; ?>" <?php echo $navActive === 'contact' ? 'aria-current="page"' : ''; ?> href="contact.php">CONTACT US</a>
             </li>
          </ul>
          <div class="taxefi-btn d-flex">
