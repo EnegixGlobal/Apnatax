@@ -286,9 +286,8 @@ class Common extends RestController
         if (!empty($token)) {
             $user = $this->account->verify_token($token);
             if (!empty($user) && is_array($user)) {
-                // Return all notifications so the app can show read vs unread and badge counts.
-                $where = array('t1.user_id' => $user['id']);
-                $notifications = $this->common->getnotifications($where);
+                // All non–user-deleted rows; user_status 0/1 = unread/read for this customer.
+                $notifications = $this->common->getnotifications_for_end_user($user['id']);
                 if (!empty($notifications)) {
                     $this->response([
                         'status' => true,
@@ -319,11 +318,13 @@ class Common extends RestController
     {
         $token = $this->post('token');
         $notification_id = $this->post('notification_id');
+        $action = $this->post('action');
+        $value = ($action === 'delete') ? 2 : 1;
         if (!empty($token) && !empty($notification_id)) {
             $user = $this->account->verify_token($token);
             if (!empty($user) && is_array($user)) {
                 $where = array('id' => $notification_id, 'user_id' => $user['id']);
-                $data = array('status' => 1, 'updated_on' => date('Y-m-d H:i:s'));
+                $data = array('user_status' => $value, 'updated_on' => date('Y-m-d H:i:s'));
                 if ($this->db->update("notify", $data, $where)) {
                     $this->response([
                         'status' => true,

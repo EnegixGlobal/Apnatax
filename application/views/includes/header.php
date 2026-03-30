@@ -345,12 +345,27 @@
                                                 <span class="light-layout"><i class="fe fe-sun"></i></span>
                                             </a>
                                         </div><?php */ ?>
+                                        <style>
+                                            .notification-row-read .notification-label { font-weight: 400 !important; opacity: 0.92; }
+                                            .notification-row-read .notification-subtext { opacity: 0.85; }
+                                            .notification-row-unread .notification-label { font-weight: 600; }
+                                            /* Read: icon circle explicit blue (unread keeps theme primary) */
+                                            .notification-row-read .notifyimg.bg-primary {
+                                                background-color: #0d6efd !important;
+                                                box-shadow: 0 0.15rem 0.45rem rgba(13, 110, 253, 0.45) !important;
+                                            }
+                                            .notification-row-read .notifyimg i {
+                                                color: #fff !important;
+                                            }
+                                        </style>
                                         <!-- NOTIFICATIONS -->
                                         <?php
                                         $notifications = getnotifications();
+                                        $notification_badge = get_notification_badge_count();
+                                        $notification_bell_mode = ($this->session->role === 'customer') ? 'customer' : 'admin';
                                         ?>
-                                        <div class="dropdown  d-flex notifications">
-                                            <a class="nav-link icon" data-bs-toggle="<?= count($notifications) > 0 ? 'dropdown' : '' ?>" aria-expanded="true"><i class="fe fe-bell"></i><sup><?= count($notifications) ?></sup>
+                                        <div class="dropdown d-flex notifications" data-bell-mode="<?= $notification_bell_mode; ?>">
+                                            <a class="nav-link icon" data-bs-toggle="<?= count($notifications) > 0 ? 'dropdown' : '' ?>" aria-expanded="true"><i class="fe fe-bell"></i><sup class="notification-badge-sup"><?= $notification_badge > 0 ? (int) $notification_badge : ''; ?></sup>
                                             </a>
                                             <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow" data-bs-popper="none">
                                                 <div class="drop-heading border-bottom">
@@ -383,21 +398,30 @@
                                                                     $link = base_url('orders/');
                                                                 }
                                                             } else {
-                                                                $link = base_url('/');
-                                                                $text = $notification['task_type'] . ' Scheduled';
+                                                                $task_label = isset($notification['task_type']) ? $notification['task_type'] : 'Notification';
+                                                                $text = $task_label . '';
+                                                            }
+                                                            $notification_row_class = 'notification-row-unread';
+                                                            if ($notification_bell_mode === 'admin' && isset($notification['admin_status']) && (int) $notification['admin_status'] === 1) {
+                                                                $notification_row_class = 'notification-row-read';
+                                                            } elseif ($notification_bell_mode === 'customer' && isset($notification['user_status']) && (int) $notification['user_status'] === 1) {
+                                                                $notification_row_class = 'notification-row-read';
                                                             }
                                                     ?>
-                                                            <a class="dropdown-item d-flex view-notification" href="<?= $link; ?>" data-value=<?= md5('notify-' . $notification['id']) ?>>
-                                                                <div class="me-3 notifyimg  bg-primary brround box-shadow-primary">
-                                                                    <i class="fe fe-mail"></i>
-                                                                </div>
-                                                                <div class="mt-1 wd-80p">
-                                                                    <h5 class="notification-label mb-1">
-                                                                        <?= $notification['message']; ?>
-                                                                    </h5>
-                                                                    <span class="notification-subtext"><?= $text ?></span>
-                                                                </div>
-                                                            </a>
+                                                            <div class="dropdown-item d-flex align-items-stretch p-0 <?= $notification_row_class; ?>">
+                                                                <a class="d-flex flex-grow-1 view-notification align-items-center text-decoration-none text-default p-2" href="<?= $link; ?>" data-value="<?= md5('notify-' . $notification['id']); ?>">
+                                                                    <div class="me-3 notifyimg bg-primary brround box-shadow-primary">
+                                                                        <i class="fe fe-mail"></i>
+                                                                    </div>
+                                                                    <div class="mt-1 wd-80p">
+                                                                        <h5 class="notification-label mb-1">
+                                                                            <?= $notification['message']; ?>
+                                                                        </h5>
+                                                                        <span class="notification-subtext"><?= $text ?></span>
+                                                                    </div>
+                                                                </a>
+                                                                <button type="button" class="btn btn-link text-muted py-2 px-2 dismiss-notification border-0 align-self-start" title="Remove" data-value="<?= md5('notify-' . $notification['id']); ?>" aria-label="Remove notification">&times;</button>
+                                                            </div>
                                                     <?php
                                                         }
                                                     }

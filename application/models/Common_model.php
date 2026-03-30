@@ -28,6 +28,12 @@ class Common_model extends CI_Model{
         if(!isset($data['status'])){
             $data['status']=0;
         }
+        if (!isset($data['user_status'])) {
+            $data['user_status'] = 0;
+        }
+        if (!isset($data['admin_status'])) {
+            $data['admin_status'] = 0;
+        }
         if($this->db->insert("notify",$data)){
             $nid = (int) $this->db->insert_id();
             if ($send_push && !empty($data['user_id'])) {
@@ -96,6 +102,57 @@ class Common_model extends CI_Model{
             $array=$query->unbuffered_row('array');
         }
         return $array;
+    }
+
+    /**
+     * Admin header bell: unread + read; excludes soft-deleted (admin_status = 2).
+     */
+    public function get_admin_bell_notifications($limit = 40)
+    {
+        $limit = (int) $limit;
+        if ($limit < 1) {
+            $limit = 40;
+        }
+        $this->db->select('t1.*');
+        $this->db->from('notify t1');
+        $this->db->where('t1.admin_status !=', 2);
+        $this->db->order_by('t1.added_on', 'desc');
+        $this->db->limit($limit);
+        $query = $this->db->get();
+        return $query->result_array();
+    }
+
+    /**
+     * Customer header bell: unread + read; excludes soft-deleted (user_status = 2).
+     */
+    public function get_customer_bell_notifications($user_id, $limit = 40)
+    {
+        $limit = (int) $limit;
+        if ($limit < 1) {
+            $limit = 40;
+        }
+        $this->db->select('t1.*');
+        $this->db->from('notify t1');
+        $this->db->where('t1.user_id', (int) $user_id);
+        $this->db->where('t1.user_status !=', 2);
+        $this->db->order_by('t1.added_on', 'desc');
+        $this->db->limit($limit);
+        $query = $this->db->get();
+        return $query->result_array();
+    }
+
+    /**
+     * Notifications for mobile / customer: excludes rows this user soft-deleted (user_status = 2).
+     */
+    public function getnotifications_for_end_user($user_id)
+    {
+        $this->db->select('t1.*');
+        $this->db->from('notify t1');
+        $this->db->where('t1.user_id', (int) $user_id);
+        $this->db->where('t1.user_status !=', 2);
+        $this->db->order_by('t1.added_on', 'desc');
+        $query = $this->db->get();
+        return $query->result_array();
     }
     
     public function updatenotification($data){

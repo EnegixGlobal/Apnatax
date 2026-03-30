@@ -69,10 +69,23 @@ class Home extends CI_Controller
     public function updatenotification()
     {
         $id = $this->input->post('id');
+        $action = $this->input->post('action');
+        $value = ($action === 'delete') ? 2 : 1;
         $notification = $this->common->getnotifications(["md5(concat('notify-',t1.id))" => $id], 'single');
-        if (!empty($notification)) {
-            $this->common->updatenotification(['status' => 1, 'id' => $notification['id']]);
+        if (empty($notification)) {
+            return;
         }
+        $role = $this->session->role;
+        if ($role === 'customer') {
+            $user = getuser();
+            if (empty($user['id']) || (int) $notification['user_id'] !== (int) $user['id']) {
+                return;
+            }
+            $field = 'user_status';
+        } else {
+            $field = 'admin_status';
+        }
+        $this->common->updatenotification([$field => $value, 'id' => $notification['id']]);
     }
 
     public function triggerautodebit()
