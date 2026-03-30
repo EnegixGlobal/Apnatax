@@ -192,9 +192,25 @@ class Account extends RestController{
             if($result['status']===true){
                 $user=$result['user'];
                 $token=md5($user['id'].'.'.time().'.'.$user['username']);
+                // `tf_tokens.regid` is NOT NULL in your schema.
+                // Forgot-password flow doesn't send FCM regid, so default to empty string.
+                $regid = $this->post('regid');
+                if ($regid === null) {
+                    $regid = '';
+                }
                 $tokendata=array("user_id"=>$user['id'],"token"=>$token,"device_id"=>$device_id,
-                                 "device_name"=>$device_name,"regid"=>$this->post('regid'));
+                                 "device_name"=>$device_name,"regid"=>$regid);
                 $verify=$this->account->addtoken($tokendata);
+                // If token insert/activation failed, do not return an unusable token to the app.
+                // Otherwise app will navigate to ResetPassword but verify_token() will fail.
+                if($verify !== true){
+                    log_message('error', '[sendotptomobile_post] addtoken failed err=' . (string)$verify . ' tokenPrefix=' . substr((string)$token, 0, 8));
+                    $this->response([
+                        'status' => false,
+                        'message' => (string)$verify
+                    ], RestController::HTTP_OK);
+                    return;
+                }
 
                 $result=$this->sendotp(array('username'=>$user['mobile']));
                 if($result['status']===true){
@@ -253,6 +269,13 @@ class Account extends RestController{
         $new_password=$this->post('new_password');
         $repassword=$this->post('repassword');
 
+        // Debug logs for reset-password flow (token validity + OTP validation).
+        // Avoid logging full password/OTP to keep it safer.
+        $tokenPrefix = !empty($token) ? substr((string)$token, 0, 8) : '';
+        $otpLen = !empty($otp) ? strlen((string)$otp) : 0;
+        $newPwLen = !empty($new_password) ? strlen((string)$new_password) : 0;
+        log_message('error', '[resetpassword_post] tokenPrefix=' . $tokenPrefix . ' otpLen=' . $otpLen . ' newPwLen=' . $newPwLen);
+
         if(empty($token) || empty($otp) || empty($new_password) || empty($repassword)){
             $this->response([
                 'status' => false,
@@ -271,6 +294,7 @@ class Account extends RestController{
 
         $user=$this->account->verify_token($token);
         if(empty($user) || !is_array($user)){
+            log_message('error', '[resetpassword_post] verify_token failed tokenPrefix=' . $tokenPrefix);
             $this->response([
                 'status' => false,
                 'message' => "Token Invalid"
@@ -281,6 +305,8 @@ class Account extends RestController{
         $where=array("username"=>$user['mobile']);
         $verifyOtpResult=$this->account->verifyotp($otp,$where);
         if($verifyOtpResult['status']!==true){
+            $errMsg = $verifyOtpResult['message'] ?? 'Invalid OTP!';
+            log_message('error', '[resetpassword_post] verifyotp failed tokenPrefix=' . $tokenPrefix . ' err=' . $errMsg);
             $this->response([
                 'status' => false,
                 'message' => $verifyOtpResult['message'] ?? 'Invalid OTP!'
@@ -290,15 +316,18 @@ class Account extends RestController{
 
         $update=$this->account->updatepassword(array("password"=>$new_password),array("id"=>$user['id']));
         if($update['status']===true){
+            log_message('error', '[resetpassword_post] password update success tokenPrefix=' . $tokenPrefix . ' userId=' . ($user['id'] ?? ''));
             $this->response([
                 'status' => true,
                 'message' => $update['message']
             ], RestController::HTTP_OK);
         }
         else{
+            $errMsg = $update['message'] ?? 'Failed to reset password';
+            log_message('error', '[resetpassword_post] password update failed tokenPrefix=' . $tokenPrefix . ' err=' . $errMsg);
             $this->response([
                 'status' => false,
-                'message' => $update['message'] ?? 'Failed to reset password'
+                'message' => $errMsg
             ], RestController::HTTP_OK);
         }
     }

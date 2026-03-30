@@ -127,9 +127,14 @@ class Account_model extends CI_Model{
 		$query = $this->db->get_where('users',$where);
 		$result=$query->unbuffered_row('array');
         $flag=false;
+        $otpLen = !empty($otp) ? strlen((string)$otp) : 0;
 		if(!empty($result)){
-			if(time()-strtotime($result['updated_on'])<1800){
-                if(password_verify($otp.SITE_SALT.$result['salt'],$result['otp'])){
+			$ageSec = time()-strtotime($result['updated_on']);
+            log_message('error', '[verifyotp] otpLen=' . $otpLen . ' ageSec=' . $ageSec . ' where=' . json_encode($where));
+			if($ageSec<1800){
+                $otpMatch = password_verify($otp.SITE_SALT.$result['salt'],$result['otp']);
+                log_message('error', '[verifyotp] otpMatch=' . ($otpMatch ? '1' : '0'));
+                if($otpMatch){
 					$this->db->where($where);
 					$this->db->update('users',array("status"=>1,'otp'=>''));
 					$flag=true;
@@ -137,8 +142,12 @@ class Account_model extends CI_Model{
 			}
 			else{
 				$flag='expired';
+                log_message('error', '[verifyotp] expired ageSec=' . $ageSec);
 			}
 		}
+        else{
+            log_message('error', '[verifyotp] no user row for where=' . json_encode($where));
+        }
         if($flag===true){
             return array("status"=>true,"result"=>$result);
         }
@@ -151,6 +160,11 @@ class Account_model extends CI_Model{
 	}
     
 	public function addtoken($data,$type="single"){
+        // Your DB schema has `regid` NOT NULL, but some flows (like forgot/reset password)
+        // might not provide it. Ensure it is never inserted as NULL.
+        if (!array_key_exists('regid', $data) || $data['regid'] === null) {
+            $data['regid'] = '';
+        }
         if($type!="multiple"){
 			$this->db->order_by("updated_on desc");
 			$getold=$this->db->get_where("tokens",array("user_id"=>$data['user_id'],"status"=>1));
@@ -175,8 +189,14 @@ class Account_model extends CI_Model{
 				}
 			}
 		}
+		// Always activate the newly issued token.
+		// `verify_token()` only accepts tokens with `status=1`, so don't rely on DB defaults.
+		$data['status'] = 1;
 		$data['added_on']=$data['updated_on']=date("Y-m-d H:i:s");
 		if($this->db->insert("tokens",$data)){
+            $tokenPrefix = isset($data['token']) ? substr((string)$data['token'], 0, 8) : '';
+            $insertId = $this->db->insert_id();
+            log_message('error', '[addtoken] inserted tokenPrefix=' . $tokenPrefix . ' user_id=' . ($data['user_id'] ?? '') . ' status=' . ($data['status'] ?? '') . ' insertId=' . $insertId);
 			// Drop superseded sessions so tf_tokens does not grow by one row on every login.
 			// The new row is status=1; all others for this user are status=0 after the update above.
 			if ($type !== 'multiple') {
@@ -209,9 +229,21 @@ class Account_model extends CI_Model{
 	}
 	
 	public function verify_token($token){
-		$gettoken=$this->db->get_where('tokens',"token='$token' and status='1'");
+        $tokenStr = (string)$token;
+        $tokenPrefix = substr($tokenStr, 0, 8);
+		$gettoken=$this->db->get_where('tokens', array('token'=>$tokenStr,'status'=>1));
+        $anytoken = $this->db->get_where('tokens', array('token'=>$tokenStr));
+        $status0token = $this->db->get_where('tokens', array('token'=>$tokenStr,'status'=>0));
+        log_message(
+            'error',
+            '[verify_token] tokenPrefix=' . $tokenPrefix .
+            ' status1Count=' . $gettoken->num_rows() .
+            ' status0Count=' . $status0token->num_rows() .
+            ' anyCount=' . $anytoken->num_rows()
+        );
 		if($gettoken->num_rows()==1){
 			$user_id=$gettoken->unbuffered_row()->user_id;
+            log_message('error', '[verify_token] matched user_id=' . $user_id . ' tokenPrefix=' . $tokenPrefix);
 			$array=$this->db->get_where("users",array("id"=>$user_id))->unbuffered_row('array');
 			if(is_array($array)){
 				$updated_on=date('Y-m-d H:i:s');
