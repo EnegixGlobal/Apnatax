@@ -59,15 +59,41 @@ if (!function_exists('countemployees')) {
     }
 }
 
+if (!function_exists('get_notification_badge_count')) {
+    function get_notification_badge_count()
+    {
+        $CI = get_instance();
+        $role = $CI->session->role;
+        if ($role === 'customer') {
+            $user = getuser();
+            if (empty($user['id'])) {
+                return 0;
+            }
+            $CI->db->from('notify');
+            $CI->db->where('user_id', (int) $user['id']);
+            $CI->db->where('user_status', 0);
+            return (int) $CI->db->count_all_results();
+        }
+        $CI->db->from('notify');
+        $CI->db->where('admin_status', 0);
+        return (int) $CI->db->count_all_results();
+    }
+}
+
 if (!function_exists('getnotifications')) {
     function getnotifications()
     {
         $CI = get_instance();
-        $notifications = $CI->common->getnotifications(array('t1.status' => 0));
-        if ($CI->session->role == 'customer') {
-            $notifications = array();
+        $role = $CI->session->role;
+        $where = array();
+        if ($role === 'customer') {
+            $user = getuser();
+            if (empty($user['id'])) {
+                return array();
+            }
+            return $CI->common->get_customer_bell_notifications((int) $user['id'], 40);
         }
-        return $notifications;
+        return $CI->common->get_admin_bell_notifications(40);
     }
 }
 
