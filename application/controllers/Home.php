@@ -839,12 +839,19 @@ class Home extends CI_Controller
         // Handle PayU payment success callback - No login required
         $this->load->library('Payu_lib');
         $this->load->model('Wallet_model', 'wallet');
-        
+
         $post_data = $this->input->post();
-        
+        $this->restorePayuWalletSessionFromPost($post_data);
+
         if (empty($post_data)) {
-            // Store message in URL parameter instead of session
-            redirect(base_url('wallet/mywallet/?msg=' . urlencode('Invalid payment response. Please contact support.')));
+            $this->load->view('payment/payu_result', [
+                'is_success' => false,
+                'title' => 'Payment Failed',
+                'message' => 'Invalid payment response. Please contact support.',
+                'details' => [],
+                'redirect_url' => $this->walletDashboardUrl(),
+                'redirect_seconds' => 6,
+            ]);
             return;
         }
 
@@ -852,7 +859,14 @@ class Home extends CI_Controller
         $is_valid = $this->payu_lib->verify_hash($post_data);
         
         if (!$is_valid) {
-            redirect(base_url('wallet/mywallet/?err_msg=' . urlencode('Payment verification failed. Please contact support.')));
+            $this->load->view('payment/payu_result', [
+                'is_success' => false,
+                'title' => 'Payment Verification Failed',
+                'message' => 'Payment verification failed. Please contact support.',
+                'details' => $this->buildPayuDisplayDetails($post_data),
+                'redirect_url' => $this->walletDashboardUrl(),
+                'redirect_seconds' => 6,
+            ]);
             return;
         }
 
@@ -872,16 +886,44 @@ class Home extends CI_Controller
                 
                 if (!empty($result['status'])) {
                     $message = !empty($result['message']) ? $result['message'] : 'Wallet recharged successfully.';
-                    redirect(base_url('wallet/mywallet/?msg=' . urlencode($message)));
+                    $this->load->view('payment/payu_result', [
+                        'is_success' => true,
+                        'title' => 'Payment Successful',
+                        'message' => $message,
+                        'details' => $this->buildPayuDisplayDetails($post_data),
+                        'redirect_url' => $this->walletDashboardUrl(),
+                        'redirect_seconds' => 6,
+                    ]);
                 } else {
                     $error_msg = !empty($result['message']) ? $result['message'] : 'Payment captured but wallet update failed. Please contact support.';
-                    redirect(base_url('wallet/mywallet/?err_msg=' . urlencode($error_msg)));
+                    $this->load->view('payment/payu_result', [
+                        'is_success' => false,
+                        'title' => 'Payment Captured, Wallet Update Failed',
+                        'message' => $error_msg,
+                        'details' => $this->buildPayuDisplayDetails($post_data),
+                        'redirect_url' => $this->walletDashboardUrl(),
+                        'redirect_seconds' => 6,
+                    ]);
                 }
             } else {
-                redirect(base_url('wallet/mywallet/?err_msg=' . urlencode('Payment captured but transaction not found. Please contact support.')));
+                $this->load->view('payment/payu_result', [
+                    'is_success' => false,
+                    'title' => 'Payment Captured, Transaction Not Found',
+                    'message' => 'Payment captured but transaction not found. Please contact support.',
+                    'details' => $this->buildPayuDisplayDetails($post_data),
+                    'redirect_url' => $this->walletDashboardUrl(),
+                    'redirect_seconds' => 6,
+                ]);
             }
         } else {
-            redirect(base_url('wallet/mywallet/?err_msg=' . urlencode('Payment failed or cancelled. Please try again.')));
+            $this->load->view('payment/payu_result', [
+                'is_success' => false,
+                'title' => 'Payment Failed',
+                'message' => 'Payment failed or cancelled. Please try again.',
+                'details' => $this->buildPayuDisplayDetails($post_data),
+                'redirect_url' => $this->walletDashboardUrl(),
+                'redirect_seconds' => 6,
+            ]);
         }
     }
 
@@ -889,12 +931,108 @@ class Home extends CI_Controller
     {
         // Handle PayU payment failure callback - No login required
         $post_data = $this->input->post();
-        
-        $status = isset($post_data['status']) ? strtolower($post_data['status']) : '';
+        $this->restorePayuWalletSessionFromPost($post_data);
+
         $error_msg = isset($post_data['error_Message']) ? $post_data['error_Message'] : 'Payment failed or cancelled. Please try again.';
-        
-        // Store message in URL parameter instead of session
-        redirect(base_url('wallet/mywallet/?err_msg=' . urlencode($error_msg)));
+
+        $this->load->view('payment/payu_result', [
+            'is_success' => false,
+            'title' => 'Payment Failed',
+            'message' => $error_msg,
+            'details' => $this->buildPayuDisplayDetails($post_data),
+            'redirect_url' => $this->walletDashboardUrl(),
+            'redirect_seconds' => 6,
+        ]);
+    }
+
+    /**
+     * Customer wallet URL (see routes: mywallet -> wallet/mywallet).
+     */
+    private function walletDashboardUrl()
+    {
+        return base_url('mywallet/');
+    }
+
+    /**
+     * PayU returns via cross-site POST; session cookie is often not sent, so checklogin()
+     * would send the user to "/". Re-establish session when txn matches a pending wallet row.
+     */
+    private function restorePayuWalletSessionFromPost($post_data)
+    {
+        if (empty($post_data) || !is_array($post_data)) {
+            return;
+        }
+        if ($this->session->user !== NULL && $this->session->project == PROJECT_NAME) {
+            return;
+        }
+        $udf2 = isset($post_data['udf2']) ? (string) $post_data['udf2'] : '';
+        if ($udf2 !== 'wallet_topup') {
+            return;
+        }
+        $txnid = isset($post_data['txnid']) ? (string) $post_data['txnid'] : '';
+        if ($txnid === '' || empty($post_data['udf1'])) {
+            return;
+        }
+        $user_id = (int) $post_data['udf1'];
+        if ($user_id < 1) {
+            return;
+        }
+        $wallet = $this->wallet->getwallet(['merchant_transaction_id' => $txnid], 'single');
+        if (empty($wallet) || (int) $wallet['user_id'] !== $user_id) {
+            return;
+        }
+        $result = $this->account->getuser(['id' => $user_id]);
+        if ($result['status'] !== true || empty($result['user'])) {
+            return;
+        }
+        $user = $result['user'];
+        if (($user['role'] ?? '') !== 'customer') {
+            return;
+        }
+        $data = [
+            'user' => md5($user['id']),
+            'name' => $user['name'],
+            'emp_id' => $user['emp_id'],
+            'role' => $user['role'],
+            'project' => PROJECT_NAME,
+        ];
+        $this->session->set_userdata($data);
+    }
+
+    private function buildPayuDisplayDetails($post_data = [])
+    {
+        if (empty($post_data) || !is_array($post_data)) {
+            return [];
+        }
+
+        $fields = [
+            'txnid' => 'Transaction ID',
+            'mihpayid' => 'PayU Payment ID',
+            'status' => 'Status',
+            'amount' => 'Amount',
+            'mode' => 'Payment Mode',
+            'bank_ref_num' => 'Bank Ref No',
+            'bankcode' => 'Bank Code',
+            'productinfo' => 'Product Info',
+            'firstname' => 'Name',
+            'email' => 'Email',
+            'phone' => 'Phone',
+            'addedon' => 'Added On',
+            'error' => 'Error Code',
+            'error_Message' => 'Error Message',
+        ];
+
+        $details = [];
+        foreach ($fields as $key => $label) {
+            if (isset($post_data[$key]) && $post_data[$key] !== '') {
+                $details[] = [
+                    'label' => $label,
+                    'value' => (string) $post_data[$key],
+                ];
+            }
+        }
+
+        return $details;
     }
 
     public function redirecturl2()
