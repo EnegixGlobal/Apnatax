@@ -1061,11 +1061,36 @@ class Home extends CI_Controller
         $service = "Lead Service";
         $source = "Lead Source";
         if ($this->input->get('type') == 'admin') {
-            adminmail($adminname, $adminemail, $name, $mobile, $service, $source);
+            $this->adminmail($adminname, $adminemail, $name, $mobile, $service, $source);
         }
         if ($this->input->get('type') == 'agent') {
-            agentmail($agentname, $agentemail, $name, $mobile, $service);
+            $this->agentmail($agentname, $agentemail, $name, $mobile, $service);
         }
+    }
+
+    private function adminmail($adminname, $adminemail, $name, $mobile, $service, $source)
+    {
+        $this->load->helper('email');
+        $subject = "Lead Assigned to Admin";
+        $message = "<p>Hello " . htmlspecialchars($adminname) . ",</p>"
+            . "<p>A new lead has been assigned.</p>"
+            . "<p><strong>Name:</strong> " . htmlspecialchars($name) . "<br>"
+            . "<strong>Mobile:</strong> " . htmlspecialchars($mobile) . "<br>"
+            . "<strong>Service:</strong> " . htmlspecialchars($service) . "<br>"
+            . "<strong>Source:</strong> " . htmlspecialchars($source) . "</p>";
+        return sendemail($adminemail, $subject, $message);
+    }
+
+    private function agentmail($agentname, $agentemail, $name, $mobile, $service)
+    {
+        $this->load->helper('email');
+        $subject = "Lead Assigned to Agent";
+        $message = "<p>Hello " . htmlspecialchars($agentname) . ",</p>"
+            . "<p>A new lead has been assigned.</p>"
+            . "<p><strong>Name:</strong> " . htmlspecialchars($name) . "<br>"
+            . "<strong>Mobile:</strong> " . htmlspecialchars($mobile) . "<br>"
+            . "<strong>Service:</strong> " . htmlspecialchars($service) . "</p>";
+        return sendemail($agentemail, $subject, $message);
     }
 
     public function runquery()
