@@ -1911,19 +1911,43 @@ class Profile extends RestController
     public function getcertificates_post()
     {
         $token = $this->post('token');
+        $firm_id = $this->post('firm_id'); // Optional firm_id for firm-specific certificates
         if (!empty($token)) {
             $user = $this->account->verify_token($token);
             if (!empty($user) && is_array($user) && $user['role'] == 'customer') {
-                $kyc = $this->account->getkyc(['t1.user_id' => $user['id']], 'single');
+                // Build where clause to match web behavior:
+                // with firm_id => firm-specific KYC, without => user-level KYC.
+                $where = ['t1.user_id' => $user['id']];
+                if (!empty($firm_id)) {
+                    $where['t1.firm_id'] = (int)$firm_id;
+                } else {
+                    $where['t1.firm_id IS NULL'] = null;
+                }
+
+                $kyc = $this->account->getkyc($where, 'single');
                 if (!empty($kyc)) {
                     $certificates = array();
                     $allowed_types = array('tds_certificate', 'gst_certificate', 'audit_report', 'income_tax_certificate');
                     foreach ($allowed_types as $type) {
                         if (!empty($kyc[$type])) {
+                            // NOTE: Account_model::getkyc() already prefixes file paths with base_url().
+                            // In some cases we may receive an already-absolute URL, so we must not wrap it again
+                            // (double base_url() can produce invalid URLs which often lead to 403).
+                            $rawPathOrUrl = $kyc[$type];
+                            $downloadUrl = $rawPathOrUrl;
+                            if (!empty($rawPathOrUrl) && !preg_match('/^https?:\/\//i', $rawPathOrUrl)) {
+                                $downloadUrl = file_url($rawPathOrUrl);
+                            }
+                            log_message(
+                                'error',
+                                'getcertificates download_url: type=' . $type .
+                                ' raw=' . substr((string)$rawPathOrUrl, 0, 200) .
+                                ' -> final=' . substr((string)$downloadUrl, 0, 200)
+                            );
                             $certificates[] = array(
                                 'type' => $type,
                                 'name' => ucfirst(str_replace('_', ' ', $type)),
-                                'download_url' => file_url($kyc[$type]),
+                                'download_url' => $downloadUrl,
                                 'file_name' => basename($kyc[$type])
                             );
                         }

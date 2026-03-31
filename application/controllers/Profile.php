@@ -74,7 +74,7 @@ class Profile extends CI_Controller
         if (!empty($firm_id)) {
             $where['t1.firm_id'] = $firm_id;
         } else {
-            // Get user-level KYC (where firm_id is NULL)
+            // Get user-level KYC (general row)
             $where['t1.firm_id IS NULL'] = null;
         }
         
@@ -85,6 +85,7 @@ class Profile extends CI_Controller
     public function download_certificate($type = '')
     {
         $user = getuser();
+        $firm_id = !empty($this->session->firm) ? (int)$this->session->firm : 0;
         $allowed_types = array('tds_certificate', 'gst_certificate', 'audit_report', 'income_tax_certificate');
 
         if (empty($type) || !in_array($type, $allowed_types)) {
@@ -102,7 +103,16 @@ class Profile extends CI_Controller
         }
 
         // Get KYC data with raw file path (without file_url conversion)
-        $kyc = $this->db->select($db_column)->where('user_id', $user['id'])->get('kyc')->row_array();
+        $this->db->select($db_column)->where('user_id', $user['id']);
+        if ($firm_id > 0) {
+            $this->db->where('firm_id', $firm_id);
+        } else {
+            $this->db->group_start();
+            $this->db->where('firm_id', 0);
+            $this->db->or_where('firm_id IS NULL', null, false);
+            $this->db->group_end();
+        }
+        $kyc = $this->db->get('kyc')->row_array();
 
         if (empty($kyc) || empty($kyc[$type])) {
             $this->session->set_flashdata("err_msg", "Certificate not found!");

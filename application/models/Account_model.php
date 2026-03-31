@@ -474,13 +474,22 @@ class Account_model extends CI_Model{
             unset($data['income_tax_certificate']);
         }
 
+        // Normalize firm_id:
+        // - positive firm_id => firm-specific row
+        // - missing/0 => general row (stored as 0 for backward compatibility)
+        $normalized_firm_id = (isset($data['firm_id']) && (int)$data['firm_id'] > 0) ? (int)$data['firm_id'] : 0;
+        $data['firm_id'] = $normalized_firm_id;
+
         // Build where clause for checking existing KYC
         $this->db->where('user_id', $data['user_id']);
-        // If firm_id is provided, check for firm-specific KYC, otherwise check for user-level KYC
-        if (!empty($data['firm_id'])) {
-            $this->db->where('firm_id', $data['firm_id']);
+        if ($normalized_firm_id > 0) {
+            $this->db->where('firm_id', $normalized_firm_id);
         } else {
-            $this->db->where('firm_id IS NULL', null, false);
+            // Treat NULL and 0 both as "general" row during lookup.
+            $this->db->group_start();
+            $this->db->where('firm_id', 0);
+            $this->db->or_where('firm_id IS NULL', null, false);
+            $this->db->group_end();
         }
         
         $existing = $this->db->get('kyc');
@@ -493,10 +502,13 @@ class Account_model extends CI_Model{
             $data['updated_on']=date('Y-m-d H:i:s');
             // Build update where clause
             $this->db->where('user_id', $data['user_id']);
-            if (!empty($data['firm_id'])) {
-                $this->db->where('firm_id', $data['firm_id']);
+            if ($normalized_firm_id > 0) {
+                $this->db->where('firm_id', $normalized_firm_id);
             } else {
-                $this->db->where('firm_id IS NULL', null, false);
+                $this->db->group_start();
+                $this->db->where('firm_id', 0);
+                $this->db->or_where('firm_id IS NULL', null, false);
+                $this->db->group_end();
             }
             $result=$this->db->update('kyc',$data);
             $msg="KYC Updated Successfully!";
@@ -533,8 +545,15 @@ class Account_model extends CI_Model{
         // Handle where clause - support both array and string formats
         if (is_array($where)) {
             foreach ($where as $key => $value) {
-                if (strpos($key, ' IS NULL') !== false) {
-                    // Handle IS NULL condition
+                if (strpos($key, 'firm_id IS NULL') !== false) {
+                    // Backward-compatible general-row lookup:
+                    // handle both firm_id IS NULL and firm_id=0.
+                    $this->db->group_start();
+                    $this->db->where('firm_id', 0);
+                    $this->db->or_where('firm_id IS NULL', null, false);
+                    $this->db->group_end();
+                } elseif (strpos($key, ' IS NULL') !== false) {
+                    // Handle generic IS NULL condition
                     $field = str_replace(' IS NULL', '', $key);
                     $field = str_replace('t1.', '', $field);
                     $this->db->where($field . ' IS NULL', null, false);
