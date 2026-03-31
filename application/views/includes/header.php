@@ -359,6 +359,7 @@
                                             }
                                         </style>
                                         <!-- NOTIFICATIONS -->
+                                        <?php if ($this->session->role !== 'employee' && $this->session->role !== 'ca') { ?>
                                         <?php
                                         $notifications = getnotifications();
                                         $notification_badge = get_notification_badge_count();
@@ -429,6 +430,7 @@
                                                 </div>
                                             </div>
                                         </div>
+                                        <?php } ?>
                                         <!-- FULL-SCREEN -->
                                         <div class="dropdown d-flex">
                                             <a class="nav-link icon full-screen-link nav-link-bg">
