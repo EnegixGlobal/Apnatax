@@ -1,5 +1,7 @@
 <?php
 $button='';
+$kyc_selected = isset($kyc) ? $kyc : array();
+$activeFirmId = !empty($kyc_selected['firm_id']) ? (int)$kyc_selected['firm_id'] : 0;
 ?>
                             <div class="card">
                                 <div class="card-header">
@@ -53,27 +55,28 @@ $button='';
                                         <?php if(!empty($all_kyc) && count($all_kyc) > 0){ ?>
                                             <!-- Tabs for different KYC records -->
                                             <ul class="nav nav-tabs mb-3" id="kycTabs" role="tablist">
-                                                <?php $first = true; foreach($all_kyc as $key => $kyc_record): ?>
+                                                <?php foreach($all_kyc as $key => $kyc_record): $fid = !empty($kyc_record['firm_id']) ? (int)$kyc_record['firm_id'] : 0; ?>
                                                     <li class="nav-item" role="presentation">
-                                                        <button class="nav-link <?= $first ? 'active' : ''; ?>" 
-                                                                id="kyc-tab-<?= $key; ?>" 
-                                                                data-bs-toggle="tab" 
-                                                                data-bs-target="#kyc-<?= $key; ?>" 
-                                                                type="button" 
-                                                                role="tab">
+                                                        <button class="nav-link <?= $fid === $activeFirmId ? 'active' : ''; ?>"
+                                                                id="kyc-tab-<?= $key; ?>"
+                                                                data-bs-toggle="tab"
+                                                                data-bs-target="#kyc-<?= $key; ?>"
+                                                                type="button"
+                                                                role="tab"
+                                                                onclick="window.location.href='<?= base_url('customers/kycdetails/'.md5($customer['id'])) ?>?firm_id=<?= $fid ?>';">
                                                             <i class="fa fa-building me-1"></i><?= htmlspecialchars($kyc_record['firm_name']); ?>
                                                         </button>
                                                     </li>
-                                                <?php $first = false; endforeach; ?>
+                                                <?php endforeach; ?>
                                             </ul>
                                             
                                             <!-- Tab Content -->
                                             <div class="tab-content" id="kycTabContent">
-                                                <?php $first = true; foreach($all_kyc as $key => $kyc_record): ?>
-                                                    <div class="tab-pane fade <?= $first ? 'show active' : ''; ?>" 
-                                                         id="kyc-<?= $key; ?>" 
+                                                <?php foreach($all_kyc as $key => $kyc_record): $fid = !empty($kyc_record['firm_id']) ? (int)$kyc_record['firm_id'] : 0; ?>
+                                                    <div class="tab-pane fade <?= $fid === $activeFirmId ? 'show active' : ''; ?>"
+                                                         id="kyc-<?= $key; ?>"
                                                          role="tabpanel">
-                                                        <?php 
+                                                        <?php
                                                             $kyc = $kyc_record; // Use current KYC record for display
                                                             $current_firm_id = !empty($kyc_record['firm_id']) ? $kyc_record['firm_id'] : null;
                                                         ?>
@@ -174,7 +177,7 @@ $button='';
                                                             </div>
                                                         </div>
                                                     </div>
-                                                <?php $first = false; endforeach; ?>
+                                                <?php endforeach; ?>
                                             </div>
                                         <?php } elseif(!empty($kyc)){ ?>
                                             <!-- Single KYC Display (backward compatibility) -->
@@ -282,9 +285,14 @@ $button='';
                                     
                                     <hr class="my-4">
                                     <!-- Certificates Section -->
+                                    <?php $kyc = $kyc_selected; ?>
                                     <div class="mb-4">
                                         <h5 class="mb-3"><i class="fa fa-certificate me-2"></i>Certificates</h5>
+
+                                        <?php $selectedId = !empty($kyc['firm_id']) ? (int)$kyc['firm_id'] : 0; ?>
+
                                         <?= form_open_multipart('customers/uploadcertificates/'.md5($customer['id'])); ?>
+                                        <input type="hidden" name="firm_id" value="<?= $selectedId; ?>">
                                         
                                         <div class="row">
                                             <div class="col-md-6 mb-3">
@@ -296,10 +304,10 @@ $button='';
                                                                 <a href="<?= $kyc['tds_certificate'] ?>" target="_blank" class="btn btn-sm btn-info">
                                                                     <i class="fa fa-eye"></i> View
                                                                 </a>
-                                                                <a href="<?= base_url('customers/download_certificate/'.md5($customer['id']).'/tds_certificate') ?>" class="btn btn-sm btn-success">
+                                                                <a href="<?= base_url('customers/download_certificate/'.md5($customer['id']).'/tds_certificate' . (!empty($kyc['firm_id']) ? '?firm_id='.(int)$kyc['firm_id'] : '')) ?>" class="btn btn-sm btn-success">
                                                                     <i class="fa fa-download"></i> Download
                                                                 </a>
-                                                                <a href="<?= base_url('customers/delete_certificate/'.md5($customer['id']).'/tds_certificate') ?>" 
+                                                                <a href="<?= base_url('customers/delete_certificate/'.md5($customer['id']).'/tds_certificate' . (!empty($kyc['firm_id']) ? '?firm_id='.(int)$kyc['firm_id'] : '')) ?>" 
                                                                    class="btn btn-sm btn-danger" 
                                                                    onclick="return confirm('Are you sure you want to delete this certificate?');">
                                                                     <i class="fa fa-trash"></i> Delete
@@ -325,10 +333,10 @@ $button='';
                                                                 <a href="<?= $kyc['gst_certificate'] ?>" target="_blank" class="btn btn-sm btn-info">
                                                                     <i class="fa fa-eye"></i> View
                                                                 </a>
-                                                                <a href="<?= base_url('customers/download_certificate/'.md5($customer['id']).'/gst_certificate') ?>" class="btn btn-sm btn-success">
+                                                                <a href="<?= base_url('customers/download_certificate/'.md5($customer['id']).'/gst_certificate' . (!empty($kyc['firm_id']) ? '?firm_id='.(int)$kyc['firm_id'] : '')) ?>" class="btn btn-sm btn-success">
                                                                     <i class="fa fa-download"></i> Download
                                                                 </a>
-                                                                <a href="<?= base_url('customers/delete_certificate/'.md5($customer['id']).'/gst_certificate') ?>" 
+                                                                <a href="<?= base_url('customers/delete_certificate/'.md5($customer['id']).'/gst_certificate' . (!empty($kyc['firm_id']) ? '?firm_id='.(int)$kyc['firm_id'] : '')) ?>" 
                                                                    class="btn btn-sm btn-danger" 
                                                                    onclick="return confirm('Are you sure you want to delete this certificate?');">
                                                                     <i class="fa fa-trash"></i> Delete
@@ -354,10 +362,10 @@ $button='';
                                                                 <a href="<?= $kyc['audit_report'] ?>" target="_blank" class="btn btn-sm btn-info">
                                                                     <i class="fa fa-eye"></i> View
                                                                 </a>
-                                                                <a href="<?= base_url('customers/download_certificate/'.md5($customer['id']).'/audit_report') ?>" class="btn btn-sm btn-success">
+                                                                <a href="<?= base_url('customers/download_certificate/'.md5($customer['id']).'/audit_report' . (!empty($kyc['firm_id']) ? '?firm_id='.(int)$kyc['firm_id'] : '')) ?>" class="btn btn-sm btn-success">
                                                                     <i class="fa fa-download"></i> Download
                                                                 </a>
-                                                                <a href="<?= base_url('customers/delete_certificate/'.md5($customer['id']).'/audit_report') ?>" 
+                                                                <a href="<?= base_url('customers/delete_certificate/'.md5($customer['id']).'/audit_report' . (!empty($kyc['firm_id']) ? '?firm_id='.(int)$kyc['firm_id'] : '')) ?>" 
                                                                    class="btn btn-sm btn-danger" 
                                                                    onclick="return confirm('Are you sure you want to delete this certificate?');">
                                                                     <i class="fa fa-trash"></i> Delete
@@ -383,10 +391,10 @@ $button='';
                                                                 <a href="<?= $kyc['income_tax_certificate'] ?>" target="_blank" class="btn btn-sm btn-info">
                                                                     <i class="fa fa-eye"></i> View
                                                                 </a>
-                                                                <a href="<?= base_url('customers/download_certificate/'.md5($customer['id']).'/income_tax_certificate') ?>" class="btn btn-sm btn-success">
+                                                                <a href="<?= base_url('customers/download_certificate/'.md5($customer['id']).'/income_tax_certificate' . (!empty($kyc['firm_id']) ? '?firm_id='.(int)$kyc['firm_id'] : '')) ?>" class="btn btn-sm btn-success">
                                                                     <i class="fa fa-download"></i> Download
                                                                 </a>
-                                                                <a href="<?= base_url('customers/delete_certificate/'.md5($customer['id']).'/income_tax_certificate') ?>" 
+                                                                <a href="<?= base_url('customers/delete_certificate/'.md5($customer['id']).'/income_tax_certificate' . (!empty($kyc['firm_id']) ? '?firm_id='.(int)$kyc['firm_id'] : '')) ?>" 
                                                                    class="btn btn-sm btn-danger" 
                                                                    onclick="return confirm('Are you sure you want to delete this certificate?');">
                                                                     <i class="fa fa-trash"></i> Delete

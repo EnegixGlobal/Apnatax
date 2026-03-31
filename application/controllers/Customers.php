@@ -118,9 +118,21 @@ class Customers extends CI_Controller
             }
         }
 
-        $data['all_kyc']  = $all_kyc;
-        // Keep $kyc pointing to the first record for the certificates section
-        $data['kyc']      = !empty($all_kyc) ? $all_kyc[0] : array();
+        $selected_firm_id = (int)$this->input->get('firm_id');
+        $selected_kyc = array();
+        if (!empty($all_kyc)) {
+            foreach ($all_kyc as $kyc_row) {
+                if ((int)$kyc_row['firm_id'] === $selected_firm_id) {
+                    $selected_kyc = $kyc_row;
+                    break;
+                }
+            }
+        }
+
+        $data['all_kyc']          = $all_kyc;
+        $data['selected_firm_id'] = $selected_firm_id;
+        // Certificates section should use selected firm KYC when provided.
+        $data['kyc']              = !empty($selected_kyc) ? $selected_kyc : (!empty($all_kyc) ? $all_kyc[0] : array());
         $data['form']     = 'update';
 
         $this->template->load('customer', 'kycdetails', $data);
@@ -133,6 +145,12 @@ class Customers extends CI_Controller
             redirect('customers/');
         }
 
+        // Keep firm_id available for redirects even if request is not a POST.
+        $firm_id = (int)$this->input->post('firm_id');
+        if ($this->input->post('firm_id') === NULL) {
+            $firm_id = (int)$this->input->get('firm_id');
+        }
+
         if ($this->input->post('uploadcertificates') !== NULL) {
             $user = getuser();
             $data = array();
@@ -140,12 +158,19 @@ class Customers extends CI_Controller
             $message = array();
             $upload_path = './assets/images/profile/kyc/';
             $allowed_types = 'gif|jpg|jpeg|png|pdf';
+            $firm_id = (int)$this->input->post('firm_id');
 
             // Check if KYC record exists
-            $kyc = $this->account->getkyc(['t1.user_id' => $customer['user_id']], 'single');
+            $where = ['t1.user_id' => $customer['user_id']];
+            if ($firm_id > 0) {
+                $where['t1.firm_id'] = $firm_id;
+            } else {
+                $where['t1.firm_id IS NULL'] = null;
+            }
+            $kyc = $this->account->getkyc($where, 'single');
             if (empty($kyc)) {
                 $this->session->set_flashdata("err_msg", "Please upload KYC details first!");
-                redirect('customers/kycdetails/' . $id);
+                redirect('customers/kycdetails/' . $id . '?firm_id=' . $firm_id);
             }
 
             // Get existing KYC data with raw file paths (without file_url conversion)
@@ -153,6 +178,7 @@ class Customers extends CI_Controller
             $existing_kyc = $this->db
                 ->select('tds_certificate, gst_certificate, company_registration_certificate as audit_report, din_certificate as income_tax_certificate')
                 ->where('user_id', $customer['user_id'])
+                ->where('firm_id', $firm_id > 0 ? $firm_id : 0)
                 ->get('kyc')
                 ->row_array();
 
@@ -222,6 +248,7 @@ class Customers extends CI_Controller
 
             if (!empty($data)) {
                 $data['user_id'] = $customer['user_id'];
+                $data['firm_id'] = $firm_id > 0 ? $firm_id : 0;
                 $data['updated_on'] = date('Y-m-d H:i:s');
                 $result = $this->account->savekyc($data);
                 if ($result['status'] === true) {
@@ -236,12 +263,13 @@ class Customers extends CI_Controller
                 $this->session->set_flashdata("err_msg", "Please select at least one certificate to upload!");
             }
         }
-        redirect('customers/kycdetails/' . $id);
+        redirect('customers/kycdetails/' . $id . '?firm_id=' . $firm_id);
     }
 
     public function download_certificate($id = NULL, $type = '')
     {
         $customer = $this->customer->getcustomers(['md5(t1.id)' => $id], 'single');
+        $firm_id = (int)$this->input->get('firm_id');
         if (empty($customer)) {
             redirect('customers/');
         }
@@ -250,7 +278,7 @@ class Customers extends CI_Controller
 
         if (empty($type) || !in_array($type, $allowed_types)) {
             $this->session->set_flashdata("err_msg", "Invalid certificate type!");
-            redirect('customers/kycdetails/' . $id);
+            redirect('customers/kycdetails/' . $id . ($firm_id > 0 ? '?firm_id=' . $firm_id : ''));
         }
 
         // Map logical type to actual DB column for backward compatibility
@@ -263,11 +291,20 @@ class Customers extends CI_Controller
         }
 
         // Get KYC data with raw file path (without file_url conversion)
-        $kyc = $this->db->select($db_column)->where('user_id', $customer['user_id'])->get('kyc')->row_array();
+        $this->db->select($db_column)->where('user_id', $customer['user_id']);
+        if ($firm_id > 0) {
+            $this->db->where('firm_id', $firm_id);
+        } else {
+            $this->db->group_start();
+            $this->db->where('firm_id', 0);
+            $this->db->or_where('firm_id IS NULL', null, false);
+            $this->db->group_end();
+        }
+        $kyc = $this->db->get('kyc')->row_array();
 
         if (empty($kyc) || empty($kyc[$type])) {
             $this->session->set_flashdata("err_msg", "Certificate not found!");
-            redirect('customers/kycdetails/' . $id);
+            redirect('customers/kycdetails/' . $id . ($firm_id > 0 ? '?firm_id=' . $firm_id : ''));
         }
 
         $file_path = $kyc[$type];
@@ -276,7 +313,7 @@ class Customers extends CI_Controller
         // Check if file exists
         if (!file_exists($full_path)) {
             $this->session->set_flashdata("err_msg", "Certificate file not found!");
-            redirect('customers/kycdetails/' . $id);
+            redirect('customers/kycdetails/' . $id . ($firm_id > 0 ? '?firm_id=' . $firm_id : ''));
         }
 
         // Get filename from path
@@ -290,6 +327,7 @@ class Customers extends CI_Controller
     public function download_kyc_document($id = NULL, $type = '')
     {
         $customer = $this->customer->getcustomers(['md5(t1.id)' => $id], 'single');
+        $firm_id = (int)$this->input->get('firm_id');
         if (empty($customer)) {
             redirect('customers/');
         }
@@ -298,15 +336,24 @@ class Customers extends CI_Controller
 
         if (empty($type) || !in_array($type, $allowed_types)) {
             $this->session->set_flashdata("err_msg", "Invalid document type!");
-            redirect('customers/kycdetails/' . $id);
+            redirect('customers/kycdetails/' . $id . ($firm_id > 0 ? '?firm_id=' . $firm_id : ''));
         }
 
         // Get KYC data with raw file path (without file_url conversion)
-        $kyc = $this->db->select($type)->where('user_id', $customer['user_id'])->get('kyc')->row_array();
+        $this->db->select($type)->where('user_id', $customer['user_id']);
+        if ($firm_id > 0) {
+            $this->db->where('firm_id', $firm_id);
+        } else {
+            $this->db->group_start();
+            $this->db->where('firm_id', 0);
+            $this->db->or_where('firm_id IS NULL', null, false);
+            $this->db->group_end();
+        }
+        $kyc = $this->db->get('kyc')->row_array();
 
         if (empty($kyc) || empty($kyc[$type])) {
             $this->session->set_flashdata("err_msg", "Document not found!");
-            redirect('customers/kycdetails/' . $id);
+            redirect('customers/kycdetails/' . $id . ($firm_id > 0 ? '?firm_id=' . $firm_id : ''));
         }
 
         $file_path = $kyc[$type];
@@ -315,7 +362,7 @@ class Customers extends CI_Controller
         // Check if file exists
         if (!file_exists($full_path)) {
             $this->session->set_flashdata("err_msg", "Document file not found!");
-            redirect('customers/kycdetails/' . $id);
+            redirect('customers/kycdetails/' . $id . ($firm_id > 0 ? '?firm_id=' . $firm_id : ''));
         }
 
         // Load download helper and force download
@@ -326,6 +373,7 @@ class Customers extends CI_Controller
     public function delete_certificate($id = NULL, $type = '')
     {
         $customer = $this->customer->getcustomers(['md5(t1.id)' => $id], 'single');
+        $firm_id = (int)$this->input->get('firm_id');
         if (empty($customer)) {
             redirect('customers/');
         }
@@ -334,7 +382,7 @@ class Customers extends CI_Controller
 
         if (empty($type) || !in_array($type, $allowed_types)) {
             $this->session->set_flashdata("err_msg", "Invalid certificate type!");
-            redirect('customers/kycdetails/' . $id);
+            redirect('customers/kycdetails/' . $id . ($firm_id > 0 ? '?firm_id=' . $firm_id : ''));
         }
 
         // Map logical type to actual DB column for backward compatibility
@@ -347,10 +395,16 @@ class Customers extends CI_Controller
         }
 
         // Get existing certificate file path
-        $kyc = $this->db->select($db_column)
-            ->where('user_id', $customer['user_id'])
-            ->get('kyc')
-            ->row_array();
+        $this->db->select($db_column)->where('user_id', $customer['user_id']);
+        if ($firm_id > 0) {
+            $this->db->where('firm_id', $firm_id);
+        } else {
+            $this->db->group_start();
+            $this->db->where('firm_id', 0);
+            $this->db->or_where('firm_id IS NULL', null, false);
+            $this->db->group_end();
+        }
+        $kyc = $this->db->get('kyc')->row_array();
 
         if (!empty($kyc) && !empty($kyc[$type])) {
             $file_path = $kyc[$type];
@@ -363,7 +417,16 @@ class Customers extends CI_Controller
 
             // Update database - set certificate field to empty
             $update_data = array($type => '', 'updated_on' => date('Y-m-d H:i:s'));
-            $result = $this->db->update('kyc', $update_data, array('user_id' => $customer['user_id']));
+            $this->db->where('user_id', $customer['user_id']);
+            if ($firm_id > 0) {
+                $this->db->where('firm_id', $firm_id);
+            } else {
+                $this->db->group_start();
+                $this->db->where('firm_id', 0);
+                $this->db->or_where('firm_id IS NULL', null, false);
+                $this->db->group_end();
+            }
+            $result = $this->db->update('kyc', $update_data);
 
             if ($result) {
                 $this->session->set_flashdata("msg", ucfirst(str_replace('_', ' ', $type)) . " deleted successfully!");
@@ -374,7 +437,7 @@ class Customers extends CI_Controller
             $this->session->set_flashdata("err_msg", "Certificate not found!");
         }
 
-        redirect('customers/kycdetails/' . $id);
+        redirect('customers/kycdetails/' . $id . ($firm_id > 0 ? '?firm_id=' . $firm_id : ''));
     }
 
     public function customerpurchases()
