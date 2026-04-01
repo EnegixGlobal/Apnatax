@@ -330,7 +330,7 @@
                                         // Use the first year as default
                                         periodValue = response.years[0].id;
 
-                                        // Try to match with current session year (format: "20232024" for AY 2023-24)
+                                        // Try to match with current session year (format: "20232024" for TY 2023-24)
                                         var currentYearId = startYear + '' + (startYear + 1);
                                         response.years.forEach(function(y) {
                                             if (y.id == currentYearId) {

@@ -1,7 +1,18 @@
 <?php
-$button='';
-if(empty($kyc) || $kyc['status']==0){
-    $button='<input type="submit" class="btn btn-sm btn-success" name="updatekyc" value="Update KYC">&nbsp;';
+$button = '';
+$status_badge = '';
+// Hide submit button while KYC is pending admin approval.
+if (empty($kyc) || !isset($kyc['status']) || (int)$kyc['status'] !== 0) {
+    $button = '<input type="submit" class="btn btn-sm btn-success" name="updatekyc" value="Submit KYC for Approval">&nbsp;';
+}
+if (!empty($kyc) && isset($kyc['status'])) {
+    if ((int)$kyc['status'] === 1) {
+        $status_badge = '<span class="badge bg-success">Approved</span>';
+    } elseif ((int)$kyc['status'] === 0) {
+        $status_badge = '<span class="badge bg-warning text-dark">Pending Admin Approval</span>';
+    } else {
+        $status_badge = '<span class="badge bg-danger">Rejected</span>';
+    }
 }
 ?>
                             <div class="card">
@@ -9,6 +20,9 @@ if(empty($kyc) || $kyc['status']==0){
                                     <div class="row">
                                         <div class="col-md-6">
                                             <?= form_open_multipart('profile/updatekyc/'); ?>
+                                                <?php if (!empty($status_badge)) { ?>
+                                                    <div class="mb-2"><?= $status_badge; ?></div>
+                                                <?php } ?>
                                                 <?php if (!empty($firm_id)) : ?>
                                                     <input type="hidden" name="firm_id" value="<?= $firm_id; ?>">
                                                 <?php endif; ?>

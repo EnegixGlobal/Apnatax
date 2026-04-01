@@ -138,6 +138,105 @@ class Customers extends CI_Controller
         $this->template->load('customer', 'kycdetails', $data);
     }
 
+    public function approvekyc($id = NULL)
+    {
+        if ($this->session->role != 'admin' && $this->session->role != 'superadmin') {
+            redirect('customers/');
+        }
+        $customer = $this->customer->getcustomers(['md5(t1.id)' => $id], 'single');
+        if (empty($customer)) {
+            $this->session->set_flashdata("err_msg", "Customer not found!");
+            redirect('customers/');
+            return;
+        }
+        $firm_id = (int)$this->input->get('firm_id');
+        $this->db->where('user_id', $customer['user_id']);
+        if ($firm_id > 0) {
+            $this->db->where('firm_id', $firm_id);
+        } else {
+            $this->db->group_start();
+            $this->db->where('firm_id', 0);
+            $this->db->or_where('firm_id IS NULL', null, false);
+            $this->db->group_end();
+        }
+        $ok = $this->db->update('kyc', ['status' => 1, 'updated_on' => date('Y-m-d H:i:s')]);
+        $this->session->set_flashdata($ok ? "msg" : "err_msg", $ok ? "KYC approved successfully." : "Failed to approve KYC.");
+        redirect('customers/kycdetails/' . $id . '?firm_id=' . $firm_id);
+    }
+
+    public function deletekyc($id = NULL)
+    {
+        if ($this->session->role != 'admin' && $this->session->role != 'superadmin') {
+            redirect('customers/');
+        }
+        $customer = $this->customer->getcustomers(['md5(t1.id)' => $id], 'single');
+        if (empty($customer)) {
+            $this->session->set_flashdata("err_msg", "Customer not found!");
+            redirect('customers/');
+            return;
+        }
+        $firm_id = (int)$this->input->get('firm_id');
+
+        // Safety rule: don't allow KYC deletion if purchases already exist for this customer+firm.
+        if ($firm_id > 0) {
+            $purchase_count = $this->db
+                ->where('user_id', $customer['user_id'])
+                ->where('firm_id', $firm_id)
+                ->count_all_results('purchases');
+            if ($purchase_count > 0) {
+                $this->session->set_flashdata("err_msg", "KYC cannot be deleted because purchases already exist for this firm.");
+                redirect('customers/kycdetails/' . $id . '?firm_id=' . $firm_id);
+                return;
+            }
+        } else {
+            // For general/non-firm row, block delete if customer has any purchases.
+            $purchase_count = $this->db
+                ->where('user_id', $customer['user_id'])
+                ->count_all_results('purchases');
+            if ($purchase_count > 0) {
+                $this->session->set_flashdata("err_msg", "General KYC cannot be deleted because purchases already exist.");
+                redirect('customers/kycdetails/' . $id . '?firm_id=' . $firm_id);
+                return;
+            }
+        }
+
+        $this->db->select('pan_image,aadhar_image,aadhar_back,tds_certificate,gst_certificate,company_registration_certificate,din_certificate');
+        $this->db->where('user_id', $customer['user_id']);
+        if ($firm_id > 0) {
+            $this->db->where('firm_id', $firm_id);
+        } else {
+            $this->db->group_start();
+            $this->db->where('firm_id', 0);
+            $this->db->or_where('firm_id IS NULL', null, false);
+            $this->db->group_end();
+        }
+        $kyc_row = $this->db->get('kyc')->row_array();
+        if (empty($kyc_row)) {
+            $this->session->set_flashdata("err_msg", "KYC record not found!");
+            redirect('customers/kycdetails/' . $id . '?firm_id=' . $firm_id);
+            return;
+        }
+
+        foreach ($kyc_row as $path) {
+            if (!empty($path) && file_exists(FCPATH . $path)) {
+                @unlink(FCPATH . $path);
+            }
+        }
+
+        $this->db->where('user_id', $customer['user_id']);
+        if ($firm_id > 0) {
+            $this->db->where('firm_id', $firm_id);
+        } else {
+            $this->db->group_start();
+            $this->db->where('firm_id', 0);
+            $this->db->or_where('firm_id IS NULL', null, false);
+            $this->db->group_end();
+        }
+        $ok = $this->db->delete('kyc');
+        $this->session->set_flashdata($ok ? "msg" : "err_msg", $ok ? "KYC deleted successfully." : "Failed to delete KYC.");
+        redirect('customers/kycdetails/' . $id . '?firm_id=' . $firm_id);
+    }
+
     public function uploadcertificates($id = NULL)
     {
         $customer = $this->customer->getcustomers(['md5(t1.id)' => $id], 'single');

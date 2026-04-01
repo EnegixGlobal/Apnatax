@@ -62,6 +62,19 @@ class Services extends CI_Controller
         return $result;
     }
 
+    /**
+     * Firm-wise KYC gate for purchases.
+     * Requires a KYC row for selected firm with PAN and Aadhar.
+     */
+    private function hasFirmKycForPurchase($user_id, $firm_id)
+    {
+        $kyc = $this->account->getkyc(['t1.user_id' => $user_id, 't1.firm_id' => $firm_id], 'single');
+        if (empty($kyc)) {
+            return false;
+        }
+        return !empty($kyc['pan']) && !empty($kyc['aadhar']) && isset($kyc['status']) && (int)$kyc['status'] === 1;
+    }
+
     public function index()
     {
         $data = ['title' => 'Services'];
@@ -1341,6 +1354,10 @@ class Services extends CI_Controller
         $firm = $this->customer->getfirms($where, 'single');
         if (!empty($firm)) {
             $firm_id = $firm['id'];
+            if (!$this->hasFirmKycForPurchase($user['id'], $firm_id)) {
+                $this->session->set_flashdata("err_msg", "Approved firm-wise KYC is mandatory before purchase. Please complete KYC and wait for admin approval.");
+                return false;
+            }
             $where = "status='1' and id ='$service_id'";
             $service = $this->master->getservices($where, 'single');
             if (!empty($service)) {
