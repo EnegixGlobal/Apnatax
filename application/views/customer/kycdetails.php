@@ -80,6 +80,23 @@ $activeFirmId = !empty($kyc_selected['firm_id']) ? (int)$kyc_selected['firm_id']
                                                             $kyc = $kyc_record; // Use current KYC record for display
                                                             $current_firm_id = !empty($kyc_record['firm_id']) ? $kyc_record['firm_id'] : null;
                                                         ?>
+                                                        <div class="mb-3">
+                                                            <?php if (isset($kyc['status']) && (int)$kyc['status'] === 1) { ?>
+                                                                <span class="badge bg-success">Approved</span>
+                                                            <?php } elseif (isset($kyc['status']) && (int)$kyc['status'] === 0) { ?>
+                                                                <span class="badge bg-warning text-dark">Pending Approval</span>
+                                                            <?php } else { ?>
+                                                                <span class="badge bg-danger">Rejected</span>
+                                                            <?php } ?>
+                                                            <?php if (!isset($kyc['status']) || (int)$kyc['status'] !== 1) { ?>
+                                                                <a href="<?= base_url('customers/approvekyc/'.md5($customer['id']).'?firm_id='.(int)$current_firm_id); ?>" class="btn btn-sm btn-success ms-2" onclick="return confirm('Approve this KYC for selected firm?');">
+                                                                    <i class="fa fa-check"></i> Approve
+                                                                </a>
+                                                            <?php } ?>
+                                                            <a href="<?= base_url('customers/deletekyc/'.md5($customer['id']).'?firm_id='.(int)$current_firm_id); ?>" class="btn btn-sm btn-danger ms-1" onclick="return confirm('Delete this KYC for selected firm?');">
+                                                                <i class="fa fa-trash"></i> Delete KYC
+                                                            </a>
+                                                        </div>
                                                         
                                                         <!-- PAN Card Section -->
                                                         <div class="card mb-3">

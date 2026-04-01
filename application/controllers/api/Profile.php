@@ -250,7 +250,12 @@ class Profile extends RestController
                 }
 
                 if ($checkaadhar && $checkpan) {
-                    $data = array("user_id" => $user['id'], "pan" => $pan);
+                    $data = array(
+                        "user_id" => $user['id'],
+                        "pan" => $pan,
+                        // Match website flow: every customer KYC submission goes for admin approval.
+                        "status" => 0
+                    );
 
                     // Add firm_id if provided
                     if (!empty($firm_id)) {
@@ -307,7 +312,7 @@ class Profile extends RestController
                             ));
                             $this->response([
                                 'status' => true,
-                                'message' => $result['message']
+                                'message' => 'KYC submitted successfully and is pending admin approval.'
                             ], RestController::HTTP_OK);
                         } else {
                             $this->response([

@@ -13,6 +13,7 @@ class Package extends CI_Controller
             redirect('/');
         }
         $this->load->model('Invoice_model', 'invoice');
+        $this->load->model('Account_model', 'account');
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -80,6 +81,18 @@ class Package extends CI_Controller
                 }
                 return $earliest !== null ? $earliest : date('Y-m-d', strtotime('+1 year', $pts));
         }
+    }
+
+    /**
+     * Firm-wise KYC gate for package creation.
+     */
+    private function hasFirmKycForPurchase($user_id, $firm_id)
+    {
+        $kyc = $this->account->getkyc(['t1.user_id' => $user_id, 't1.firm_id' => $firm_id], 'single');
+        if (empty($kyc)) {
+            return false;
+        }
+        return !empty($kyc['pan']) && !empty($kyc['aadhar']) && isset($kyc['status']) && (int)$kyc['status'] === 1;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -211,6 +224,12 @@ class Package extends CI_Controller
         );
         if (empty($firm)) {
             $this->session->set_flashdata('err_msg', 'Firm not selected!');
+            redirect($_SERVER['HTTP_REFERER']);
+            return;
+        }
+
+        if (!$this->hasFirmKycForPurchase($user['id'], $firm_id)) {
+            $this->session->set_flashdata('err_msg', 'Approved firm-wise KYC is mandatory before buying package. Please complete KYC and wait for admin approval.');
             redirect($_SERVER['HTTP_REFERER']);
             return;
         }

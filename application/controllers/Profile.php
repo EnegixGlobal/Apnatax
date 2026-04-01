@@ -279,7 +279,9 @@ class Profile extends CI_Controller
             if ($checkaadhar) {
                 $kyc_data = array(
                     "user_id" => $user['id'],
-                    "pan" => $data['pan']
+                    "pan" => $data['pan'],
+                    // Customer-submitted KYC must be approved by admin.
+                    "status" => 0
                 );
                 
                 // Add firm_id if provided
@@ -330,7 +332,7 @@ class Profile extends CI_Controller
                 if ($status) {
                     $result = $this->account->savekyc($kyc_data);
                     if ($result['status'] === true) {
-                        $this->session->set_flashdata("msg", $result['message']);
+                        $this->session->set_flashdata("msg", "KYC submitted successfully and is pending admin approval.");
                     } else {
                         $this->session->set_flashdata("err_msg", $result['message']);
                     }

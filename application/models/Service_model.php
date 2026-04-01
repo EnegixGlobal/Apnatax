@@ -706,6 +706,126 @@ class Service_model extends CI_Model
         return $query->result_array();
     }
 
+    public function get_gst_sales_report($period = 'all', $selected_month = NULL, $selected_quarter = NULL, $selected_year = NULL, $report_type = 'b2b')
+    {
+        $has_purchase_date = $this->db->field_exists('date', 'purchases');
+        $has_subtotal = $this->db->field_exists('subtotal', 'purchases');
+        $has_gst_amount = $this->db->field_exists('gst_amount', 'purchases');
+        $has_gst_rate = $this->db->field_exists('gst_rate', 'purchases');
+        $has_invoice_no = $this->db->field_exists('invoice_no', 'invoices');
+        $has_invoice_date = $this->db->field_exists('invoice_date', 'invoices');
+        $has_firm_gstin = $this->db->field_exists('gstin', 'firms');
+        $has_firm_parent_id = $this->db->field_exists('parent_id', 'firms');
+        $has_customer_parent_id = $this->db->field_exists('parent_id', 'customers');
+
+        $purchase_date_col = $has_purchase_date ? 't1.date' : 't1.added_on';
+        $purchase_month_expr = "DATE_FORMAT({$purchase_date_col}, '%Y-%m')";
+        $purchase_year_expr = "YEAR({$purchase_date_col})";
+        $purchase_month_num_expr = "MONTH({$purchase_date_col})";
+        $purchase_quarter_expr = "QUARTER({$purchase_date_col})";
+
+        $gst_amount_expr = $has_gst_amount ? 'COALESCE(t1.gst_amount, 0)' : '0';
+        $subtotal_expr = $has_subtotal ? 'COALESCE(t1.subtotal, (t1.amount - ' . $gst_amount_expr . '))' : '(t1.amount - ' . $gst_amount_expr . ')';
+        $gst_rate_expr = $has_gst_rate
+            ? "COALESCE(t1.gst_rate, CASE WHEN ({$subtotal_expr}) > 0 AND ({$gst_amount_expr}) > 0 THEN ROUND((({$gst_amount_expr}) * 100) / ({$subtotal_expr}), 2) ELSE 0 END)"
+            : "CASE WHEN ({$subtotal_expr}) > 0 AND ({$gst_amount_expr}) > 0 THEN ROUND((({$gst_amount_expr}) * 100) / ({$subtotal_expr}), 2) ELSE 0 END";
+
+        $invoice_no_expr = $has_invoice_no ? "COALESCE(t4.invoice_no, '')" : "''";
+        $invoice_date_expr = $has_invoice_date ? "COALESCE(t4.invoice_date, {$purchase_date_col})" : $purchase_date_col;
+        $recipient_gstin_expr = $has_firm_gstin ? "COALESCE(t3.gstin, '')" : "''";
+        $recipient_pan_expr = "COALESCE(NULLIF(t7.pan, ''), NULLIF(t8.pan, ''), '')";
+
+        $date_filter = "";
+        if ($period == 'monthly') {
+            if (!empty($selected_month)) {
+                $date_filter = $purchase_month_expr . " = " . $this->db->escape($selected_month);
+            } else {
+                $date_filter = $purchase_month_expr . " = DATE_FORMAT(CURDATE(), '%Y-%m')";
+            }
+        } elseif ($period == 'quarterly') {
+            if (!empty($selected_quarter) && strpos($selected_quarter, '-Q') !== false) {
+                list($year, $quarter) = explode('-Q', $selected_quarter);
+                $year = (int)$year;
+                $quarter = (int)$quarter;
+                $start_month = ($quarter - 1) * 3 + 1;
+                $end_month = $quarter * 3;
+                $date_filter = "{$purchase_year_expr} = {$year} AND {$purchase_month_num_expr} >= {$start_month} AND {$purchase_month_num_expr} <= {$end_month}";
+            } else {
+                $quarter = ceil(date('n') / 3);
+                $date_filter = "{$purchase_quarter_expr} = {$quarter} AND {$purchase_year_expr} = YEAR(CURDATE())";
+            }
+        } elseif ($period == 'yearly') {
+            if (!empty($selected_year)) {
+                $year = (int)$selected_year;
+                $date_filter = "{$purchase_year_expr} = {$year}";
+            } else {
+                $date_filter = "{$purchase_year_expr} = YEAR(CURDATE())";
+            }
+        }
+        // When period is "all", no date filter is applied.
+
+        // Place of supply should be buyer/customer state name.
+        $place_of_supply_expr = "''";
+        if ($has_customer_parent_id) {
+            $place_of_supply_expr = "COALESCE(t5.name, '')";
+        } elseif ($has_firm_parent_id) {
+            $place_of_supply_expr = "COALESCE(t5.name, '')";
+        }
+
+        $columns = "t1.id as order_id,
+                    t1.user_id,
+                    {$purchase_date_col} as purchase_date,
+                    t1.amount as invoice_value,
+                    {$subtotal_expr} as taxable_value,
+                    {$gst_rate_expr} as gst_rate,
+                    COALESCE(t2.name, '') as receiver_name,
+                    {$recipient_gstin_expr} as recipient_gstin,
+                    {$recipient_pan_expr} as recipient_pan,
+                    {$invoice_no_expr} as invoice_no,
+                    {$invoice_date_expr} as invoice_date,
+                    COALESCE({$place_of_supply_expr}, '') as place_of_supply";
+
+        $this->db->select($columns, false);
+        $this->db->from('purchases t1');
+        $this->db->join('users t2', 't1.user_id = t2.id', 'left');
+        if ($has_customer_parent_id) {
+            $this->db->join('customers t6', 't1.user_id = t6.user_id', 'left');
+        }
+        // PAN from KYC: prefer firm-level KYC PAN, then user-level PAN
+        $this->db->join('kyc t7', 't1.user_id = t7.user_id AND t1.firm_id = t7.firm_id', 'left');
+        $this->db->join('kyc t8', 't1.user_id = t8.user_id AND (t8.firm_id = 0 OR t8.firm_id IS NULL)', 'left');
+        $this->db->join('firms t3', 't1.firm_id = t3.id', 'left');
+        $this->db->join('invoices t4', 't4.order_id = t1.id', 'left');
+        if ($has_customer_parent_id) {
+            $this->db->join('area t5', 't6.parent_id = t5.id', 'left');
+        } elseif ($has_firm_parent_id) {
+            $this->db->join('area t5', 't3.parent_id = t5.id', 'left');
+        }
+        if (!empty($date_filter)) {
+            $this->db->where($date_filter, null, false);
+        }
+        // Strict split:
+        // B2B -> include only rows where firm GSTIN exists
+        // B2C -> include only rows where firm GSTIN missing and PAN exists
+        if ($report_type === 'b2b') {
+            $this->db->where("{$recipient_gstin_expr} !=", '');
+        } elseif ($report_type === 'b2c') {
+            $this->db->where("{$recipient_gstin_expr} =", '');
+            $this->db->where("{$recipient_pan_expr} !=", '');
+        }
+        $this->db->order_by($purchase_date_col, 'DESC');
+        $query = $this->db->get();
+
+        if (!$query) {
+            $error = $this->db->error();
+            log_message('error', 'get_gst_sales_report query failed: ' . (!empty($error['message']) ? $error['message'] : 'Unknown DB error'));
+            log_message('error', 'get_gst_sales_report SQL: ' . $this->db->last_query());
+            return array();
+        }
+
+        return $query->result_array();
+    }
+
     public function getcustomersbyservice($where = array(), $service_id = NULL, $start_date = NULL, $end_date = NULL)
     {
         // Select all columns from purchases, then add specific ones

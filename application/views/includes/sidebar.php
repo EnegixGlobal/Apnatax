@@ -84,12 +84,14 @@
                             <li><a href="<?= base_url('users/roles/'); ?>" class="slide-item <?= activate_menu('users/roles'); ?>"> User Roles</a></li>
                         </ul>
                     </li>
-                    <li class="slide <?= activate_dropdown('reports/adminincome') ?>">
-                        <a class="side-menu__item <?= activate_dropdown('reports/adminincome') ?>" data-bs-toggle="slide" href="javascript:void(0)"><i class="side-menu__icon  fa fa-line-chart"></i><span class="side-menu__label">Income Reports</span><i class="angle fe fe-chevron-right"></i></a>
+                    <li class="slide <?= activate_dropdown(['reports/adminincome', 'reports/servicecustomers', 'reports/gstsalesreport', 'reports/gstsalesreportb2c']) ?>">
+                        <a class="side-menu__item <?= activate_dropdown(['reports/adminincome', 'reports/servicecustomers', 'reports/gstsalesreport', 'reports/gstsalesreportb2c']) ?>" data-bs-toggle="slide" href="javascript:void(0)"><i class="side-menu__icon  fa fa-line-chart"></i><span class="side-menu__label">Income Reports</span><i class="angle fe fe-chevron-right"></i></a>
                         <ul class="slide-menu">
                             <li class="side-menu-label1"><a href="javascript:void(0)">Income Reports</a></li>
                             <li><a href="<?= base_url('reports/adminincome/'); ?>" class="slide-item <?= activate_menu('reports/adminincome'); ?>"> Income by Service</a></li>
                             <li><a href="<?= base_url('reports/servicecustomers/'); ?>" class="slide-item <?= activate_menu('reports/servicecustomers'); ?>"> Service Customers</a></li>
+                            <li><a href="<?= base_url('reports/gstsalesreport/'); ?>" class="slide-item <?= activate_menu('reports/gstsalesreport'); ?>"> GST Sales Report B2B</a></li>
+                            <li><a href="<?= base_url('reports/gstsalesreportb2c/'); ?>" class="slide-item <?= activate_menu('reports/gstsalesreportb2c'); ?>"> GST Sales Report B2C</a></li>
                         </ul>
                     </li>
                     <?php if ($this->session->role == 'superadmin' || $this->session->role == 'admin' || $this->session->role == 'employee') { ?>

@@ -156,7 +156,7 @@ if (!function_exists('getyearly')) {
         $array = array();
         while ($start < date('Y', strtotime('next year'))) {
             $index = $start . ($start + 1);
-            $value = 'AY ' . $start . '-' . substr(($start + 1), -2);
+            $value = 'TY ' . $start . '-' . substr(($start + 1), -2);
             $array[] = array('id' => $index, 'value' => $value);
             $start++;
         }
@@ -172,7 +172,7 @@ if (!function_exists('getyearmonthvalues')) {
             $start = substr($value, 0, 4);
             $end = substr($value, -4);
             $index = $value;
-            $value = 'AY ' . $start . '-' . substr(($end), -2);
+            $value = 'TY ' . $start . '-' . substr(($end), -2);
             $result = array('id' => $index, 'name' => 'Year', 'value' => $value, 'year1' => $start, 'year2' => $end);
         } elseif (strlen($value) == 6) {
             $year = substr($value, 0, 4);

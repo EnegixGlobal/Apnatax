@@ -429,6 +429,332 @@ class Reports extends CI_Controller
         $this->template->load('reports', 'admin_income', $data);
     }
 
+    public function gstsalesreport()
+    {
+        if ($this->session->role != 'admin' && $this->session->role != 'superadmin') {
+            redirect('home/');
+        }
+
+        $data = ['title' => 'GST Sales Report B2B'];
+        $data['breadcrumb'] = array("active" => "GST Sales Report B2B");
+        $data['datatable'] = true;
+        $data['alertify'] = true;
+
+        $period = $this->input->get('period') ? $this->input->get('period') : 'all';
+        $selected_month = $this->input->get('month') ? $this->input->get('month') : date('Y-m');
+        $selected_quarter = $this->input->get('quarter') ? $this->input->get('quarter') : '';
+        $selected_year = $this->input->get('year') ? $this->input->get('year') : date('Y');
+        $export = strtolower(trim((string)$this->input->get('export')));
+
+        $month_options = array('' => 'Select Month');
+        for ($i = 11; $i >= 0; $i--) {
+            $date = date('Y-m', strtotime("-$i months"));
+            $month_options[$date] = date('F Y', strtotime($date . '-01'));
+        }
+
+        $quarter_options = array('' => 'Select Quarter');
+        $added_quarters = array();
+        for ($i = 0; $i < 24; $i++) {
+            $date = date('Y-m', strtotime("-$i months"));
+            $year = date('Y', strtotime($date . '-01'));
+            $month = date('n', strtotime($date . '-01'));
+            $quarter = ceil($month / 3);
+            $qv = $year . '-Q' . $quarter;
+            if (!isset($added_quarters[$qv]) && count($added_quarters) < 8) {
+                $quarter_options[$qv] = 'Q' . $quarter . ' ' . $year;
+                $added_quarters[$qv] = true;
+            }
+        }
+
+        $year_options = array('' => 'Select Year');
+        $current_year = date('Y');
+        for ($i = 0; $i < 5; $i++) {
+            $year = $current_year - $i;
+            $year_options[$year] = $year;
+        }
+
+        $rows = $this->service->get_gst_sales_report($period, $selected_month, $selected_quarter, $selected_year, 'b2b');
+        $report_rows = array();
+        foreach ($rows as $row) {
+            $invoice_no = !empty($row['invoice_no']) ? $row['invoice_no'] : (!empty($row['order_id']) ? $row['order_id'] : '');
+            $invoice_date = !empty($row['invoice_date']) ? date('d-M-y', strtotime($row['invoice_date'])) : '';
+            $invoice_value = isset($row['invoice_value']) ? (float)$row['invoice_value'] : 0.0;
+            $taxable_value = isset($row['taxable_value']) ? (float)$row['taxable_value'] : 0.0;
+            $rate = isset($row['gst_rate']) ? (float)$row['gst_rate'] : 0.0;
+            $recipient_gstin = !empty($row['recipient_gstin']) ? $row['recipient_gstin'] : '';
+            $place_of_supply = !empty($row['place_of_supply']) ? $row['place_of_supply'] : '';
+            $gst_state_code = substr($recipient_gstin, 0, 2);
+            // Keep buyer's state name when available; use GST code mapping only as fallback.
+            if (empty($place_of_supply) && !empty($gst_state_code)) {
+                $state_name = $this->gststatename($gst_state_code);
+                if (!empty($state_name)) {
+                    $place_of_supply = $gst_state_code . '-' . $state_name;
+                } elseif (empty($place_of_supply)) {
+                    $place_of_supply = $gst_state_code;
+                }
+            }
+
+            $report_rows[] = array(
+                'recipient_gstin' => $recipient_gstin,
+                'receiver_name' => !empty($row['receiver_name']) ? $row['receiver_name'] : '',
+                'invoice_number' => $invoice_no,
+                'invoice_date' => $invoice_date,
+                'invoice_value' => round($invoice_value, 2),
+                'place_of_supply' => $place_of_supply,
+                'reverse_charge' => 'N',
+                'applicable_tax_rate' => '',
+                'invoice_type' => 'Regular B2B',
+                'ecommerce_gstin' => '',
+                'rate' => rtrim(rtrim(number_format($rate, 2, '.', ''), '0'), '.'),
+                'taxable_value' => round($taxable_value, 2),
+                'cess_amount' => ''
+            );
+        }
+
+        if (in_array($export, array('csv', 'pdf', 'json'), true)) {
+            $this->exportgstsalesreport($report_rows, $export, $period, $selected_month, $selected_quarter, $selected_year);
+            return;
+        }
+
+        $data['selected_period'] = $period;
+        $data['selected_month'] = $selected_month;
+        $data['selected_quarter'] = $selected_quarter;
+        $data['selected_year'] = $selected_year;
+        $data['month_options'] = $month_options;
+        $data['quarter_options'] = $quarter_options;
+        $data['year_options'] = $year_options;
+        $data['report_rows'] = $report_rows;
+
+        $this->template->load('reports', 'gst_sales_report', $data);
+    }
+
+    public function gstsalesreportb2c()
+    {
+        if ($this->session->role != 'admin' && $this->session->role != 'superadmin') {
+            redirect('home/');
+        }
+
+        $data = ['title' => 'GST Sales Report B2C'];
+        $data['breadcrumb'] = array("active" => "GST Sales Report B2C");
+        $data['datatable'] = true;
+        $data['alertify'] = true;
+
+        $period = $this->input->get('period') ? $this->input->get('period') : 'all';
+        $selected_month = $this->input->get('month') ? $this->input->get('month') : date('Y-m');
+        $selected_quarter = $this->input->get('quarter') ? $this->input->get('quarter') : '';
+        $selected_year = $this->input->get('year') ? $this->input->get('year') : date('Y');
+        $export = strtolower(trim((string)$this->input->get('export')));
+
+        $month_options = array('' => 'Select Month');
+        for ($i = 11; $i >= 0; $i--) {
+            $date = date('Y-m', strtotime("-$i months"));
+            $month_options[$date] = date('F Y', strtotime($date . '-01'));
+        }
+
+        $quarter_options = array('' => 'Select Quarter');
+        $added_quarters = array();
+        for ($i = 0; $i < 24; $i++) {
+            $date = date('Y-m', strtotime("-$i months"));
+            $year = date('Y', strtotime($date . '-01'));
+            $month = date('n', strtotime($date . '-01'));
+            $quarter = ceil($month / 3);
+            $qv = $year . '-Q' . $quarter;
+            if (!isset($added_quarters[$qv]) && count($added_quarters) < 8) {
+                $quarter_options[$qv] = 'Q' . $quarter . ' ' . $year;
+                $added_quarters[$qv] = true;
+            }
+        }
+
+        $year_options = array('' => 'Select Year');
+        $current_year = date('Y');
+        for ($i = 0; $i < 5; $i++) {
+            $year = $current_year - $i;
+            $year_options[$year] = $year;
+        }
+
+        $rows = $this->service->get_gst_sales_report($period, $selected_month, $selected_quarter, $selected_year, 'b2c');
+        $report_rows = array();
+        foreach ($rows as $row) {
+            $invoice_no = !empty($row['invoice_no']) ? $row['invoice_no'] : (!empty($row['order_id']) ? $row['order_id'] : '');
+            $invoice_date = !empty($row['invoice_date']) ? date('d-M-y', strtotime($row['invoice_date'])) : '';
+            $invoice_value = isset($row['invoice_value']) ? (float)$row['invoice_value'] : 0.0;
+            $taxable_value = isset($row['taxable_value']) ? (float)$row['taxable_value'] : 0.0;
+            $rate = isset($row['gst_rate']) ? (float)$row['gst_rate'] : 0.0;
+            $recipient_pan = !empty($row['recipient_pan']) ? $row['recipient_pan'] : '';
+            $place_of_supply = !empty($row['place_of_supply']) ? $row['place_of_supply'] : '';
+
+            $report_rows[] = array(
+                'recipient_pan' => $recipient_pan,
+                'receiver_name' => !empty($row['receiver_name']) ? $row['receiver_name'] : '',
+                'invoice_number' => $invoice_no,
+                'invoice_date' => $invoice_date,
+                'invoice_value' => round($invoice_value, 2),
+                'place_of_supply' => $place_of_supply,
+                'reverse_charge' => 'N',
+                'applicable_tax_rate' => '',
+                'invoice_type' => 'Regular B2C',
+                'ecommerce_gstin' => '',
+                'rate' => rtrim(rtrim(number_format($rate, 2, '.', ''), '0'), '.'),
+                'taxable_value' => round($taxable_value, 2),
+                'cess_amount' => ''
+            );
+        }
+
+        if (in_array($export, array('csv', 'pdf', 'json'), true)) {
+            $this->exportgstsalesreport($report_rows, $export, $period, $selected_month, $selected_quarter, $selected_year, 'b2c');
+            return;
+        }
+
+        $data['selected_period'] = $period;
+        $data['selected_month'] = $selected_month;
+        $data['selected_quarter'] = $selected_quarter;
+        $data['selected_year'] = $selected_year;
+        $data['month_options'] = $month_options;
+        $data['quarter_options'] = $quarter_options;
+        $data['year_options'] = $year_options;
+        $data['report_rows'] = $report_rows;
+
+        $this->template->load('reports', 'gst_sales_report_b2c', $data);
+    }
+
+    private function exportgstsalesreport($rows, $format, $period, $month, $quarter, $year, $report_type = 'b2b')
+    {
+        $first_column = $report_type === 'b2c' ? 'PAN of Recipient' : 'GSTIN/UIN of Recipient';
+        $headers = array(
+            $first_column,
+            'Receiver Name',
+            'Invoice Number',
+            'Invoice date',
+            'Invoice Value',
+            'Place Of Supply',
+            'Reverse Charge',
+            'Applicable % of Tax Rate',
+            'Invoice Type',
+            'E-Commerce GSTIN',
+            'Rate',
+            'Taxable Value',
+            'Cess Amount'
+        );
+        $period_label = $this->gstperiodlabel($period, $month, $quarter, $year);
+        $filename_base = ($report_type === 'b2c' ? 'gst_sales_report_b2c_' : 'gst_sales_report_b2b_') . preg_replace('/[^a-zA-Z0-9_-]/', '_', strtolower($period_label)) . '_' . date('Ymd_His');
+
+        if ($format === 'csv') {
+            header('Content-Type: text/csv');
+            header('Content-Disposition: attachment; filename="' . $filename_base . '.csv"');
+            $out = fopen('php://output', 'w');
+            fputcsv($out, $headers);
+            foreach ($rows as $row) {
+                fputcsv($out, array_values($row));
+            }
+            fclose($out);
+            exit;
+        }
+
+        if ($format === 'json') {
+            header('Content-Type: application/json; charset=utf-8');
+            header('Content-Disposition: attachment; filename="' . $filename_base . '.json"');
+            $payload = array(
+                'report' => $report_type === 'b2c' ? 'GST Sales Report B2C' : 'GST Sales Report B2B',
+                'period' => $period,
+                'month' => $month,
+                'quarter' => $quarter,
+                'year' => $year,
+                'generated_at' => date('c'),
+                'total_records' => count($rows),
+                'data' => array_values($rows)
+            );
+            echo json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        if ($format === 'pdf') {
+            $html = '<h3>GST Sales Report - ' . htmlspecialchars($period_label) . '</h3>';
+            $html .= '<table border="1" cellpadding="6" cellspacing="0" width="100%" style="border-collapse: collapse; font-size: 11px;">';
+            $html .= '<thead><tr>';
+            foreach ($headers as $header) {
+                $html .= '<th style="background:#f4f4f4;">' . htmlspecialchars($header) . '</th>';
+            }
+            $html .= '</tr></thead><tbody>';
+            if (!empty($rows)) {
+                foreach ($rows as $row) {
+                    $html .= '<tr>';
+                    foreach (array_values($row) as $value) {
+                        $html .= '<td>' . htmlspecialchars((string)$value) . '</td>';
+                    }
+                    $html .= '</tr>';
+                }
+            } else {
+                $html .= '<tr><td colspan="13" style="text-align:center;">No data found</td></tr>';
+            }
+            $html .= '</tbody></table>';
+
+            $this->load->library('pdf');
+            $this->pdf->generate($html, $filename_base, 'A4', 'landscape');
+            exit;
+        }
+    }
+
+    private function gstperiodlabel($period, $month, $quarter, $year)
+    {
+        if ($period === 'all') {
+            return 'all_time';
+        }
+        if ($period === 'monthly') {
+            return !empty($month) ? date('F_Y', strtotime($month . '-01')) : 'monthly';
+        }
+        if ($period === 'quarterly') {
+            return !empty($quarter) ? str_replace('-', '_', $quarter) : 'quarterly';
+        }
+        if ($period === 'yearly') {
+            return !empty($year) ? 'year_' . $year : 'yearly';
+        }
+        return 'report';
+    }
+
+    private function gststatename($code)
+    {
+        $states = array(
+            '01' => 'Jammu and Kashmir',
+            '02' => 'Himachal Pradesh',
+            '03' => 'Punjab',
+            '04' => 'Chandigarh',
+            '05' => 'Uttarakhand',
+            '06' => 'Haryana',
+            '07' => 'Delhi',
+            '08' => 'Rajasthan',
+            '09' => 'Uttar Pradesh',
+            '10' => 'Bihar',
+            '11' => 'Sikkim',
+            '12' => 'Arunachal Pradesh',
+            '13' => 'Nagaland',
+            '14' => 'Manipur',
+            '15' => 'Mizoram',
+            '16' => 'Tripura',
+            '17' => 'Meghalaya',
+            '18' => 'Assam',
+            '19' => 'West Bengal',
+            '20' => 'Jharkhand',
+            '21' => 'Odisha',
+            '22' => 'Chhattisgarh',
+            '23' => 'Madhya Pradesh',
+            '24' => 'Gujarat',
+            '26' => 'Dadra and Nagar Haveli and Daman and Diu',
+            '27' => 'Maharashtra',
+            '28' => 'Andhra Pradesh',
+            '29' => 'Karnataka',
+            '30' => 'Goa',
+            '31' => 'Lakshadweep',
+            '32' => 'Kerala',
+            '33' => 'Tamil Nadu',
+            '34' => 'Puducherry',
+            '35' => 'Andaman and Nicobar Islands',
+            '36' => 'Telangana',
+            '37' => 'Andhra Pradesh',
+            '38' => 'Ladakh'
+        );
+        return isset($states[$code]) ? $states[$code] : '';
+    }
+
     public function servicecustomers()
     {
         if ($this->session->role != 'admin' && $this->session->role != 'superadmin') {
@@ -873,7 +1199,7 @@ class Reports extends CI_Controller
         for ($i = 0; $i < 5; $i++) {
             $yr = ($current_fy - $i) . ($current_fy - $i + 1);
             $yr_display = ($current_fy - $i) . '-' . substr(($current_fy - $i + 1), -2);
-            $year_options[$yr] = 'AY ' . $yr_display;
+            $year_options[$yr] = 'TY ' . $yr_display;
         }
 
         $data['pending_renewals'] = $pending_renewals;
