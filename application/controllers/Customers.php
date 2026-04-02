@@ -13,7 +13,9 @@ class Customers extends CI_Controller
     /** Staff roles that see the full customer list (no added_by filter). */
     private function staff_sees_all_customers()
     {
-        return in_array($this->session->role, array('admin', 'superadmin', 'ca', 'employee'), true);
+        $role = (string) $this->session->role;
+        $isCa = ($role === 'ca') || preg_match('/^ca[-_]/i', $role) === 1;
+        return in_array($role, array('admin', 'superadmin', 'employee'), true) || $isCa;
     }
 
     public function index()
