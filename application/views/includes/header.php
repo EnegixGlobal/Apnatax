@@ -359,7 +359,6 @@
                                             }
                                         </style>
                                         <!-- NOTIFICATIONS -->
-                                        <?php if ($this->session->role !== 'employee' && $this->session->role !== 'ca') { ?>
                                         <?php
                                         $notifications = getnotifications();
                                         $notification_badge = get_notification_badge_count();
@@ -398,6 +397,12 @@
                                                                 } else {
                                                                     $link = base_url('orders/');
                                                                 }
+                                                            } elseif ($notification['type'] == 'kyc_pending') {
+                                                                if (!empty($notification['order_id'])) {
+                                                                    $link = base_url('customers/kycdetails/' . md5($notification['order_id']));
+                                                                } else {
+                                                                    $link = base_url('customers/');
+                                                                }
                                                             } else {
                                                                 $task_label = isset($notification['task_type']) ? $notification['task_type'] : 'Notification';
                                                                 $text = $task_label . '';
@@ -430,7 +435,6 @@
                                                 </div>
                                             </div>
                                         </div>
-                                        <?php } ?>
                                         <!-- FULL-SCREEN -->
                                         <div class="dropdown d-flex">
                                             <a class="nav-link icon full-screen-link nav-link-bg">

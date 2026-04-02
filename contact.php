@@ -26,15 +26,15 @@ $submit_contact_url = $__dir . '/website/submit_contact';
                         <div class="contact-info-list">
                             <div class="contact-info-item">
                                 <i class="fa-solid fa-phone"></i>
-                                <span>9874563210</span>
+                                <span>+91 91539 92348</span>
                             </div>
                             <div class="contact-info-item">
                                 <i class="fa-solid fa-envelope"></i>
-                                <span>info@apnotax.com</span>
+                                <span>apnotax@gmail.com</span>
                             </div>
                             <div class="contact-info-item">
                                 <i class="fa-solid fa-location-dot"></i>
-                                <span>Near High school stadium Suriya District Giridih Jharkhand 825320</span>
+                                <span>Vigyan Vihar Colony, District: Giridih, Jharkhand, 826004</span>
                             </div>
                         </div>
                     </div>

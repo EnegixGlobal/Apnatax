@@ -10,6 +10,12 @@ class Customers extends CI_Controller
         checklogin();
     }
 
+    /** Staff roles that see the full customer list (no added_by filter). */
+    private function staff_sees_all_customers()
+    {
+        return in_array($this->session->role, array('admin', 'superadmin', 'ca', 'employee'), true);
+    }
+
     public function index()
     {
         $data['title'] = "Customers";
@@ -17,7 +23,7 @@ class Customers extends CI_Controller
         $data['breadcrumb'] = array();
         $data['datatable'] = true;
         $where = array();
-        if ($this->session->role != 'admin' && $this->session->role != 'ca') {
+        if (!$this->staff_sees_all_customers()) {
             $where['md5(t1.added_by)'] = $this->session->user;
         }
         $data['customers'] = $this->customer->getcustomers($where);
@@ -546,7 +552,7 @@ class Customers extends CI_Controller
         $data['breadcrumb'] = array();
         $data['datatable'] = true;
         $where = array();
-        if ($this->session->role != 'admin' && $this->session->role != 'ca') {
+        if (!$this->staff_sees_all_customers()) {
             $where['md5(t1.added_by)'] = $this->session->user;
         }
         $data['customers'] = customer_dropdown($where);
@@ -561,7 +567,7 @@ class Customers extends CI_Controller
         $data['breadcrumb'] = array();
         $data['datatable'] = true;
         $where = array();
-        if ($this->session->role != 'admin' && $this->session->role != 'ca') {
+        if (!$this->staff_sees_all_customers()) {
             $where['md5(t1.added_by)'] = $this->session->user;
         }
         $data['customers'] = customer_dropdown($where);

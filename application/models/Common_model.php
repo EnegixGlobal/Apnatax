@@ -54,6 +54,52 @@ class Common_model extends CI_Model{
     }
 
     /**
+     * Admin header bell: customer submitted KYC for approval (web or app).
+     * user_id is set to a staff account so the row does not appear in customer bell.
+     * order_id stores customers.id (not a purchase id) for linking to kycdetails.
+     */
+    public function notify_admins_kyc_pending_submission($customer_user_id, $firm_id = null)
+    {
+        $customer_user_id = (int) $customer_user_id;
+        if ($customer_user_id < 1) {
+            return;
+        }
+        $admin_row = $this->db->select('id')->from('users')->where_in('role', array('admin', 'superadmin'))->order_by('id', 'asc')->limit(1)->get()->row_array();
+        if (empty($admin_row['id'])) {
+            return;
+        }
+        $admin_user_id = (int) $admin_row['id'];
+
+        $cust = $this->db->select('id, name')->from('customers')->where('user_id', $customer_user_id)->limit(1)->get()->row_array();
+        $customer_table_id = !empty($cust['id']) ? (int) $cust['id'] : 0;
+        $name = !empty($cust['name']) ? $cust['name'] : 'A customer';
+
+        $fid = ($firm_id !== null && $firm_id !== '') ? (int) $firm_id : 0;
+        $firm_part = '';
+        if ($fid > 0) {
+            $f = $this->db->select('name')->from('firms')->where('id', $fid)->limit(1)->get()->row_array();
+            $firm_part = ' — firm: ' . (!empty($f['name']) ? $f['name'] : ('#' . $fid));
+        } else {
+            $firm_part = ' — general KYC';
+        }
+
+        $msg = $name . ' submitted KYC for approval' . $firm_part . '.';
+
+        $payload = array(
+            'user_id'      => $admin_user_id,
+            'type'         => 'kyc_pending',
+            'message'      => $msg,
+            'admin_status' => 0,
+            'user_status'  => 0,
+        );
+        if ($customer_table_id > 0) {
+            $payload['order_id'] = $customer_table_id;
+        }
+
+        $this->savenotification($payload, false);
+    }
+
+    /**
      * Short title for FCM (and mobile tray).
      */
     public function notification_title_for_type($type)
@@ -65,6 +111,7 @@ class Common_model extends CI_Model{
             'Documents Uploaded'  => 'Documents',
             'payment'             => 'Payment',
             'kyc'                 => 'KYC',
+            'kyc_pending'         => 'KYC pending',
             'invoice'             => 'Invoice',
             'package'             => 'Package',
             'Service Renewed'     => 'Subscription',

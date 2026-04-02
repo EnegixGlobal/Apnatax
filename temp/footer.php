@@ -47,7 +47,7 @@
                         <ul class="footer-contact-list">
                            <li>+91 91539 92348</li>
                            <li>apnotax@gmail.com </li>
-                           <li>Near High school stadium Suriya District Giridih Jharkhand 825320</li>
+                           <li>Vigyan Vihar Colony, District: Giridih, Jharkhand, 826004</li>
                         </ul>
                      </div>
                   </div>
