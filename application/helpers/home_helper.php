@@ -36,7 +36,9 @@ if (!function_exists('countcustomers')) {
             $user = $CI->session->user;
         }
         $where = array();
-        if (!in_array($CI->session->role, array('ca', 'admin'), true)) {
+        $role = (string) $CI->session->role;
+        $isCa = ($role === 'ca') || preg_match('/^ca[-_]/i', $role) === 1;
+        if (!($isCa || $role === 'admin')) {
             $where["md5(added_by)"] = $user;
         }
         $count = $CI->db->get_where('customers', $where)->num_rows();
