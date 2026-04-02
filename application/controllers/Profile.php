@@ -332,6 +332,7 @@ class Profile extends CI_Controller
                 if ($status) {
                     $result = $this->account->savekyc($kyc_data);
                     if ($result['status'] === true) {
+                        $this->common->notify_admins_kyc_pending_submission($user['id'], $firm_id);
                         $this->session->set_flashdata("msg", "KYC submitted successfully and is pending admin approval.");
                     } else {
                         $this->session->set_flashdata("err_msg", $result['message']);

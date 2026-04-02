@@ -39,14 +39,14 @@ if ($basePath === '.' || $basePath === '' || $basePath === '/') {
                   <li>
                      <div class="top-icon">
                         <i class="fa fa-phone" aria-hidden="true"></i>
-                        <span>91 9876543210</span>
+                        <span>+91 91539 92348</span>
                      </div>
                   </li>
                   <li>|</li>
                   <li>
                      <div class="top-icon">
                         <i class="fa fa-envelope" aria-hidden="true"></i>
-                        <span>abc@gmail.com</span>
+                        <span>apnotax@gmail.com</span>
                      </div>
                   </li>
                </ul>

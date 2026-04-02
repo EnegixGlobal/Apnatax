@@ -310,6 +310,7 @@ class Profile extends RestController
                                 'type' => 'kyc',
                                 'message' => 'Your KYC documents were submitted successfully. Verification may take some time.',
                             ));
+                            $this->common->notify_admins_kyc_pending_submission((int) $user['id'], !empty($firm_id) ? (int) $firm_id : null);
                             $this->response([
                                 'status' => true,
                                 'message' => 'KYC submitted successfully and is pending admin approval.'
