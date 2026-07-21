@@ -341,6 +341,36 @@ class Package extends CI_Controller
                 }
             }
         }
+
+        // ── Append to existing package if one exists ───────────────────────
+        $existing_pkg = $this->db->get_where('service_packages', [
+            'user_id'      => $user['id'],
+            'firm_id'      => $firm_id,
+            'year'         => $year,
+            'package_type' => $package_type
+        ])->unbuffered_row('array');
+
+        if (!empty($existing_pkg)) {
+            $existing_sids = !empty($existing_pkg['service_ids']) ? array_filter(array_map('trim', explode(',', $existing_pkg['service_ids']))) : [];
+            $existing_opts = !empty($existing_pkg['service_option_ids']) ? json_decode($existing_pkg['service_option_ids'], true) : [];
+            if (!is_array($existing_opts)) {
+                $existing_opts = [];
+            }
+            
+            // Merge IDs
+            $service_id = array_unique(array_merge($existing_sids, $service_id));
+            $s_ids_str  = implode(',', $service_id);
+            
+            // Merge options
+            foreach ($service_option_ids as $sid => $opt_id) {
+                $existing_opts[$sid] = $opt_id;
+            }
+            $service_option_ids = $existing_opts;
+            
+            // Reload services to calculate the combined bill amount
+            $services = $this->master->getservices("status='1' AND id IN (" . $s_ids_str . ")");
+        }
+
         $service_option_ids_json = !empty($service_option_ids) ? json_encode($service_option_ids) : null;
 
         // ── Calculate bill amount & expiry ─────────────────────────────────
