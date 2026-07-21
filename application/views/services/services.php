@@ -254,15 +254,20 @@
                             $('#type-form').removeClass('d-none');
                             $('#package-form').addClass('d-none');
                             $('#service-options-form').addClass('d-none');
+                            var wallet_balance = <?= isset($wallet_balance) ? (float)$wallet_balance : 0 ?>;
                             var type = $(this).data('types');
                             if (type == '') {
 
                             } else if (type.search(',') == -1) {
                                 var escapedType = $('<div>').text(type).html();
-                                $('#type').html('<option value="">Select Type</option><option value="' + escapedType + '">' + escapedType + '</option>');
-                                $('#type').val(type);
+                                var optionsHtml = '<option value="">Select Type</option><option value="' + escapedType + '">' + escapedType + '</option>';
+                                if (wallet_balance <= 0) {
+                                    optionsHtml += '<option value="Credit limit">Credit limit</option>';
+                                }
+                                $('#type').html(optionsHtml);
+                                // Do not auto-select if we want them to see both options, but let's select empty string so they have to choose
+                                $('#type').val('');
                                 myModal.show();
-                                $('#type').trigger('change');
                                 return false;
                             } else {
                                 // Multiple types - show dropdown
@@ -271,6 +276,9 @@
                                 for (let i = 0; i < types.length; i++) {
                                     var escapedType = $('<div>').text(types[i].trim()).html();
                                     options += '<option value="' + escapedType + '">' + escapedType + '</option>';
+                                }
+                                if (wallet_balance <= 0) {
+                                    options += '<option value="Credit limit">Credit limit</option>';
                                 }
                                 $('#type').html(options);
 

@@ -73,6 +73,22 @@ if ($this->session->role == 'admin') {
                 </div>
             </a>
         </div>
+        <div class="col-md-3 mt-4 mt-md-0 mb-4">
+            <a href="<?= base_url('creditlimit/'); ?>">
+                <div class="card bg-warning img-card box-primary-shadow">
+                    <div class="card-body">
+                        <div class="d-flex">
+                            <div class="text-white">
+                                <h2>₹<?= isset($available_credit_limit) ? number_format($available_credit_limit, 2) : '0.00'; ?></h2>
+                                <p class="text-white mb-0">Credit Limit </p>
+                            </div>
+                            <div class="ms-auto card-icon">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </a>
+        </div>
         <div class="col-md-3">
             <a href="<?= base_url('profile/kyc/'); ?>">
                 <div class="card bg-success img-card box-primary-shadow">

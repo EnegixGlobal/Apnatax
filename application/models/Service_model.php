@@ -41,11 +41,13 @@ class Service_model extends CI_Model
                 $parent_id = $parent_id === NULL ? $order_id : $parent_id;
 
                 $amt = isset($single['amount']) ? (float) $single['amount'] : 0;
+                $is_credit = isset($single['type']) && $single['type'] === 'Credit limit';
+                $debit_source = $is_credit ? 'Credit Limit' : 'wallet';
                 $notifydata = array(
                     "type" => "order",
                     "user_id" => $single['user_id'],
                     'order_id' => $order_id,
-                    'message' => 'Your order for "' . $service_name . '" is placed. ₹' . number_format($amt, 2) . ' debited from wallet.',
+                    'message' => 'Your order for "' . $service_name . '" is placed. ₹' . number_format($amt, 2) . ' debited from ' . $debit_source . '.',
                     'added_on' => $datetime,
                     'updated_on' => $datetime
                 );
