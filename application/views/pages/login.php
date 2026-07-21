@@ -12,7 +12,7 @@
                         <div class="employee-login-logo">
                             <img src="<?= file_url('assets/images/logo.png'); ?>" alt="Logo" class="employee-logo-img">
                         </div>
-                        <h2 class="employee-login-title">Login</h2>
+                        <h2 class="employee-login-title">Employee Login</h2>
                         <?= form_open('login/validatelogin/','class="employee-login-form"'); ?>
                             <div class="employee-form-group">
                                 <label for="username">Mobile No.</label>

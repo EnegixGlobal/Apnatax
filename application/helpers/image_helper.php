@@ -53,6 +53,23 @@
     }
 	if(!function_exists('create_letter_image')) {
   		function create_letter_image($letter,$color=array(180,112,160)) { 
+			// GD is optional in some PHP/XAMPP installations. Return an SVG avatar
+			// when it is unavailable instead of failing the image request with HTTP 500.
+			if (!function_exists('imagecreatetruecolor')) {
+				$letter = strtoupper(substr((string) $letter, 0, 1));
+				$letter = $letter === '' ? 'P' : $letter;
+				$red = isset($color[0]) ? max(0, min(255, (int) $color[0])) : 180;
+				$green = isset($color[1]) ? max(0, min(255, (int) $color[1])) : 112;
+				$blue = isset($color[2]) ? max(0, min(255, (int) $color[2])) : 160;
+
+				header('Content-Type: image/svg+xml; charset=UTF-8');
+				echo '<svg xmlns="http://www.w3.org/2000/svg" width="250" height="250" viewBox="0 0 250 250" role="img" aria-label="Profile initial">';
+				echo '<rect width="250" height="250" fill="rgb(' . $red . ',' . $green . ',' . $blue . ')"/>';
+				echo '<text x="125" y="125" fill="#fff" font-family="Arial, sans-serif" font-size="100" font-weight="400" text-anchor="middle" dominant-baseline="central">' . htmlspecialchars($letter, ENT_QUOTES, 'UTF-8') . '</text>';
+				echo '</svg>';
+				return;
+			}
+
             // Create a blank image with a white background
             $width = 250;
             $height = 250;

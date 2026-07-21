@@ -24,8 +24,11 @@ date_default_timezone_set('Asia/Kolkata');
 | a PHP script and you can easily do that on your own.
 |
 */
-if(isset($_SERVER['HTTP_HOST']) && $_SERVER['HTTP_HOST']=='localhost'){
-    $config['base_url'] = 'http://localhost/soratax/';
+if (isset($_SERVER['HTTP_HOST']) && preg_match('/^(localhost|127\.0\.0\.1)(:\d+)?$/', $_SERVER['HTTP_HOST'])) {
+    // Keep local URLs aligned with the directory Apache is serving this app from.
+    $script_path = isset($_SERVER['SCRIPT_NAME']) ? dirname($_SERVER['SCRIPT_NAME']) : '';
+    $script_path = rtrim(str_replace('\\', '/', $script_path), '/');
+    $config['base_url'] = 'http://' . $_SERVER['HTTP_HOST'] . ($script_path === '' || $script_path === '.' ? '/' : $script_path . '/');
 }
 else{
     $config['base_url'] = "https://$_SERVER[HTTP_HOST]/";
