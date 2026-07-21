@@ -100,6 +100,9 @@
                         </li>
                     <?php } ?>
                     <li class="slide">
+                         <a class="side-menu__item <?= activate_menu('creditlimit'); ?>" data-bs-toggle="slide" href="<?= base_url('creditlimit'); ?>"><i class="side-menu__icon fa fa-credit-card"></i><span class="side-menu__label">Credit Limit</span></a>
+                    </li>
+                    <li class="slide">
                         <a class="side-menu__item <?= activate_menu('chat'); ?>" data-bs-toggle="slide" href="<?= base_url('chat/'); ?>"><i class="side-menu__icon fa fa-comments"></i><span class="side-menu__label">Chat</span></a>
                     </li>
                 <?php } elseif ($this->session->role == 'customer') {
@@ -151,6 +154,9 @@
                             </li><?php */ ?>
                     <li class="slide">
                         <a class="side-menu__item <?= activate_menu('wallet/mywallet'); ?>" data-bs-toggle="slide" href="<?= base_url('mywallet/'); ?>"><i class="side-menu__icon fa fa-money"></i><span class="side-menu__label">Wallet</span></a>
+                    </li>
+                    <li class="slide">
+                         <a class="side-menu__item <?= activate_menu('creditlimit'); ?>" data-bs-toggle="slide" href="<?= base_url('creditlimit'); ?>"><i class="side-menu__icon fa fa-credit-card"></i><span class="side-menu__label">Credit Limit</span></a>
                     </li>
                     <?php
                     if (checkaccountancy(getuser(), $this->session->firm)) {
@@ -287,6 +293,9 @@
                                 <li><a href="<?= base_url('wallet/'); ?>" class="slide-item <?= activate_menu('wallet'); ?>"> My Earnings</a></li>
                                 <li><a href="<?= base_url('wallet/mypayments/'); ?>" class="slide-item <?= activate_menu('wallet/mypayments'); ?>"> My Payments</a></li>
                             </ul>
+                        </li>
+                        <li class="slide">
+                            <a class="side-menu__item <?= activate_menu('creditlimit'); ?>" data-bs-toggle="slide" href="<?= base_url('creditlimit'); ?>"><i class="side-menu__icon fa fa-credit-card"></i><span class="side-menu__label">Credit Limit</span></a>
                         </li>
                         <li class="slide">
                             <a class="side-menu__item <?= activate_menu('chat'); ?>" data-bs-toggle="slide" href="<?= '#';

@@ -85,6 +85,15 @@ if ($form == 'add') {
                     ?>
                 </div>
             </div>
+            <div class="col-md-4">
+                <div class="form-group">
+                    <?php
+                    $credit_limit = !empty($customer['credit_limit']) ? $customer['credit_limit'] : '0.00';
+                    $attributes = array("id" => "credit_limit", "Placeholder" => "Credit Limit (₹)", "autocomplete" => "off", "type" => "number", "step" => "0.01", "min" => "0");
+                    echo create_form_input("text", "credit_limit", "Credit Limit (₹)", false, $credit_limit, $attributes);
+                    ?>
+                </div>
+            </div>
             <?php /* GST Configuration - Now handled via bulk toggle in customers list
                                             <div class="col-md-4">
                                                 <div class="form-group">
