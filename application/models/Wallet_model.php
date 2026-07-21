@@ -62,7 +62,7 @@ class Wallet_model extends CI_Model{
         $balance+=$wallet;
         
         $this->db->select_sum('amount');
-        $this->db->where(['user_id'=>$user_id]);
+        $this->db->where(['user_id'=>$user_id, 'type !=' => 'Credit limit']);
         $purchases=$this->db->get("purchases")->unbuffered_row()->amount;
         $purchases=!empty($purchases)?$purchases:0;
         $balance-=$purchases;

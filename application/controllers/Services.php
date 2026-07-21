@@ -118,6 +118,7 @@ class Services extends CI_Controller
 
         $data['services'] = $services;
         $data['package_service_ids'] = $package_service_ids;
+        $data['wallet_balance'] = $this->wallet->getwalletbalance($user['id']);
         $data['datatable'] = true;
         $this->template->load('services', 'services', $data);
     }
@@ -1573,7 +1574,7 @@ class Services extends CI_Controller
                         $this->session->set_flashdata("err_msg", $message);
                     }
                     return false;
-                } elseif (!$has_service_options && !in_array($type, $types)) {
+                } elseif (!$has_service_options && !in_array($type, $types) && $type !== 'Credit limit') {
                     $status = false;
                     $message = $type . " option not available for " . $service['name'];
                 } elseif ($has_service_options && !empty($service_option)) {
@@ -1809,7 +1810,21 @@ class Services extends CI_Controller
                         $single['service_option'] = $service_option;
                         $single['service_option_display'] = $selected_option_display;
                     }
-                    $balance = $this->wallet->getwalletbalance($user['id']);
+                    $is_credit_limit = ($type === 'Credit limit');
+                    
+                    if ($is_credit_limit) {
+                        $customer = $this->db->get_where('customers', ['user_id' => $user['id']])->unbuffered_row('array');
+                        $total_credit_limit = !empty($customer['credit_limit']) ? (float)$customer['credit_limit'] : 0.00;
+                        
+                        $this->db->select_sum('amount');
+                        $this->db->where(['user_id' => $user['id'], 'type' => 'Credit limit']);
+                        $used_credit = $this->db->get("purchases")->unbuffered_row()->amount;
+                        $used_credit = !empty($used_credit) ? (float)$used_credit : 0;
+                        
+                        $balance = $total_credit_limit - $used_credit;
+                    } else {
+                        $balance = $this->wallet->getwalletbalance($user['id']);
+                    }
 
                     if ($balance >= $total) {
                         $data = array($single);
@@ -1848,10 +1863,15 @@ class Services extends CI_Controller
                             $this->session->set_flashdata("err_msg", $result['message']);
                         }
                     } else {
-                        $remaining = $total - $balance;
-                        $this->session->set_userdata('tobuy', true);
-                        $this->session->set_flashdata("remaining", $remaining);
-                        $url = base_url('mywallet/');
+                        if ($is_credit_limit) {
+                            $this->session->set_flashdata("err_msg", "Insufficient Credit Limit. You need ₹" . number_format($total - $balance, 2) . " more.");
+                            $url = '';
+                        } else {
+                            $remaining = $total - $balance;
+                            $this->session->set_userdata('tobuy', true);
+                            $this->session->set_flashdata("remaining", $remaining);
+                            $url = base_url('mywallet/');
+                        }
                     }
                 } else {
                     $this->session->set_flashdata("err_msg", $message);

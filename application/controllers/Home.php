@@ -16,6 +16,7 @@ class Home extends CI_Controller
     public function index()
     {
         $this->triggerautodebit();
+        $this->triggercreditpayment();
         checklogin();
         $this->employee->generatecommission();
         $data = ['title' => 'Dashboard'];
@@ -25,6 +26,19 @@ class Home extends CI_Controller
         if ($this->session->role == 'customer') {
             $user = getuser();
             $data['user'] = $user;
+            
+            $customer = $this->db->get_where('customers', ['user_id' => $user['id']])->unbuffered_row('array');
+            $credit_limit = !empty($customer['credit_limit']) ? (float)$customer['credit_limit'] : 0.00;
+            
+            $this->db->select_sum('amount');
+            $this->db->where(['user_id' => $user['id'], 'type' => 'Credit limit']);
+            $used_credit = $this->db->get("purchases")->unbuffered_row()->amount;
+            $used_credit = !empty($used_credit) ? (float)$used_credit : 0.00;
+            
+            $available_limit = $credit_limit - $used_credit;
+            if ($available_limit < 0) $available_limit = 0;
+            
+            $data['available_credit_limit'] = $available_limit;
         } elseif ($this->session->role != 'admin') {
             $user = getuser();
             $data['balances'] = $this->employee->getemployeebalance($user['emp_id']);
@@ -1157,5 +1171,35 @@ class Home extends CI_Controller
     {
         $this->load->library('alldata');
         $this->alldata->updatedata();
+    }
+    public function triggercreditpayment()
+    {
+        // Auto deduct from wallet on the 6th or later of the month
+        if (date('d') >= 6) {
+            $first_day_of_month = date('Y-m-01 00:00:00');
+            
+            $this->db->where('type', 'Credit limit');
+            $this->db->where('added_on <', $first_day_of_month);
+            $purchases = $this->db->get('purchases')->result_array();
+            
+            if (!empty($purchases)) {
+                foreach ($purchases as $p) {
+                    // Update type so it gets picked up by wallet calculation (deducting from wallet)
+                    // and won't be processed again next time
+                    $this->db->update('purchases', ['type' => 'Credit limit Paid'], ['id' => $p['id']]);
+                    
+                    // Add notification
+                    $amount = number_format($p['amount'], 2);
+                    $this->common->savenotification(array(
+                        "type" => "credit_payment",
+                        "user_id" => $p['user_id'],
+                        'order_id' => $p['id'],
+                        'message' => '₹' . $amount . ' automatically deducted from your wallet for Credit Limit usage on ' . date('d M Y', strtotime($p['added_on'])) . '.',
+                        'added_on' => date('Y-m-d H:i:s'),
+                        'updated_on' => date('Y-m-d H:i:s')
+                    ));
+                }
+            }
+        }
     }
 }

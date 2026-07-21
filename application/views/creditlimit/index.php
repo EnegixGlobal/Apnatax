@@ -4,7 +4,7 @@
             <div class="card-body">
                 <div class="d-flex">
                     <div class="text-white">
-                        <h2 class="mb-0 number-font">₹ <?= number_format($credit_limit, 2) ?></h2>
+                        <h2 class="mb-0 number-font">₹ <?= number_format($available_limit, 2) ?></h2>
                         <p class="text-white mb-0">Available Credit Limit</p>
                     </div>
                     <div class="ms-auto"> <i class="fa fa-credit-card text-white fs-30 me-2 mt-2"></i> </div>
@@ -20,10 +20,21 @@
             </div>
             <div class="card-body">
                 <p>Welcome to your Credit Limit dashboard. Your admin has assigned you a credit limit which allows you to purchase services seamlessly up to the available amount.</p>
-                <ul>
-                    <li><strong>Total Credit Limit:</strong> ₹ <?= number_format($credit_limit, 2) ?></li>
+                <ul class="list-group mb-4">
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <strong>Total Credit Limit:</strong> 
+                        <span>₹ <?= number_format($credit_limit, 2) ?></span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <strong>Used Credit Limit:</strong> 
+                        <span class="text-danger">₹ <?= number_format($used_credit, 2) ?></span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <strong>Available Limit:</strong> 
+                        <span class="text-success fw-bold">₹ <?= number_format($available_limit, 2) ?></span>
+                    </li>
                 </ul>
-                <?php if ($credit_limit > 0): ?>
+                <?php if ($available_limit > 0): ?>
                     <div class="alert alert-success mt-4">
                         <i class="fa fa-check-circle-o"></i> Your credit line is active!
                     </div>
