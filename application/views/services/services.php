@@ -74,7 +74,7 @@
                                 </div>
                                 <div class="row mt-3">
                                     <div class="col-12">
-                                        <?= create_form_input('select', 'payment_method', 'Payment Method', false, '', ['id' => 'payment_method'], ['Wallet' => 'Wallet', 'Credit Limit' => 'Credit Limit']); ?>
+                                        <?= create_form_input('select', 'payment_method', 'Payment Method', false, '', ['id' => 'payment_method'], ['' => 'Select Method', 'Wallet' => 'Wallet', 'Credit Limit' => 'Credit Limit']); ?>
                                     </div>
                                 </div>
                                 <div class="row mt-3" id="period-selection-row" style="display: none;">
@@ -164,6 +164,7 @@
                                         <div class="form-group mb-3 mt-3">
                                             <label>Payment Method:</label>
                                             <select name="payment_method_option" id="payment_method_option" class="form-control">
+                                                <option value="">Select Method</option>
                                                 <option value="Wallet">Wallet</option>
                                                 <option value="Credit Limit">Credit Limit</option>
                                             </select>
@@ -311,6 +312,11 @@
                             var selectedOption = $('#service_option').val();
                             if (selectedOption == '') {
                                 alert('Please select an option!');
+                                return false;
+                            }
+                            
+                            if ($('#payment_method_option').val() == '') {
+                                alert('Select Payment Method!');
                                 return false;
                             }
 
@@ -473,6 +479,11 @@
                         $('body').on('click', '#purchase', function() {
                             if ($('#type').val() == '') {
                                 alert('Select type!');
+                                return false;
+                            }
+                            
+                            if ($('#payment_method').val() == '') {
+                                alert('Select Payment Method!');
                                 return false;
                             }
 
