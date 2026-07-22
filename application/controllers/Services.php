@@ -1348,6 +1348,7 @@ class Services extends CI_Controller
         $service_id = $this->input->post('id');
         $package_id = $this->input->post('package_id');
         $type = $this->input->post('type');
+        $payment_method = $this->input->post('payment_method');
         $amount = $this->input->post('amount');
         $service_option = $this->input->post('service_option'); // Generic parameter for all services with options
         $period_value = $this->input->post('period_value'); // Period value for Monthly/Quarterly/Yearly
@@ -1574,7 +1575,7 @@ class Services extends CI_Controller
                         $this->session->set_flashdata("err_msg", $message);
                     }
                     return false;
-                } elseif (!$has_service_options && !in_array($type, $types) && $type !== 'Credit limit') {
+                } elseif (!$has_service_options && !in_array($type, $types)) {
                     $status = false;
                     $message = $type . " option not available for " . $service['name'];
                 } elseif ($has_service_options && !empty($service_option)) {
@@ -1810,9 +1811,10 @@ class Services extends CI_Controller
                         $single['service_option'] = $service_option;
                         $single['service_option_display'] = $selected_option_display;
                     }
-                    $is_credit_limit = ($type === 'Credit limit');
+                    $is_credit_limit = ($payment_method === 'Credit Limit');
                     
                     if ($is_credit_limit) {
+                        $single['type'] = 'Credit limit'; // Save in DB as Credit limit for Wallet_model and auto-debit
                         $customer = $this->db->get_where('customers', ['user_id' => $user['id']])->unbuffered_row('array');
                         $total_credit_limit = !empty($customer['credit_limit']) ? (float)$customer['credit_limit'] : 0.00;
                         

@@ -72,6 +72,11 @@
                                         <?= create_form_input('select', '', 'Type', false, '', ['id' => 'type'], ['' => 'Select Type']); ?>
                                     </div>
                                 </div>
+                                <div class="row mt-3">
+                                    <div class="col-12">
+                                        <?= create_form_input('select', 'payment_method', 'Payment Method', false, '', ['id' => 'payment_method'], ['Wallet' => 'Wallet', 'Credit Limit' => 'Credit Limit']); ?>
+                                    </div>
+                                </div>
                                 <div class="row mt-3" id="period-selection-row" style="display: none;">
                                     <div class="col-12">
                                         <div class="form-group">
@@ -155,6 +160,13 @@
                                         </div>
                                         <div class="alert alert-info" id="service_option_amount_display" style="display: none;">
                                             <strong>Amount: ₹<span id="service_option_amount">0</span></strong>
+                                        </div>
+                                        <div class="form-group mb-3 mt-3">
+                                            <label>Payment Method:</label>
+                                            <select name="payment_method_option" id="payment_method_option" class="form-control">
+                                                <option value="Wallet">Wallet</option>
+                                                <option value="Credit Limit">Credit Limit</option>
+                                            </select>
                                         </div>
                                     </div>
                                 </div>
@@ -261,9 +273,6 @@
                             } else if (type.search(',') == -1) {
                                 var escapedType = $('<div>').text(type).html();
                                 var optionsHtml = '<option value="">Select Type</option><option value="' + escapedType + '">' + escapedType + '</option>';
-                                if (wallet_balance <= 0) {
-                                    optionsHtml += '<option value="Credit limit">Credit limit</option>';
-                                }
                                 $('#type').html(optionsHtml);
                                 // Do not auto-select if we want them to see both options, but let's select empty string so they have to choose
                                 $('#type').val('');
@@ -276,9 +285,6 @@
                                 for (let i = 0; i < types.length; i++) {
                                     var escapedType = $('<div>').text(types[i].trim()).html();
                                     options += '<option value="' + escapedType + '">' + escapedType + '</option>';
-                                }
-                                if (wallet_balance <= 0) {
-                                    options += '<option value="Credit limit">Credit limit</option>';
                                 }
                                 $('#type').html(options);
 
@@ -359,6 +365,7 @@
                                 data: {
                                     id: id,
                                     type: 'Yearly', // Default type for services with options
+                                    payment_method: $('#payment_method_option').val(),
                                     amount: amount,
                                     package_id: '',
                                     service_option: selectedOption,
@@ -530,6 +537,7 @@
                             data: {
                                 id: id,
                                 type: $('#type').val(),
+                                payment_method: $('#payment_method').val(),
                                 amount: amount,
                                 package_id: package_id,
                                 period_value: period_value
