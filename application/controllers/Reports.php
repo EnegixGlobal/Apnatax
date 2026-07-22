@@ -193,6 +193,51 @@ class Reports extends CI_Controller
         $years = getyearmonthvalues($year);
         $where = array('t1.user_id' => $user['id'], 't1.firm_id' => $firm_id, 't1.date>=' => $years['year1'] . '-04-01', 't1.date<=' => $years['year2'] . '-03-31');
         $purchases = $this->service->getpurchases($where);
+        
+        // Add Monthly Account Work packages to purchases array for display
+        $this->db->select('id, user_id, firm_id, year, purchase_date as date, bill_amount, amount as base_amount, added_on, status');
+        $this->db->where([
+            'user_id' => $user['id'], 
+            'firm_id' => $firm_id,
+            'package_type' => 'Monthly',
+            'year' => $year
+        ]);
+        $monthly_packages = $this->db->get('customer_packages')->result_array();
+        
+        if (!empty($monthly_packages)) {
+            if (empty($purchases)) $purchases = [];
+            foreach ($monthly_packages as $mp) {
+                $bill_amount = (float)$mp['bill_amount'];
+                $base_amount = (float)$mp['base_amount'];
+                $months_covered = 1;
+                
+                if ($base_amount > 0) {
+                    $months_covered = round($bill_amount / $base_amount);
+                }
+                
+                // Limit to max 12 months just in case
+                if ($months_covered > 12) $months_covered = 12;
+                
+                // Distribute the amount across the elapsed months starting from April
+                for ($m = 0; $m < $months_covered; $m++) {
+                    $month_num = 4 + $m;
+                    $calc_year = $years['year1'];
+                    
+                    if ($month_num > 12) {
+                        $month_num -= 12;
+                        $calc_year = $years['year2'];
+                    }
+                    
+                    $entry = $mp;
+                    $entry['amount'] = $base_amount;
+                    $entry['date'] = sprintf('%04d-%02d-01', $calc_year, $month_num);
+                    $entry['service_id'] = '1'; // Ensure it's a string to match DB type
+                    $entry['service'] = 'Account Work Monthly';
+                    
+                    $purchases[] = $entry;
+                }
+            }
+        }
         $services = $this->master->getservices();
         $report = array();
         $row = array('service' => 'Service');
