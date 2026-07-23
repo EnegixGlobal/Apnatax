@@ -198,6 +198,12 @@ class Orders extends CI_Controller
             redirect('orders/');
             exit;
         }
+        
+        if (isset($order['status']) && $order['status'] == 0) {
+            $this->session->set_flashdata('err_msg', 'This service is pending renewal. Work cannot be done until it is renewed.');
+            redirect('orders/');
+            return;
+        }
         $service_id = $order['service_id'];
         $user = getuser();
         $data = array(
@@ -236,6 +242,16 @@ class Orders extends CI_Controller
         if ($this->input->post('assignemployee') !== NULL) {
             $data = $this->input->post();
             $user = getuser();
+            
+            // Check if order is pending
+            $order_id = $data['order_id'];
+            $order = $this->service->getpurchases(['t1.id' => $order_id], 'single');
+            if (!empty($order) && isset($order['status']) && $order['status'] == 0) {
+                $this->session->set_flashdata('err_msg', 'This service is pending renewal. Work cannot be done until it is renewed.');
+                redirect('orders/');
+                return;
+            }
+            
             $data['done_by'] = $user['id'];
             unset($data['assignemployee']);
             $data['added_on'] = $data['updated_on'] = date('Y-m-d H:i:s');
@@ -272,6 +288,11 @@ class Orders extends CI_Controller
             $allowed_types = 'pdf|xlsx|doc|docx';
             if (isset($_FILES['file']['tmp_name'])) {
                 $order = $this->service->getpurchases(['t1.id' => $data['order_id']], 'single');
+                if (!empty($order) && isset($order['status']) && $order['status'] == 0) {
+                    $this->session->set_flashdata('err_msg', 'This service is pending renewal. Work cannot be done until it is renewed.');
+                    redirect('orders/viewdocuments/' . md5($data['order_id']));
+                    return;
+                }
                 $filename = $order['name'] . '-' . $order['service_name'] . '-assessment';
                 $upload = upload_file('file', $upload_path, $allowed_types, $filename);
                 if ($upload['status'] === true) {
@@ -309,6 +330,12 @@ class Orders extends CI_Controller
         if (empty($order)) {
             $this->session->set_flashdata('err_msg', 'Order not found!');
             redirect('orders/');
+            return;
+        }
+
+        if (isset($order['status']) && $order['status'] == 0) {
+            $this->session->set_flashdata('err_msg', 'This service is pending renewal. Work cannot be done until it is renewed.');
+            redirect('orders/viewdocuments/' . md5($order['id']));
             return;
         }
 
