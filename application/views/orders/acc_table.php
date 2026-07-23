@@ -112,7 +112,7 @@
                         <?= $this->amount->toDecimal($balance, false); ?>
                     </td>
                     <td>
-                        <?= $single['due_date'] != '' ? date('d-m-Y', strtotime($single['due_date'])) : '--'; ?>
+                        <?= $single['due_date'] != '' ? date('d-m-Y F', strtotime($single['due_date'])) : '--'; ?>
                     </td>
                     <td><?= $days; ?></td>
                     <?php if ($paid == 0) { ?>

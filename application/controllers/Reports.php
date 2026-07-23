@@ -130,7 +130,7 @@ class Reports extends CI_Controller
                     $total_fees += $acc_fees;
                     $total_paid += $paid;
                     $month = $single['date'] != '' ? date('F-y', strtotime($single['date'])) : '--';
-                    $due_date = $single['due_date'] != '' ? date('d-m-Y', strtotime($single['due_date'])) : '--';
+                    $due_date = $single['due_date'] != '' ? date('d-m-Y F', strtotime($single['due_date'])) : '--';
                     $row = array(
                         'month' => $month,
                         'outstanding' => round($outstanding, 2),
