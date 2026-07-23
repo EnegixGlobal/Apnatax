@@ -1352,6 +1352,7 @@ class Services extends CI_Controller
         $amount = $this->input->post('amount');
         $service_option = $this->input->post('service_option'); // Generic parameter for all services with options
         $period_value = $this->input->post('period_value'); // Period value for Monthly/Quarterly/Yearly
+        $month_val = $this->input->post('month'); // Selected month for Monthly Account Work
         $where = array('t1.id' => $firm_id, "t1.user_id" => $user['id']);
         $firm = $this->customer->getfirms($where, 'single');
         if (!empty($firm)) {
@@ -1506,9 +1507,21 @@ class Services extends CI_Controller
                                 // Fallback: if no debit_date, use purchase_date + 1 month
                                 $expiry_date = date('Y-m-d', strtotime('+1 month', strtotime($purchase_date)));
                             }
-                            // For Monthly type, store the entered amount as-is (without GST)
-                            // GST will be calculated only at renewal/payment time
+                            // For Monthly type, calculate amount based on elapsed months in financial year
                             $bill_amount = (float)$amount;
+                            if (!empty($month_val)) {
+                                $month_int = (int)$month_val;
+                                // Financial year starts in April (4)
+                                // If month is 4 (April), elapsed = 1
+                                // If month is 7 (July), elapsed = 4
+                                // If month is 1 (January), elapsed = 10
+                                if ($month_int >= 4) {
+                                    $multiplier = $month_int - 3;
+                                } else {
+                                    $multiplier = $month_int + 9;
+                                }
+                                $bill_amount = $bill_amount * $multiplier;
+                            }
                         } else {
                             // Turnover/Yearly: expiry = next year's debit_date or +1 year
                             $debit_date = !empty($service['debit_date']) ? $service['debit_date'] : null;

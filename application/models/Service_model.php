@@ -493,7 +493,8 @@ class Service_model extends CI_Model
         $sql = "SELECT
                 DATE_FORMAT(t1.date, '%Y-%m') AS month,
                 t1.*,
-                COALESCE(SUM(t2.amount), 0) AS paid
+                COALESCE(SUM(t2.amount), 0) AS paid,
+                MAX(t2.added_on) AS payment_date
             FROM
                 {$accountancy_table} t1
             LEFT JOIN

@@ -11,7 +11,7 @@
             <th>Balance</th>
             <th>Due date</th>
             <th>Delay in Days</th>
-            <th>Action</th>
+            <th>Review</th>
         </tr>
     </thead>
     <tbody>
@@ -24,7 +24,7 @@
         if (!empty($accountancy)) {
             $total_fees = $total_other = $total_paid = $total_penalty = 0;
             $total_days = 0;
-            $outstanding = $total = 0;
+            $outstanding = $total = $balance = 0;
             $total_turnover *= $this->multiplier;
             $fees = $total_turnover / $package['turnover'];
             $fees *= $package['rate'];
@@ -37,7 +37,7 @@
             foreach ($accountancy as $single) {
                 $days = $paid = $penalty = 0;
                 $paid = !empty($single['paid']) ? $single['paid'] : 0;
-                $outstanding = $total;
+                $outstanding = $balance;
                 if ($single['date'] != '') {
                     $acc_fees = $fees / $count;
                 } else {
@@ -66,6 +66,10 @@
                     $total_days += $days;
                 } else {
                     $balance -= $paid;
+                }
+                // Ensure balance doesn't go negative
+                if ($balance < 0) {
+                    $balance = 0;
                 }
                 $total = $balance + $penalty;
                 $total_fees += $acc_fees;
@@ -112,7 +116,7 @@
                         <?= $this->amount->toDecimal($balance, false); ?>
                     </td>
                     <td>
-                        <?= $single['due_date'] != '' ? date('d-m-Y', strtotime($single['due_date'])) : '--'; ?>
+                        <?= $single['due_date'] != '' ? date('d-m-Y F', strtotime($single['due_date'])) : '--'; ?>
                     </td>
                     <td><?= $days; ?></td>
                     <?php if ($paid == 0) { ?>

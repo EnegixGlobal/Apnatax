@@ -65,8 +65,12 @@
             $customers=$CI->customer->getcustomers($where);
             if(!empty($customers)){
                 foreach($customers as $customer){
-                    if($id){ $options[$customer['id']]=$customer['name']; }
-                    else{ $options[$customer['user_id']]=$customer['name']; }
+                    $package_suffix = '';
+                    if (!empty($customer['package_type'])) {
+                        $package_suffix = ' (' . strtolower($customer['package_type']) . ')';
+                    }
+                    if($id){ $options[$customer['id']]=$customer['name'] . $package_suffix; }
+                    else{ $options[$customer['user_id']]=$customer['name'] . $package_suffix; }
                 }
             }
             return $options;

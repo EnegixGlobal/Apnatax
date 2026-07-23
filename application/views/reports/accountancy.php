@@ -38,6 +38,8 @@ if ($this->session->flashdata('year') !== NULL) {
                             <th>Balance</th>
                             <th>Due date</th>
                             <th>Delay in Days</th>
+                            <th>Auto Debit Status</th>
+                            <th>Action / Date</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -150,9 +152,16 @@ if ($this->session->flashdata('year') !== NULL) {
                                         <?= $this->amount->toDecimal($balance, false); ?>
                                     </td>
                                     <td>
-                                        <?= $single['due_date'] != '' ? date('d-m-Y', strtotime($single['due_date'])) : '--'; ?>
+                                        <?= $single['due_date'] != '' ? date('d-m-Y F', strtotime($single['due_date'])) : '--'; ?>
                                     </td>
                                     <td><?= $days; ?></td>
+                                    <td class="text-center">
+                                        <?php if (($single['auto_debit_status'] ?? 'Pending') == 'Confirmed') { ?>
+                                            <span class="badge bg-success">Confirmed</span>
+                                        <?php } else { ?>
+                                            <span class="badge bg-warning text-dark">Pending</span>
+                                        <?php } ?>
+                                    </td>
                                     <?php if ($paid == 0) { ?>
                                         <td>
                                             <button type="button" class="btn btn-sm btn-info edit-btn" value="<?= $single['id']; ?>"><i class="fa fa-edit"></i></button>
@@ -160,8 +169,8 @@ if ($this->session->flashdata('year') !== NULL) {
                                         </td>
                                     <?php } else {
                                     ?>
-                                        <td class="text-center">
-                                            <i class="fa fa-check-circle text-success" style="font-size: 1.5em;"></i>
+                                        <td class="text-center font-weight-bold text-success">
+                                            <?= !empty($single['payment_date']) ? date('d-m-Y', strtotime($single['payment_date'])) : '<i class="fa fa-check-circle" style="font-size: 1.5em;"></i>' ?>
                                         </td>
                                     <?php
                                     }
@@ -238,6 +247,7 @@ if ($this->session->flashdata('year') !== NULL) {
                                 <th></th>
                                 <th></th>
                                 <th><?= $total_days; ?></th>
+                                <th></th>
                                 <th>
                                     <?php if ($total_balance > 0) { ?>
                                         <a href="<?= base_url('reports/payment/'); ?>" class="btn btn-sm btn-success">

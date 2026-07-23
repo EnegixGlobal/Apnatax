@@ -3,6 +3,8 @@ defined('BASEPATH') or exit('No direct script access allowed');
 
 class Customers extends CI_Controller
 {
+    var $multiplier = 1;
+
 
     function __construct()
     {
@@ -562,6 +564,20 @@ class Customers extends CI_Controller
         $this->template->load('customer', 'customerpurchases', $data);
     }
 
+    public function customerfirmdetails()
+    {
+        $data['title'] = "Customer Firm Details";
+        $data['breadcrumb'] = array();
+        $data['datatable'] = true;
+        $where = array();
+        if (!$this->staff_sees_all_customers()) {
+            $where['md5(t1.added_by)'] = $this->session->user;
+        }
+        $data['customers'] = customer_dropdown($where);
+        $data['years'] = year_dropdown();
+        $this->template->load('customer', 'customerfirmdetails', $data);
+    }
+
     public function customerwisereport()
     {
         $data['title'] = "Customer Wise Report";
@@ -861,6 +877,64 @@ class Customers extends CI_Controller
         }
         $data['services'] = $this->master->getservices();
         $this->load->view('customer/servicetable', $data);
+    }
+
+    public function getuserfirms()
+    {
+        $user_id = $this->input->post('user_id');
+        $firms = $this->customer->getfirms(['t1.user_id' => $user_id, 't1.status' => 1]);
+        $options = "<option value=''>Select Firm</option>";
+        if (!empty($firms)) {
+            foreach ($firms as $firm) {
+                $options .= "<option value='" . $firm['id'] . "'>" . $firm['name'] . "</option>";
+            }
+        }
+        echo $options;
+    }
+
+    public function getfirmdetails()
+    {
+        $user_id = $this->input->post('user_id');
+        $firm_id = $this->input->post('firm_id');
+        $year = $this->input->post('year');
+        if (!empty($user_id) && !empty($year) && !empty($firm_id)) {
+            $yearval = getyearmonthvalues($year);
+            $year1 = $yearval['year1'];
+            $year2 = $yearval['year2'];
+            $from = "$year1-04-01";
+            $to = "$year2-03-31";
+            $data = array();
+            
+            // Get customer credit limit
+            $customer = $this->customer->getcustomers(['t1.user_id' => $user_id], 'single');
+            $data['credit_limit'] = !empty($customer['credit_limit']) ? (float)$customer['credit_limit'] : 0.00;
+            
+            // Get wallet balance
+            $this->load->model('Wallet_model', 'wallet');
+            $data['wallet_balance'] = $this->wallet->getwalletbalance($user_id);
+            
+            // Get package details
+            $where = array('user_id' => $user_id, 'firm_id' => $firm_id, 'status' => 1);
+            $query = $this->db->get_where('customer_packages', $where);
+            $data['cpackage'] = null;
+            if ($query->num_rows() > 0) {
+                $cpackage = $query->unbuffered_row('array');
+                $data['cpackage'] = $cpackage;
+                
+                $where2 = "t1.user_id='$user_id' and t1.firm_id='$firm_id' and t1.date>='$from' and t1.date<='$to'";
+                $data['accountancy'] = $this->service->getturnoverswithpayment($where2);
+                $turnovers = !empty($data['accountancy']) ? array_column($data['accountancy'], 'turnover') : array(0);
+                $turnover = array_sum($turnovers);
+                $data['total_turnover'] = $turnover;
+                $name = $cpackage['package_id'] == 1 ? 'Accountancy Prime' : 'Accountancy Premium';
+                $data['package'] = $this->master->getpackages(['name' => $name, 'turnover>' => $turnover], 'single');
+            } else {
+                $data['accountancy'] = array();
+            }
+            $this->load->view('customer/firmdetailstable', $data);
+        } else {
+            echo '';
+        }
     }
 
     public function getcustomerreport()

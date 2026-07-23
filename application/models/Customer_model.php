@@ -59,7 +59,8 @@ class Customer_model extends CI_Model
 
     public function getcustomers($where = array(), $type = "all")
     {
-        $columns = "t1.*,t2.name as state_name,t3.name as district_name,t4.name as user_name";
+        $prefix = $this->db->dbprefix;
+        $columns = "t1.*,t2.name as state_name,t3.name as district_name,t4.name as user_name, (SELECT package_type FROM {$prefix}customer_packages WHERE user_id = t1.user_id AND status = 1 LIMIT 1) as package_type";
         $this->db->select($columns);
         $this->db->where($where);
         $this->db->from('customers t1');
