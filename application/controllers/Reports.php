@@ -87,7 +87,7 @@ class Reports extends CI_Controller
                     $count--;
                 }
                 $acc_fees = $fees / $count;
-                foreach ($accountancy as $single) {
+                foreach ($accountancy as &$single) {
                     $days = $paid = $penalty = 0;
                     $paid = !empty($single['paid']) ? $single['paid'] : 0;
                     // Outstanding should be the previous month's balance (unpaid amount)
@@ -126,6 +126,32 @@ class Reports extends CI_Controller
                         $balance = 0;
                     }
                     $total = $balance + $penalty;
+                    
+                    // --- AUTO DEBIT LOGIC ---
+                    $auto_debit_status = $single['auto_debit_status'] ?? 'Pending';
+                    if ($auto_debit_status !== 'Confirmed' && $single['due_date'] <= $date && $total > 0) {
+                        $wallet_bal = $this->wallet->getwalletbalance($user_id);
+                        if ($wallet_bal >= $total) {
+                            $payment_data = array(
+                                'user_id' => $user_id,
+                                'firm_id' => $firm_id,
+                                'amount' => $total,
+                                'acc_date' => $single['date'],
+                                'added_on' => date('Y-m-d H:i:s'),
+                                'updated_on' => date('Y-m-d H:i:s')
+                            );
+                            $this->db->insert('acc_payment', $payment_data);
+                            $this->db->update('accountancy', ['auto_debit_status' => 'Confirmed'], ['id' => $single['id']]);
+                            $paid += $total;
+                            $auto_debit_status = 'Confirmed';
+                            $single['auto_debit_status'] = 'Confirmed';
+                            $single['payment_date'] = date('Y-m-d H:i:s');
+                            $balance = 0;
+                            $total = 0;
+                        }
+                    }
+                    // --- END AUTO DEBIT LOGIC ---
+
                     $total_sum += $total;
                     $total_fees += $acc_fees;
                     $total_paid += $paid;
@@ -141,7 +167,8 @@ class Reports extends CI_Controller
                         'paid' => round($paid, 2),
                         'balance' => round($balance, 2),
                         'due_date' => $due_date,
-                        'due_days' => $days
+                        'due_days' => $days,
+                        'auto_debit_status' => $auto_debit_status
                     );
 
                     $report[] = $row;
@@ -156,7 +183,8 @@ class Reports extends CI_Controller
                     'paid' => round($total_paid, 2),
                     'balance' => 0,
                     'due_date' => '',
-                    'due_days' => $total_days
+                    'due_days' => $total_days,
+                    'auto_debit_status' => ''
                 );
 
                 $report[] = $row;
