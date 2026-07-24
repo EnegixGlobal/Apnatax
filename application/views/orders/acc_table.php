@@ -11,7 +11,8 @@
             <th>Balance</th>
             <th>Due date</th>
             <th>Delay in Days</th>
-            <th>Review</th>
+            <th>Auto Debit Status</th>
+            <th>Review / Date</th>
         </tr>
     </thead>
     <tbody>
@@ -119,14 +120,29 @@
                         <?= $single['due_date'] != '' ? date('d-m-Y F', strtotime($single['due_date'])) : '--'; ?>
                     </td>
                     <td><?= $days; ?></td>
+                    <td class="text-center">
+                        <?php if (($single['auto_debit_status'] ?? 'Pending') == 'Confirmed') { ?>
+                            <span class="badge bg-success">Confirmed</span>
+                        <?php } else { ?>
+                            <span class="badge bg-warning text-dark">Pending</span>
+                        <?php } ?>
+                    </td>
                     <?php if ($paid == 0) { ?>
-                        <td>
-                            <button type="button" class="btn btn-sm btn-info edit-btn" value="<?= $single['id']; ?>"><i class="fa fa-edit"></i></button>
-                            <button type="button" class="btn btn-sm btn-danger delete-btn" value="<?= $single['id']; ?>"><i class="fa fa-trash"></i></button>
+                        <td class="text-center">
+                            <button type="button" class="btn btn-sm btn-primary renew-btn" 
+                                data-id="<?= $single['id']; ?>" 
+                                data-amount="<?= $total; ?>" 
+                                data-userid="<?= $single['user_id']; ?>" 
+                                data-firmid="<?= $single['firm_id']; ?>" 
+                                data-date="<?= $single['date']; ?>" 
+                                title="Renew this month">
+                                <i class="fa fa-refresh"></i> Renew
+                            </button>
                         </td>
                     <?php } else {
                     ?>
-                        <td class="done">
+                        <td class="done text-center font-weight-bold text-success">
+                            <?= !empty($single['payment_date']) ? date('d-m-Y', strtotime($single['payment_date'])) : '<i class="fa fa-check-circle" style="font-size: 1.5em;"></i>' ?>
                         </td>
                     <?php
                     }
@@ -160,6 +176,7 @@
                 <th></th>
                 <th></th>
                 <th><?= $total_days; ?></th>
+                <th></th>
                 <th>
                 </th>
             </tr>

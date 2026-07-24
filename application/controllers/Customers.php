@@ -936,6 +936,60 @@ class Customers extends CI_Controller
             echo '';
         }
     }
+    public function renewaccountancy()
+    {
+        // Only allow admin access
+        if ($this->session->role != 'admin' && $this->session->role != 'superadmin') {
+            echo json_encode(['status' => false, 'message' => 'Unauthorized access!']);
+            return;
+        }
+
+        $id = $this->input->post('id');
+        $amount = $this->input->post('amount');
+        $user_id = $this->input->post('user_id');
+        $firm_id = $this->input->post('firm_id');
+        $date = $this->input->post('date');
+
+        if (empty($id) || empty($amount) || empty($user_id) || empty($firm_id)) {
+            echo json_encode(['status' => false, 'message' => 'Missing required fields!']);
+            return;
+        }
+
+        // Verify wallet balance
+        $this->load->model('Wallet_model', 'wallet');
+        $wallet_balance = $this->wallet->getwalletbalance($user_id);
+
+        if ($wallet_balance < $amount) {
+            echo json_encode(['status' => false, 'message' => 'Insufficient wallet balance. Current balance is ₹' . number_format($wallet_balance, 2)]);
+            return;
+        }
+
+        // Insert payment record
+        $payment_data = array(
+            'user_id' => $user_id,
+            'firm_id' => $firm_id,
+            'acc_date' => $date,
+            'amount' => $amount,
+            'added_on' => date('Y-m-d H:i:s'),
+            'updated_on' => date('Y-m-d H:i:s')
+        );
+
+        if ($this->db->insert('acc_payment', $payment_data)) {
+            // Update auto_debit_status in accountancy table
+            $this->db->update('accountancy', ['auto_debit_status' => 'Confirmed'], ['id' => $id]);
+            
+            // Add notification
+            $this->common->savenotification(array(
+                'user_id' => (int) $user_id,
+                'type' => 'payment',
+                'message' => '₹' . number_format((float) $amount, 2) . ' deducted from your wallet for accountancy renewal.',
+            ));
+
+            echo json_encode(['status' => true, 'message' => 'Renewal successful. ₹' . number_format($amount, 2) . ' deducted from wallet.']);
+        } else {
+            echo json_encode(['status' => false, 'message' => 'Failed to record payment. Please try again.']);
+        }
+    }
 
     public function getcustomerreport()
     {

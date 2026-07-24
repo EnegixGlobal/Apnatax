@@ -103,4 +103,29 @@ if($this->session->flashdata('year')!==NULL){
                 function reloadAjax(){
                     getfirmdetails();
                 }
+
+                $('body').on('click', '.renew-btn', function() {
+                    var id = $(this).data('id');
+                    var amount = parseFloat($(this).data('amount')).toFixed(2);
+                    var user_id = $(this).data('userid');
+                    var firm_id = $(this).data('firmid');
+                    var date = $(this).data('date');
+
+                    if (confirm("Are you sure you want to deduct ₹" + amount + " from the wallet for this renewal?")) {
+                        $.ajax({
+                            type: "post",
+                            url: "<?= base_url('customers/renewaccountancy/'); ?>",
+                            data: { id: id, amount: amount, user_id: user_id, firm_id: firm_id, date: date },
+                            dataType: 'json',
+                            success: function(response) {
+                                if (response.status === true) {
+                                    alert(response.message);
+                                    reloadAjax();
+                                } else {
+                                    alert(response.message || "An error occurred.");
+                                }
+                            }
+                        });
+                    }
+                });
             </script>
