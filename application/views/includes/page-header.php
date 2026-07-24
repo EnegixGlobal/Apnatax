@@ -8,6 +8,11 @@
                                 $sess_firms=firm_dropdown();
                             ?>
                             <div>
+                                <?php if (isset($title) && $title === 'My Package'): ?>
+                                    <a href="<?= base_url('package/list') ?>" class="btn btn-primary"><i class="fe fe-list"></i> Package list</a>
+                                <?php elseif (isset($title) && $title === 'Package list'): ?>
+                                    <a href="<?= base_url('package') ?>" class="btn btn-secondary"><i class="fe fe-arrow-left"></i> Back</a>
+                                <?php endif; ?>
                                 <a href="#" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#smallmodal" id="display_year" >Year: <?= $sess_years[$this->session->year]?$sess_years[$this->session->year]:'' ?></a>
                                 <a href="#" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#smallmodal" id="display_firm">Firm: <?= $sess_firms[$this->session->firm]?$sess_firms[$this->session->firm]:'' ?></a>
                             </div>

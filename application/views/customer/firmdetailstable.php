@@ -37,8 +37,29 @@ if (!empty($cpackage)) {
 </div>
 
 <?php
+if (!empty($pending_monthly)) {
+    echo '<div class="row mb-4"><div class="col-md-12"><h4 class="mb-3 text-danger"><i class="fe fe-alert-circle me-1"></i> Pending Monthly Packages</h4>';
+    echo '<div class="table-responsive"><table class="table table-bordered table-striped">';
+    echo '<thead class="bg-light"><tr><th>Month</th><th>Amount</th><th>Status</th><th>Pay</th></tr></thead><tbody>';
+    foreach ($pending_monthly as $pm) {
+        $month_name = date('F Y', strtotime($pm['purchase_date']));
+        $amt = number_format($pm['bill_amount'], 2);
+        echo '<tr>';
+        echo '<td>' . $month_name . '</td>';
+        echo '<td>₹ ' . $amt . '</td>';
+        echo '<td><span class="badge bg-danger">Pending</span></td>';
+        echo '<td><button class="btn btn-sm btn-danger renew-monthly-btn" data-id="'.$pm['id'].'" data-amount="'.$pm['bill_amount'].'" data-userid="'.$pm['user_id'].'" data-firmid="'.$pm['firm_id'].'"><i class="fe fe-credit-card me-1"></i> Pay</button></td>';
+        echo '</tr>';
+    }
+    echo '</tbody></table></div></div></div>';
+}
+
 if (!empty($cpackage)) {
-    $this->load->view('orders/acc_table', $data ?? []);
+    if (isset($cpackage['package_type']) && $cpackage['package_type'] == 'Monthly') {
+        // Do not show the turnover table for Monthly packages
+    } else {
+        $this->load->view('orders/acc_table', $data ?? []);
+    }
 } else {
     echo '<h3 class="text-danger text-center mt-4">No Active Package Found For This Firm!</h3>';
 }

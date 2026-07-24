@@ -729,4 +729,40 @@ class Package extends CI_Controller
         }
         redirect($_SERVER['HTTP_REFERER']);
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // LIST PACKAGES
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public function list()
+    {
+        $data = ['title' => 'Package list'];
+        $data['breadcrumb'] = array("package" => "My Package", "active" => "Package list");
+        $data['alertify'] = true;
+
+        $user    = getuser();
+        $year    = $this->session->year;
+        $firm_id = $this->session->firm;
+
+        $data['user'] = $user;
+        $data['firm_id'] = $firm_id;
+
+        // ALL service packages for this user/firm/year
+        $where_pkg = array('t1.user_id' => $user['id'], 't1.firm_id' => $firm_id, 't1.year' => $year);
+        $data['service_packages'] = $this->customer->getservicepackage($where_pkg, 'all');
+
+        // All services (exclude id=1 / account-work) with options
+        $all_services = $this->master->getservices(['status' => 1, 'id>' => 1]);
+        $services_with_options = array();
+        if (!empty($all_services)) {
+            foreach ($all_services as $svc) {
+                $opts = $this->master->getserviceoptions(['service_id' => $svc['id'], 'status' => 1], 'all');
+                $services_with_options[$svc['id']] = ['service' => $svc, 'options' => $opts];
+            }
+        }
+        $data['all_services']          = $all_services;
+        $data['services_with_options'] = $services_with_options;
+
+        $this->template->load('package', 'packagelist', $data);
+    }
 }

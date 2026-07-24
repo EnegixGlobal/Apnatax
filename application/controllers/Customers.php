@@ -913,13 +913,15 @@ class Customers extends CI_Controller
             $this->load->model('Wallet_model', 'wallet');
             $data['wallet_balance'] = $this->wallet->getwalletbalance($user_id);
             
-            // Get package details
+            // Get package details (Active Package)
             $where = array('user_id' => $user_id, 'firm_id' => $firm_id, 'status' => 1);
-            $query = $this->db->get_where('customer_packages', $where);
+            $query = $this->db->order_by('purchase_date', 'DESC')->get_where('customer_packages', $where);
             $data['cpackage'] = null;
+            $active_pkg_id = 0;
             if ($query->num_rows() > 0) {
                 $cpackage = $query->unbuffered_row('array');
                 $data['cpackage'] = $cpackage;
+                $active_pkg_id = $cpackage['id'];
                 
                 $where2 = "t1.user_id='$user_id' and t1.firm_id='$firm_id' and t1.date>='$from' and t1.date<='$to'";
                 $data['accountancy'] = $this->service->getturnoverswithpayment($where2);
@@ -931,6 +933,24 @@ class Customers extends CI_Controller
             } else {
                 $data['accountancy'] = array();
             }
+
+            // Get all pending Monthly packages (Exclude the active package)
+            $where_pending = array(
+                'user_id' => $user_id,
+                'firm_id' => $firm_id,
+                'year' => $year,
+                'package_type' => 'Monthly',
+                'status' => 1,
+                'payment_status' => 0
+            );
+            $this->db->where($where_pending);
+            if ($active_pkg_id > 0) {
+                $this->db->where('id !=', $active_pkg_id);
+            }
+            $data['pending_monthly'] = $this->db->order_by('purchase_date', 'ASC')
+                                                ->get('customer_packages')
+                                                ->result_array();
+
             $this->load->view('customer/firmdetailstable', $data);
         } else {
             echo '';
@@ -988,6 +1008,114 @@ class Customers extends CI_Controller
             echo json_encode(['status' => true, 'message' => 'Renewal successful. ₹' . number_format($amount, 2) . ' deducted from wallet.']);
         } else {
             echo json_encode(['status' => false, 'message' => 'Failed to record payment. Please try again.']);
+        }
+    }
+
+    public function renewmonthlypackage()
+    {
+        // Only allow admin access
+        if ($this->session->role != 'admin' && $this->session->role != 'superadmin') {
+            echo json_encode(['status' => false, 'message' => 'Unauthorized access!']);
+            return;
+        }
+
+        $id = $this->input->post('id');
+        $amount = (float)$this->input->post('amount');
+        $user_id = $this->input->post('user_id');
+
+        if (empty($id) || empty($amount) || empty($user_id)) {
+            echo json_encode(['status' => false, 'message' => 'Missing required fields!']);
+            return;
+        }
+
+        // Verify wallet balance
+        $this->load->model('Wallet_model', 'wallet');
+        $wallet_balance = $this->wallet->getwalletbalance($user_id);
+
+        if ($wallet_balance < $amount) {
+            echo json_encode(['status' => false, 'message' => 'Insufficient wallet balance. Current balance is ₹' . number_format($wallet_balance, 2)]);
+            return;
+        }
+
+        $this->db->trans_start();
+
+        // 1. Update package
+        $update_data = [
+            'payment_status' => 1,
+            'updated_on' => date('Y-m-d H:i:s')
+        ];
+        $this->db->update('customer_packages', $update_data, ['id' => $id]);
+
+        // 2. Fetch package info
+        $pkg = $this->db->get_where('customer_packages', ['id' => $id])->unbuffered_row('array');
+        if (!empty($pkg)) {
+            $payment_data = array(
+                'user_id' => $user_id,
+                'firm_id' => $pkg['firm_id'],
+                'acc_date' => date('Y-m-d', strtotime($pkg['purchase_date'])),
+                'amount' => $amount,
+                'added_on' => date('Y-m-d H:i:s'),
+                'updated_on' => date('Y-m-d H:i:s')
+            );
+            $this->db->insert('acc_payment', $payment_data);
+            
+            $current_month_start = date('Y-m-01', strtotime($pkg['purchase_date']));
+            $acc_record = $this->db->get_where('accountancy', [
+                'user_id' => $user_id,
+                'firm_id' => $pkg['firm_id'],
+                'date' => $current_month_start
+            ])->unbuffered_row('array');
+            
+            if (!empty($acc_record)) {
+                $existing_other_fee = (float)($acc_record['other_fee'] ?? 0);
+                $new_other_fee = $existing_other_fee + $amount;
+                $this->db->update('accountancy', [
+                    'other_fee' => $new_other_fee,
+                    'updated_on' => date('Y-m-d H:i:s')
+                ], ['id' => $acc_record['id']]);
+            } else {
+                $acc_data = [
+                    'user_id' => $user_id,
+                    'firm_id' => $pkg['firm_id'],
+                    'date' => $current_month_start,
+                    'other_fee' => $amount,
+                    'added_on' => date('Y-m-d H:i:s'),
+                    'updated_on' => date('Y-m-d H:i:s')
+                ];
+                $this->db->insert('accountancy', $acc_data);
+            }
+            
+            // 3. Insert purchase to deduct from wallet
+            $this->db->insert('purchases', [
+                'date'       => date('Y-m-d'),
+                'year'       => $pkg['year'],
+                'type'       => 'Monthly',
+                'user_id'    => $user_id,
+                'service_id' => 1,
+                'firm_id'    => $pkg['firm_id'],
+                'service'    => 'Account Work Monthly (Pending Renewal - ' . date('F Y', strtotime($pkg['purchase_date'])) . ')',
+                'rate'       => $amount,
+                'subtotal'   => $amount,
+                'gst_amount' => 0,
+                'gst_enabled'=> 0,
+                'amount'     => $amount,
+                'status'     => 0,
+                'added_on'   => date('Y-m-d H:i:s'),
+                'updated_on' => date('Y-m-d H:i:s'),
+            ]);
+        }
+
+        $this->db->trans_complete();
+
+        if ($this->db->trans_status() === FALSE) {
+            echo json_encode(['status' => false, 'message' => 'Failed to process renewal.']);
+        } else {
+            $this->common->savenotification(array(
+                'user_id' => (int) $user_id,
+                'type' => 'payment',
+                'message' => '₹' . number_format($amount, 2) . ' deducted from your wallet for Monthly package renewal.',
+            ));
+            echo json_encode(['status' => true, 'message' => 'Renewal successful. ₹' . number_format($amount, 2) . ' deducted from wallet.']);
         }
     }
 
