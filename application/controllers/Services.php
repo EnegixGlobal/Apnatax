@@ -1581,6 +1581,78 @@ class Services extends CI_Controller
                         $result = $this->db->insert("customer_packages", $data);
                         if ($result) {
                             if ($type == "Monthly") {
+                                // --- NEW FEATURE: BACKFILL PENDING MONTHS ---
+                                if (!empty($month_val)) {
+                                    $years = getyearmonthvalues($year);
+                                    $year1 = (int)$years['year1'];
+                                    
+                                    $target_month = (int)$month_val;
+                                    $target_index = ($target_month >= 4) ? $target_month : $target_month + 12;
+                                    
+                                    $months_to_create = [];
+                                    for ($i = 4; $i < $target_index; $i++) {
+                                        $iter_m = ($i > 12) ? $i - 12 : $i;
+                                        $iter_y = ($i > 12) ? $year1 + 1 : $year1;
+                                        $months_to_create[] = ['m' => $iter_m, 'y' => $iter_y];
+                                    }
+                                    
+                                    foreach ($months_to_create as $mi) {
+                                        $iter_m = $mi['m'];
+                                        $iter_y = $mi['y'];
+                                        
+                                        $iter_purchase_date = sprintf('%04d-%02d-01', $iter_y, $iter_m);
+                                        
+                                        // Calculate expiry date (28th of next month)
+                                        $next_m = $iter_m + 1;
+                                        $next_y = $iter_y;
+                                        if ($next_m > 12) {
+                                            $next_m = 1;
+                                            $next_y++;
+                                        }
+                                        $debit_date = !empty($service['debit_date']) ? $service['debit_date'] : null;
+                                        if ($debit_date) {
+                                            $dd = (int)date('d', strtotime($debit_date));
+                                            $iter_expiry_date = sprintf('%04d-%02d-%02d', $next_y, $next_m, $dd);
+                                            if (!checkdate($next_m, $dd, $next_y)) {
+                                                $iter_expiry_date = date('Y-m-t', strtotime(sprintf('%04d-%02d-01', $next_y, $next_m)));
+                                            }
+                                        } else {
+                                            $iter_expiry_date = date('Y-m-d', strtotime('+1 month', strtotime($iter_purchase_date)));
+                                        }
+                                        
+                                        $iter_bill_amount = (float)$amount; // Single month amount
+                                        
+                                        // Check for duplicate
+                                        $check_sql = "SELECT id FROM " . $this->db->dbprefix('customer_packages') . " 
+                                                      WHERE user_id = {$user['id']} AND firm_id = {$firm_id} AND year = '{$year}' 
+                                                      AND package_type = 'Monthly' AND MONTH(purchase_date) = {$iter_m} AND YEAR(purchase_date) = {$iter_y}";
+                                        $exists = $this->db->query($check_sql)->num_rows() > 0;
+                                        
+                                        if (!$exists) {
+                                            $iter_data = array(
+                                                'user_id' => $user['id'],
+                                                'firm_id' => $firm_id,
+                                                'year' => $year,
+                                                'status' => 1,
+                                                'expiry_date' => $iter_expiry_date,
+                                                'payment_status' => 0, // Unpaid
+                                                'purchase_date' => $iter_purchase_date,
+                                                'bill_amount' => $iter_bill_amount,
+                                                'package_type' => 'Monthly',
+                                                'added_on' => $datetime,
+                                                'updated_on' => $datetime,
+                                                'amount' => $amount,
+                                                'package_id' => 0
+                                            );
+                                            if (!empty($autodebit) && $autodebit != 0) {
+                                                $iter_data['autodebit'] = 1;
+                                            }
+                                            $this->db->insert("customer_packages", $iter_data);
+                                        }
+                                    }
+                                }
+                                // --------------------------------------------
+                                
                                 $this->session->set_flashdata("msg", "Account Work Monthly package selected successfully! Package expires on " . date('d-m-Y', strtotime($expiry_date)) . ". Amount ₹" . number_format($amount, 2) . " will be auto-debited monthly.");
                             } else {
                                 $name = $package_id == 1 ? 'Accountancy Prime' : 'Accountancy Premium';
