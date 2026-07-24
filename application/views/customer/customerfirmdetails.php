@@ -128,4 +128,35 @@ if($this->session->flashdata('year')!==NULL){
                         });
                     }
                 });
+
+                $('body').on('click', '.renew-monthly-btn', function() {
+                    var btn = $(this);
+                    var id = btn.data('id');
+                    var amount = parseFloat(btn.data('amount')).toFixed(2);
+                    var user_id = btn.data('userid');
+                    var firm_id = btn.data('firmid');
+
+                    if (confirm("Are you sure you want to deduct ₹" + amount + " from the customer's wallet for this monthly package?")) {
+                        btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Processing...');
+                        $.ajax({
+                            type: "post",
+                            url: "<?= base_url('customers/renewmonthlypackage/'); ?>",
+                            data: { id: id, amount: amount, user_id: user_id, firm_id: firm_id },
+                            dataType: 'json',
+                            success: function(response) {
+                                if (response.status === true) {
+                                    alert(response.message);
+                                    reloadAjax();
+                                } else {
+                                    alert(response.message || "An error occurred.");
+                                    btn.prop('disabled', false).html('<i class="fe fe-credit-card me-1"></i> Pay');
+                                }
+                            },
+                            error: function() {
+                                alert("Server error occurred.");
+                                btn.prop('disabled', false).html('<i class="fe fe-credit-card me-1"></i> Pay');
+                            }
+                        });
+                    }
+                });
             </script>
