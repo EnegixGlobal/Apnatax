@@ -1479,6 +1479,12 @@ class Services extends CI_Controller
                     if ($status) {
                         $datetime = date('Y-m-d H:i:s');
                         $purchase_date = date('Y-m-d');
+                        if ($type == "Monthly" && !empty($month_val)) {
+                            $years = getyearmonthvalues($year);
+                            $month_int = (int)$month_val;
+                            $actual_year = ($month_int >= 4) ? $years['year1'] : $years['year2'];
+                            $purchase_date = sprintf('%04d-%02d-01', $actual_year, $month_int);
+                        }
                         
                         // Calculate expiry date based on type
                         $expiry_date = null;

@@ -887,7 +887,7 @@ if (!empty($service_packages)) {
             if ($is_expired && $is_unpaid) {
                 $status_class = 'state-overdue';
                 $status_icon = 'fe-alert-circle';
-                $status_label = 'Expired – Renew';
+                $status_label = ($pkg_type == 'Monthly') ? 'Pending' : 'Expired – Renew';
             } else {
                 $status_class = 'state-paid';
                 $status_icon = 'fe-check-circle';
@@ -915,21 +915,32 @@ if (!empty($service_packages)) {
                         <?php endif; ?>
                     </div>
                     <div class="d-flex flex-wrap gap-3" style="font-size:.82rem;color:#555;">
-                        <span>
-                            <i class="fe fe-calendar me-1 text-muted"></i>
-                            Selected: <strong><?= date('d M Y', strtotime($package['added_on'])) ?></strong>
-                        </span>
-                        <?php if (!empty($package['year'])) : ?>
+                        <?php if ($pkg_type == 'Monthly') : ?>
                             <span>
-                                <i class="fe fe-file-text me-1 text-muted"></i>
-                                Year: <strong><?= htmlspecialchars($package['year']) ?></strong>
+                                <i class="fe fe-calendar me-1 text-muted"></i>
+                                Selected Month: <strong><?= date('F', strtotime($package['purchase_date'])) ?></strong>
                             </span>
-                        <?php endif; ?>
-                        <?php if (!empty($package['expiry_date'])) : ?>
                             <span class="<?= $is_expired && $is_unpaid ? 'text-danger fw-semibold' : '' ?>">
                                 <i class="fe fe-clock me-1 text-muted"></i>
-                                Expires: <strong><?= date('d M Y', $expiry_ts) ?></strong>
+                                Renewal Month: <strong><?= date('F', $expiry_ts) ?></strong>
                             </span>
+                        <?php else : ?>
+                            <span>
+                                <i class="fe fe-calendar me-1 text-muted"></i>
+                                Selected: <strong><?= date('d M Y', strtotime($package['added_on'])) ?></strong>
+                            </span>
+                            <?php if (!empty($package['year'])) : ?>
+                                <span>
+                                    <i class="fe fe-file-text me-1 text-muted"></i>
+                                    Year: <strong><?= htmlspecialchars($package['year']) ?></strong>
+                                </span>
+                            <?php endif; ?>
+                            <?php if (!empty($package['expiry_date'])) : ?>
+                                <span class="<?= $is_expired && $is_unpaid ? 'text-danger fw-semibold' : '' ?>">
+                                    <i class="fe fe-clock me-1 text-muted"></i>
+                                    Expires: <strong><?= date('d M Y', $expiry_ts) ?></strong>
+                                </span>
+                            <?php endif; ?>
                         <?php endif; ?>
                     </div>
                     <?php if ($is_expired && $is_unpaid) :
@@ -1353,193 +1364,7 @@ if (!empty($service_packages)) {
         })();
     </script>
 
-    <?php
-    /* ════════════════════════════════════════════════════════
-   SECTION 1 – Existing packages
-   ════════════════════════════════════════════════════════ */
-    if (!empty($service_packages)) :
-    ?>
-        <div class="pkg-section-title">
-            <i class="fe fe-layers"></i> Your Packages
-        </div>
-        <div class="row g-4 mb-4">
-            <?php foreach ($service_packages as $pkg) :
-                /* resolve services */
-                $pkg_ids = !empty($pkg['service_ids'])
-                    ? array_filter(array_map('trim', explode(',', $pkg['service_ids']))) : [];
-                $pkg_services = [];
-                foreach ($all_services as $_s) {
-                    if (in_array((string)$_s['id'], $pkg_ids)) $pkg_services[] = $_s;
-                }
-                $pkg_type   = !empty($pkg['package_type']) ? $pkg['package_type'] : 'Yearly';
-                $meta       = pkg_type_meta($pkg_type);
-                $state      = payment_state($pkg);
-                $is_expired = $state['cls'] === 'state-overdue';
-                $expiry_ts  = !empty($pkg['expiry_date']) ? strtotime($pkg['expiry_date']) : 0;
 
-                /* days until expiry */
-                $days_left_txt = '';
-                if ($expiry_ts) {
-                    $days = (int)ceil(($expiry_ts - time()) / 86400);
-                    if ($days > 0)  $days_left_txt = "Expires in $days day" . ($days > 1 ? 's' : '');
-                    elseif ($is_expired) $days_left_txt = abs($days) . ' day' . (abs($days) != 1 ? 's' : '') . ' overdue';
-                }
-
-                /* pkg total */
-                $pkg_total  = 0;
-                $opt_ids_map = [];
-                if (!empty($pkg['service_option_ids'])) {
-                    $opt_ids_map = json_decode($pkg['service_option_ids'], true) ?: [];
-                }
-                $pkg_card_cls = $is_expired ? 'is-overdue' : 'is-active';
-            ?>
-                <div class="col-lg-6 col-xl-4 mb-4">
-                    <div class="pkg-card card <?= $pkg_card_cls ?>">
-                        <!-- Card header -->
-                        <div class="pkg-card-header">
-                            <div class="d-flex align-items-start justify-content-between gap-2">
-                                <div>
-                                    <div class="d-flex align-items-center gap-2 mb-1">
-                                        <?= pkg_type_badge_inline($pkg_type) ?>
-                                        <span class="state-pill <?= $state['cls'] ?>">
-                                            <i class="<?= $state['icon'] ?>"></i>
-                                            <?= $state['label'] ?>
-                                        </span>
-                                    </div>
-                                    <div class="fw-bold text-dark" style="font-size:.95rem">
-                                        <?= htmlspecialchars($pkg['firm_name'] ?? 'My Firm') ?>
-                                    </div>
-                                    <div class="text-muted" style="font-size:.78rem">
-                                        Financial Year: <strong><?= htmlspecialchars($pkg['year'] ?? '') ?></strong>
-                                        <?php if ($days_left_txt) : ?>
-                                            &nbsp;·&nbsp;
-                                            <span class="<?= $is_expired ? 'text-danger' : 'text-warning' ?> fw-semibold">
-                                                <?= $days_left_txt ?>
-                                            </span>
-                                        <?php endif; ?>
-                                    </div>
-                                </div>
-                                <div class="text-end flex-shrink-0">
-                                    <div style="font-size:1.2rem;font-weight:700;color:<?= $meta['color'] ?>">
-                                        ₹<?= number_format($pkg['bill_amount'] ?? 0, 0) ?>
-                                    </div>
-                                    <div class="text-muted" style="font-size:.7rem">Total Bill</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Services list -->
-                        <div class="pkg-card-body">
-                            <ul class="svc-list">
-                                <?php foreach ($pkg_services as $psvc) :
-                                    $rate     = (float)$psvc['rate'];
-                                    $opt_label = '';
-                                    if (!empty($opt_ids_map[$psvc['id']])) {
-                                        $svc_opts = $services_with_options[$psvc['id']]['options'] ?? [];
-                                        foreach ($svc_opts as $o) {
-                                            if ((string)$o['id'] === (string)$opt_ids_map[$psvc['id']]) {
-                                                $rate      = (float)$o['rate'];
-                                                $opt_label = $o['display_name'];
-                                                break;
-                                            }
-                                        }
-                                    }
-                                    $pkg_total += $rate;
-                                ?>
-                                    <li>
-                                        <span class="svc-dot" style="background:<?= $meta['color'] ?>"></span>
-                                        <span class="svc-name">
-                                            <?= htmlspecialchars($psvc['name']) ?>
-                                            <?php if ($opt_label) : ?>
-                                                <small class="text-muted fw-normal">(<?= htmlspecialchars($opt_label) ?>)</small>
-                                            <?php endif; ?>
-                                        </span>
-                                        <span class="svc-for badge bg-light text-secondary border"><?= htmlspecialchars($psvc['service_for']) ?></span>
-                                        <?php if (!empty($psvc['debit_date'])) : ?>
-                                            <span class="svc-date">
-                                                <i class="fe fe-calendar" style="font-size:.7rem"></i>
-                                                <?= date('d M', strtotime($psvc['debit_date'])) ?>
-                                            </span>
-                                        <?php endif; ?>
-                                        <span class="svc-rate">₹<?= number_format($rate, 0) ?></span>
-                                    </li>
-                                <?php endforeach; ?>
-                            </ul>
-                        </div>
-
-                        <!-- Info strip -->
-                        <div class="pkg-info-strip">
-                            <div class="pkg-info-item">
-                                <div class="label">Purchased</div>
-                                <div class="value"><?= !empty($pkg['purchase_date']) ? date('d M Y', strtotime($pkg['purchase_date'])) : '—' ?></div>
-                            </div>
-                            <div class="pkg-info-item">
-                                <div class="label">Debit / Expiry</div>
-                                <div class="value <?= $is_expired ? 'danger' : '' ?>">
-                                    <?= !empty($pkg['expiry_date']) ? date('d M Y', strtotime($pkg['expiry_date'])) : '—' ?>
-                                </div>
-                            </div>
-                            <div class="pkg-info-item">
-                                <div class="label"># Services</div>
-                                <div class="value"><?= count($pkg_services) ?></div>
-                            </div>
-                        </div>
-
-                        <!-- Bill alert / info -->
-                        <?php if ($is_expired) : ?>
-                            <div class="pkg-bill-alert alert-danger">
-                                <span>
-                                    <i class="fe fe-alert-circle me-1"></i>
-                                    Bill of <strong>₹<?= number_format($pkg['bill_amount'], 2) ?></strong> is due. Pay to renew.
-                                </span>
-                                <button class="btn btn-danger btn-sm pay-bill-btn px-3"
-                                    data-pkg-id="<?= $pkg['id'] ?>"
-                                    data-amount="<?= $pkg['bill_amount'] ?>">
-                                    <i class="fe fe-credit-card me-1"></i>Pay Now
-                                </button>
-                            </div>
-                        <?php else : ?>
-                            <div class="pkg-bill-alert alert-warning" style="background:#fffbf0;border-top-color:#ffe8a0">
-                                <span style="color:#7d5a00">
-                                    <i class="fe fe-info me-1"></i>
-                                    <strong>₹<?= number_format($pkg['bill_amount'], 2) ?></strong>
-                                    will be billed on expiry
-                                    (<strong><?= !empty($pkg['expiry_date']) ? date('d M Y', strtotime($pkg['expiry_date'])) : '—' ?></strong>).
-                                    If wallet has balance, it auto-renews. Keep your wallet topped up.
-                                </span>
-                            </div>
-                        <?php endif; ?>
-
-                        <!-- Actions -->
-                        <div class="pkg-actions">
-                            <?php $req = isset($pkg['request']) ? (int)$pkg['request'] : 0; ?>
-                            <?php if ($req == 1) : ?>
-                                <span class="badge bg-warning text-dark px-3 py-2">
-                                    <i class="fe fe-clock me-1"></i>Delete request pending
-                                </span>
-                            <?php else : ?>
-                                <form method="post" action="<?= base_url('package/requestdelete') ?>"
-                                    style="display:inline"
-                                    onsubmit="return confirm('Request admin to delete this package?')">
-                                    <input type="hidden" name="package_id" value="<?= $pkg['id'] ?>">
-                                    <button type="submit" class="btn btn-sm btn-outline-danger">
-                                        <i class="fe fe-trash-2 me-1"></i>Request Delete
-                                    </button>
-                                </form>
-                                <?php if ($req == 2) : ?>
-                                    <span class="badge bg-danger px-2 py-1" style="font-size:.7rem">
-                                        <i class="fe fe-x me-1"></i>Prev. request rejected
-                                    </span>
-                                <?php endif; ?>
-                            <?php endif; ?>
-                        </div>
-
-                    </div><!-- /.pkg-card -->
-                </div>
-            <?php endforeach; ?>
-        </div>
-    <?php endif; // end existing packages 
-    ?>
 
     <?php
     /* ════════════════════════════════════════════════════════
