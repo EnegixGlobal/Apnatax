@@ -86,8 +86,7 @@
 </head>
 
 <?php
-$role = $this->session->role ?? '';
-if (($role == 'admin' || $role == 'superadmin') && empty($sidebartoggle)) {
+if (empty($sidebartoggle)) {
     $sidebartoggle = 'sidenav-toggled';
 }
 ?>
