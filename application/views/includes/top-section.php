@@ -85,6 +85,12 @@
     ?>
 </head>
 
+<?php
+$role = $this->session->role ?? '';
+if (($role == 'admin' || $role == 'superadmin') && empty($sidebartoggle)) {
+    $sidebartoggle = 'sidenav-toggled';
+}
+?>
 <body class="app sidebar-mini ltr <?= !empty($sidebartoggle) ? $sidebartoggle : ''; ?>">
     <?php
     if (isset($page) && $page == 'login') {
