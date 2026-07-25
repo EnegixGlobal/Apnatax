@@ -969,19 +969,44 @@ class Customers extends CI_Controller
         $user_id = $this->input->post('user_id');
         $firm_id = $this->input->post('firm_id');
         $date = $this->input->post('date');
+        $payment_method = $this->input->post('payment_method') ?: 'Wallet';
 
         if (empty($id) || empty($amount) || empty($user_id) || empty($firm_id)) {
             echo json_encode(['status' => false, 'message' => 'Missing required fields!']);
             return;
         }
 
-        // Verify wallet balance
-        $this->load->model('Wallet_model', 'wallet');
-        $wallet_balance = $this->wallet->getwalletbalance($user_id);
+        // Verify balance
+        if ($payment_method == 'Credit Limit') {
+            $customer = $this->customer->getcustomers(['t1.user_id' => $user_id], 'single');
+            $credit_limit = !empty($customer['credit_limit']) ? (float)$customer['credit_limit'] : 0.00;
+            
+            $this->db->select_sum('amount');
+            $this->db->where(['user_id' => $user_id, 'type' => 'Credit limit']);
+            $credit_used = $this->db->get("purchases")->unbuffered_row()->amount;
+            $credit_used = !empty($credit_used) ? $credit_used : 0;
+            
+            $this->db->select_sum('amount');
+            $this->db->where(['user_id' => $user_id, 'payment_mode' => 'Credit Limit']);
+            $credit_used_acc = $this->db->get("acc_payment")->unbuffered_row()->amount;
+            $credit_used_acc = !empty($credit_used_acc) ? $credit_used_acc : 0;
+            
+            // To prevent double counting if renewmonthlypackage inserted both, we could be careful, but we'll sum both to be consistent with wallet logic
+            $credit_used += $credit_used_acc;
+            $available_credit = $credit_limit - $credit_used;
 
-        if ($wallet_balance < $amount) {
-            echo json_encode(['status' => false, 'message' => 'Insufficient wallet balance. Current balance is ₹' . number_format($wallet_balance, 2)]);
-            return;
+            if ($available_credit < $amount) {
+                echo json_encode(['status' => false, 'message' => 'Insufficient Credit Limit. Available credit is ₹' . number_format($available_credit, 2)]);
+                return;
+            }
+        } else {
+            $this->load->model('Wallet_model', 'wallet');
+            $wallet_balance = $this->wallet->getwalletbalance($user_id);
+
+            if ($wallet_balance < $amount) {
+                echo json_encode(['status' => false, 'message' => 'Insufficient wallet balance. Current balance is ₹' . number_format($wallet_balance, 2)]);
+                return;
+            }
         }
 
         // Insert payment record
@@ -990,6 +1015,7 @@ class Customers extends CI_Controller
             'firm_id' => $firm_id,
             'acc_date' => $date,
             'amount' => $amount,
+            'payment_mode' => $payment_method,
             'added_on' => date('Y-m-d H:i:s'),
             'updated_on' => date('Y-m-d H:i:s')
         );
@@ -1002,10 +1028,10 @@ class Customers extends CI_Controller
             $this->common->savenotification(array(
                 'user_id' => (int) $user_id,
                 'type' => 'payment',
-                'message' => '₹' . number_format((float) $amount, 2) . ' deducted from your wallet for accountancy renewal.',
+                'message' => '₹' . number_format((float) $amount, 2) . ' deducted from your ' . $payment_method . ' for accountancy renewal.',
             ));
 
-            echo json_encode(['status' => true, 'message' => 'Renewal successful. ₹' . number_format($amount, 2) . ' deducted from wallet.']);
+            echo json_encode(['status' => true, 'message' => 'Renewal successful. ₹' . number_format($amount, 2) . ' deducted from ' . $payment_method . '.']);
         } else {
             echo json_encode(['status' => false, 'message' => 'Failed to record payment. Please try again.']);
         }
@@ -1022,19 +1048,44 @@ class Customers extends CI_Controller
         $id = $this->input->post('id');
         $amount = (float)$this->input->post('amount');
         $user_id = $this->input->post('user_id');
+        $payment_method = $this->input->post('payment_method') ?: 'Wallet';
 
         if (empty($id) || empty($amount) || empty($user_id)) {
             echo json_encode(['status' => false, 'message' => 'Missing required fields!']);
             return;
         }
 
-        // Verify wallet balance
-        $this->load->model('Wallet_model', 'wallet');
-        $wallet_balance = $this->wallet->getwalletbalance($user_id);
+        // Verify balance
+        if ($payment_method == 'Credit Limit') {
+            $customer = $this->customer->getcustomers(['t1.user_id' => $user_id], 'single');
+            $credit_limit = !empty($customer['credit_limit']) ? (float)$customer['credit_limit'] : 0.00;
+            
+            $this->db->select_sum('amount');
+            $this->db->where(['user_id' => $user_id, 'type' => 'Credit limit']);
+            $credit_used = $this->db->get("purchases")->unbuffered_row()->amount;
+            $credit_used = !empty($credit_used) ? $credit_used : 0;
+            
+            $this->db->select_sum('amount');
+            $this->db->where(['user_id' => $user_id, 'payment_mode' => 'Credit Limit']);
+            $credit_used_acc = $this->db->get("acc_payment")->unbuffered_row()->amount;
+            $credit_used_acc = !empty($credit_used_acc) ? $credit_used_acc : 0;
+            
+            $credit_used += $credit_used_acc;
+            
+            $available_credit = $credit_limit - $credit_used;
 
-        if ($wallet_balance < $amount) {
-            echo json_encode(['status' => false, 'message' => 'Insufficient wallet balance. Current balance is ₹' . number_format($wallet_balance, 2)]);
-            return;
+            if ($available_credit < $amount) {
+                echo json_encode(['status' => false, 'message' => 'Insufficient Credit Limit. Available credit is ₹' . number_format($available_credit, 2)]);
+                return;
+            }
+        } else {
+            $this->load->model('Wallet_model', 'wallet');
+            $wallet_balance = $this->wallet->getwalletbalance($user_id);
+
+            if ($wallet_balance < $amount) {
+                echo json_encode(['status' => false, 'message' => 'Insufficient wallet balance. Current balance is ₹' . number_format($wallet_balance, 2)]);
+                return;
+            }
         }
 
         $this->db->trans_start();
@@ -1054,6 +1105,7 @@ class Customers extends CI_Controller
                 'firm_id' => $pkg['firm_id'],
                 'acc_date' => date('Y-m-d', strtotime($pkg['purchase_date'])),
                 'amount' => $amount,
+                'payment_mode' => $payment_method,
                 'added_on' => date('Y-m-d H:i:s'),
                 'updated_on' => date('Y-m-d H:i:s')
             );
@@ -1086,10 +1138,11 @@ class Customers extends CI_Controller
             }
             
             // 3. Insert purchase to deduct from wallet
+            $purchase_type = ($payment_method == 'Credit Limit') ? 'Credit limit' : 'Monthly';
             $this->db->insert('purchases', [
                 'date'       => date('Y-m-d'),
                 'year'       => $pkg['year'],
-                'type'       => 'Monthly',
+                'type'       => $purchase_type,
                 'user_id'    => $user_id,
                 'service_id' => 1,
                 'firm_id'    => $pkg['firm_id'],
@@ -1113,9 +1166,9 @@ class Customers extends CI_Controller
             $this->common->savenotification(array(
                 'user_id' => (int) $user_id,
                 'type' => 'payment',
-                'message' => '₹' . number_format($amount, 2) . ' deducted from your wallet for Monthly package renewal.',
+                'message' => '₹' . number_format($amount, 2) . ' deducted from your ' . $payment_method . ' for Monthly package renewal.',
             ));
-            echo json_encode(['status' => true, 'message' => 'Renewal successful. ₹' . number_format($amount, 2) . ' deducted from wallet.']);
+            echo json_encode(['status' => true, 'message' => 'Renewal successful. ₹' . number_format($amount, 2) . ' deducted from ' . $payment_method . '.']);
         }
     }
 

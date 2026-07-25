@@ -104,59 +104,80 @@ if($this->session->flashdata('year')!==NULL){
                     getfirmdetails();
                 }
 
-                $('body').on('click', '.renew-btn', function() {
-                    var id = $(this).data('id');
-                    var amount = parseFloat($(this).data('amount')).toFixed(2);
-                    var user_id = $(this).data('userid');
-                    var firm_id = $(this).data('firmid');
-                    var date = $(this).data('date');
+                var pendingRenewData = {};
+                var pendingRenewAction = '';
+                var pendingRenewBtn = null;
 
-                    if (confirm("Are you sure you want to deduct ₹" + amount + " from the wallet for this renewal?")) {
-                        $.ajax({
-                            type: "post",
-                            url: "<?= base_url('customers/renewaccountancy/'); ?>",
-                            data: { id: id, amount: amount, user_id: user_id, firm_id: firm_id, date: date },
-                            dataType: 'json',
-                            success: function(response) {
-                                if (response.status === true) {
-                                    alert(response.message);
-                                    reloadAjax();
-                                } else {
-                                    alert(response.message || "An error occurred.");
-                                }
-                            }
-                        });
-                    }
-                });
-
-                $('body').on('click', '.renew-monthly-btn', function() {
+                $('body').on('click', '.renew-btn, .renew-monthly-btn', function() {
                     var btn = $(this);
-                    var id = btn.data('id');
+                    pendingRenewBtn = btn;
                     var amount = parseFloat(btn.data('amount')).toFixed(2);
-                    var user_id = btn.data('userid');
-                    var firm_id = btn.data('firmid');
-
-                    if (confirm("Are you sure you want to deduct ₹" + amount + " from the customer's wallet for this monthly package?")) {
-                        btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Processing...');
-                        $.ajax({
-                            type: "post",
-                            url: "<?= base_url('customers/renewmonthlypackage/'); ?>",
-                            data: { id: id, amount: amount, user_id: user_id, firm_id: firm_id },
-                            dataType: 'json',
-                            success: function(response) {
-                                if (response.status === true) {
-                                    alert(response.message);
-                                    reloadAjax();
-                                } else {
-                                    alert(response.message || "An error occurred.");
-                                    btn.prop('disabled', false).html('<i class="fe fe-credit-card me-1"></i> Pay');
-                                }
-                            },
-                            error: function() {
-                                alert("Server error occurred.");
-                                btn.prop('disabled', false).html('<i class="fe fe-credit-card me-1"></i> Pay');
-                            }
-                        });
-                    }
+                    
+                    pendingRenewData = {
+                        id: btn.data('id'),
+                        amount: amount,
+                        user_id: btn.data('userid'),
+                        firm_id: btn.data('firmid'),
+                        date: btn.data('date') || ''
+                    };
+                    
+                    pendingRenewAction = btn.hasClass('renew-btn') ? 'renewaccountancy' : 'renewmonthlypackage';
+                    
+                    $('#pm_amount').text(amount);
+                    $('#paymentMethodModal').modal('show');
                 });
+
+                function processRenewal(payment_method) {
+                    $('#paymentMethodModal').modal('hide');
+                    var url = "<?= base_url('customers/'); ?>" + pendingRenewAction;
+                    pendingRenewData.payment_method = payment_method;
+                    
+                    if (pendingRenewAction == 'renewmonthlypackage') {
+                        pendingRenewBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Processing...');
+                    }
+                    
+                    $.ajax({
+                        type: "post",
+                        url: url,
+                        data: pendingRenewData,
+                        dataType: 'json',
+                        success: function(response) {
+                            if (response.status === true) {
+                                alert(response.message);
+                                reloadAjax();
+                            } else {
+                                alert(response.message || "An error occurred.");
+                                if (pendingRenewAction == 'renewmonthlypackage') {
+                                    pendingRenewBtn.prop('disabled', false).html('<i class="fe fe-credit-card me-1"></i> Pay');
+                                }
+                            }
+                        },
+                        error: function() {
+                            alert("Server error occurred.");
+                            if (pendingRenewAction == 'renewmonthlypackage') {
+                                pendingRenewBtn.prop('disabled', false).html('<i class="fe fe-credit-card me-1"></i> Pay');
+                            }
+                        }
+                    });
+                }
+
+                $('#btn-pay-wallet').click(function() { processRenewal('Wallet'); });
+                $('#btn-pay-credit').click(function() { processRenewal('Credit Limit'); });
             </script>
+
+            <!-- Modal for Payment Method -->
+            <div class="modal fade" id="paymentMethodModal" tabindex="-1" role="dialog" aria-hidden="true">
+              <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
+                <div class="modal-content">
+                  <div class="modal-header">
+                    <h5 class="modal-title">Payment Method</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                  </div>
+                  <div class="modal-body text-center">
+                    <p>Choose a method to pay ₹<span id="pm_amount" style="font-weight:bold;"></span></p>
+                    <button type="button" class="btn btn-primary btn-block mb-2" id="btn-pay-wallet" style="width:100%;">Wallet</button>
+                    <button type="button" class="btn btn-info btn-block text-white" id="btn-pay-credit" style="width:100%;">Credit Limit</button>
+                  </div>
+                </div>
+              </div>
+            </div>
