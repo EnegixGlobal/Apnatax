@@ -106,7 +106,7 @@ function payment_state($pkg)
                                 <th>Type</th>
                                 <th>Purchased</th>
                                 <th>Expiry</th>
-                                <th>Total Bill</th>
+                                <th>Price</th>
                                 <th>Status</th>
                                 <th class="text-end">Action</th>
                             </tr>
@@ -119,26 +119,93 @@ function payment_state($pkg)
                                 $pkg_ids = !empty($pkg['service_ids'])
                                     ? array_filter(array_map('trim', explode(',', $pkg['service_ids']))) : [];
                                 $pkg_services = [];
+                                $service_opts = !empty($pkg['service_option_ids']) ? json_decode($pkg['service_option_ids'], true) : [];
                                 foreach ($all_services as $_s) {
-                                    if (in_array((string)$_s['id'], $pkg_ids)) $pkg_services[] = $_s['name'];
+                                    if (in_array((string)$_s['id'], $pkg_ids)) {
+                                        $price = isset($_s['rate']) ? (float)$_s['rate'] : 0.0;
+                                        if (!empty($service_opts[$_s['id']]) && isset($services_with_options[$_s['id']]['options'])) {
+                                            $opt_id = $service_opts[$_s['id']];
+                                            foreach ($services_with_options[$_s['id']]['options'] as $o) {
+                                                if ($o['id'] == $opt_id && isset($o['rate']) && $o['rate'] > 0) {
+                                                    $price = (float)$o['rate'];
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                        $pkg_services[] = [
+                                            'name' => $_s['name'],
+                                            'price' => $price
+                                        ];
+                                    }
                                 }
                                 $pkg_type   = !empty($pkg['package_type']) ? $pkg['package_type'] : 'Yearly';
                                 $meta       = pkg_type_meta($pkg_type);
                                 $state      = payment_state($pkg);
                                 $is_expired = $state['cls'] === 'state-overdue';
+
+                                if (!empty($pkg_services)): 
+                                    foreach ($pkg_services as $svc):
                             ?>
                                 <tr>
                                     <td class="text-muted fw-bold">
                                         <?= $sno++ ?>
                                     </td>
                                     <td>
-                                        <?php if (!empty($pkg_services)): ?>
-                                            <?php foreach ($pkg_services as $svc_name): ?>
-                                                <span class="badge bg-light text-dark border me-1 mb-1" style="font-weight: 500;"><?= htmlspecialchars($svc_name) ?></span>
-                                            <?php endforeach; ?>
-                                        <?php else: ?>
-                                            <span class="text-muted">—</span>
+                                        <div class="mb-1"><span class="badge bg-light text-dark border" style="font-weight: 500;"><?= htmlspecialchars($svc['name']) ?></span></div>
+                                    </td>
+                                    <td>
+                                        <?= htmlspecialchars($pkg['year'] ?? '') ?>
+                                    </td>
+                                    <td>
+                                        <?= pkg_type_badge_inline($pkg_type) ?>
+                                    </td>
+                                    <td>
+                                        <?= !empty($pkg['purchase_date']) ? date('d M Y', strtotime($pkg['purchase_date'])) : '—' ?>
+                                    </td>
+                                    <td class="<?= $is_expired ? 'text-danger fw-bold' : '' ?>">
+                                        <?= !empty($pkg['expiry_date']) ? date('d M Y', strtotime($pkg['expiry_date'])) : '—' ?>
+                                    </td>
+                                    <td class="fw-bold" style="color:<?= $meta['color'] ?>">
+                                        ₹<?= number_format($svc['price'] ?? 0, 0) ?>
+                                    </td>
+                                    <td>
+                                        <span class="state-pill <?= $state['cls'] ?>">
+                                            <i class="<?= $state['icon'] ?>"></i>
+                                            <?= $state['label'] ?>
+                                        </span>
+                                    </td>
+                                    <td class="text-end">
+                                        <?php if ($is_expired) : ?>
+                                            <button class="btn btn-danger btn-sm pay-bill-btn"
+                                                data-pkg-id="<?= $pkg['id'] ?>"
+                                                data-amount="<?= $pkg['bill_amount'] ?>">
+                                                Pay Now
+                                            </button>
+                                        <?php else : ?>
+                                            <?php $req = isset($pkg['request']) ? (int)$pkg['request'] : 0; ?>
+                                            <?php if ($req == 1) : ?>
+                                                <span class="badge bg-warning text-dark py-1">Pending Delete</span>
+                                            <?php else : ?>
+                                                <form method="post" action="<?= base_url('package/requestdelete') ?>"
+                                                    style="display:inline"
+                                                    onsubmit="return confirm('Request admin to delete this package?')">
+                                                    <input type="hidden" name="package_id" value="<?= $pkg['id'] ?>">
+                                                    <button type="submit" class="btn btn-outline-danger btn-sm">
+                                                        <i class="fe fe-trash-2"></i> Delete
+                                                    </button>
+                                                </form>
+                                            <?php endif; ?>
                                         <?php endif; ?>
+                                    </td>
+                                </tr>
+                                    <?php endforeach; ?>
+                                <?php else: ?>
+                                <tr>
+                                    <td class="text-muted fw-bold">
+                                        <?= $sno++ ?>
+                                    </td>
+                                    <td>
+                                        <span class="text-muted">—</span>
                                     </td>
                                     <td>
                                         <?= htmlspecialchars($pkg['year'] ?? '') ?>
@@ -185,6 +252,7 @@ function payment_state($pkg)
                                         <?php endif; ?>
                                     </td>
                                 </tr>
+                                <?php endif; ?>
                             <?php endforeach; ?>
                         </tbody>
                     </table>
