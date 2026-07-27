@@ -255,8 +255,12 @@ class Wallet extends RestController
                     if (!empty($accountancy)) {
                         $total_fees = $total_paid = $total_penalty = $total_days = 0;
                         $outstanding = $total = 0;
-                        $fees = $total_turnover / $package['turnover'];
-                        $fees *= $package['rate'];
+                        if (isset($name) && $name === 'Accountancy Prime' && $total_turnover > 10000000) {
+                            $fees = 30000 + (floor(($total_turnover - 10000000) / 10000000) * 10000);
+                        } else {
+                            $fees = $total_turnover / $package['turnover'];
+                            $fees *= $package['rate'];
+                        }
                         $count = count($accountancy);
                         $last = end($accountancy);
                         if ($last['date'] == '') {
@@ -371,8 +375,12 @@ class Wallet extends RestController
                         if (!empty($accountancy)) {
                             $total_fees = $total_paid = $total_penalty = $total_days = 0;
                             $outstanding = $total = 0;
-                            $fees = $total_turnover / $package['turnover'];
-                            $fees *= $package['rate'];
+                            if (isset($name) && $name === 'Accountancy Prime' && $total_turnover > 10000000) {
+                                $fees = 30000 + (floor(($total_turnover - 10000000) / 10000000) * 10000);
+                            } else {
+                                $fees = $total_turnover / $package['turnover'];
+                                $fees *= $package['rate'];
+                            }
                             $count = count($accountancy);
                             $last = end($accountancy);
                             if ($last['date'] == '') {

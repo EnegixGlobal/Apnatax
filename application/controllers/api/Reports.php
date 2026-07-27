@@ -881,8 +881,12 @@ class Reports extends RestController
                         $total_fees = $total_other = $total_paid = $total_penalty = $total_days = 0;
                         $outstanding = $total = $balance = 0;
                         $total_sum = 0;
-                        $fees = $total_turnover / $package['turnover'];
-                        $fees *= $package['rate'];
+                        if (isset($name) && $name === 'Accountancy Prime' && $total_turnover > 10000000) {
+                            $fees = 30000 + (floor(($total_turnover - 10000000) / 10000000) * 10000);
+                        } else {
+                            $fees = $total_turnover / $package['turnover'];
+                            $fees *= $package['rate'];
+                        }
                         $count = count($accountancy);
                         $last = end($accountancy);
                         if ($last['date'] == '') {
@@ -1069,8 +1073,12 @@ class Reports extends RestController
                 $total_paid = 0;
                 $outstanding = $total = 0;
 
-                $fees = $total_turnover / $package['turnover'];
-                $fees *= $package['rate'];
+                if (isset($name) && $name === 'Accountancy Prime' && $total_turnover > 10000000) {
+                    $fees = 30000 + (floor(($total_turnover - 10000000) / 10000000) * 10000);
+                } else {
+                    $fees = $total_turnover / $package['turnover'];
+                    $fees *= $package['rate'];
+                }
                 $count = count($accountancy);
                 $last = end($accountancy);
                 if ($last['date'] == '') {
@@ -1302,8 +1310,12 @@ class Reports extends RestController
                 $total_paid = 0;
                 $outstanding = $total = 0;
 
-                $fees = $total_turnover / $package['turnover'];
-                $fees *= $package['rate'];
+                if (isset($name) && $name === 'Accountancy Prime' && $total_turnover > 10000000) {
+                    $fees = 30000 + (floor(($total_turnover - 10000000) / 10000000) * 10000);
+                } else {
+                    $fees = $total_turnover / $package['turnover'];
+                    $fees *= $package['rate'];
+                }
                 $count = count($accountancy);
                 $last = end($accountancy);
                 if ($last['date'] == '') {

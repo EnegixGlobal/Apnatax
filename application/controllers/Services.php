@@ -560,8 +560,12 @@ class Services extends CI_Controller
                 $package = $this->master->getpackages(['name' => $name, 'turnover>' => $turnover], 'single');
                 
                 if (!empty($package)) {
-                    $fees = $total_turnover / $package['turnover'];
-                    $fees *= $package['rate'];
+                    if (isset($name) && $name === 'Accountancy Prime' && $total_turnover > 10000000) {
+                        $fees = 30000 + (floor(($total_turnover - 10000000) / 10000000) * 10000);
+                    } else {
+                        $fees = $total_turnover / $package['turnover'];
+                        $fees *= $package['rate'];
+                    }
                     $bill = (float)$fees;
                 } else {
                     $package = $this->master->getpackages(['name' => $name], 'single');
