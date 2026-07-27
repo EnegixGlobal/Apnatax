@@ -255,22 +255,41 @@ class Wallet extends RestController
                     if (!empty($accountancy)) {
                         $total_fees = $total_paid = $total_penalty = $total_days = 0;
                         $outstanding = $total = 0;
-                        $fees = $total_turnover / $package['turnover'];
-                        $fees *= $package['rate'];
+                        if (isset($name) && $name === 'Accountancy Prime' && $total_turnover > 10000000) {
+                            $fees = 30000 + (floor(($total_turnover - 10000000) / 10000000) * 10000);
+                        } else {
+                            $fees = $total_turnover / $package['turnover'];
+                            $fees *= $package['rate'];
+                        }
                         $count = count($accountancy);
                         $last = end($accountancy);
                         if ($last['date'] == '') {
                             $count--;
                         }
                         $acc_fees = $fees / $count;
+                        $premium_cumulative_gto = 0;
+                        $premium_previous_fee = 0;
                         foreach ($accountancy as $single) {
                             $days = $paid = $penalty = 0;
                             $paid = $single['paid'];
                             $outstanding = $total;
-                            if ($single['date'] != '') {
-                                $acc_fees = $fees / $count;
+                            if (isset($name) && $name === 'Accountancy Premium' && $single['date'] != '') {
+                                $premium_cumulative_gto += $single['turnover'];
+                                $gto = $premium_cumulative_gto;
+                                if ($gto <= 0) $current_total_fee = 0;
+                                elseif ($gto <= 2500000) $current_total_fee = 15000;
+                                elseif ($gto <= 5000000) $current_total_fee = 24000;
+                                elseif ($gto <= 7500000) $current_total_fee = 30000;
+                                elseif ($gto <= 10000000) $current_total_fee = 36000;
+                                else $current_total_fee = 36000 + (ceil(($gto - 10000000) / 10000000) * 15000);
+                                $acc_fees = $current_total_fee - $premium_previous_fee;
+                                $premium_previous_fee = $current_total_fee;
                             } else {
-                                $acc_fees = 0;
+                                if ($single['date'] != '') {
+                                    $acc_fees = $fees / $count;
+                                } else {
+                                    $acc_fees = 0;
+                                }
                             }
                             $balance = $outstanding + $acc_fees;
                             if ($single['due_date'] < $date && $paid < $balance) {
@@ -371,23 +390,43 @@ class Wallet extends RestController
                         if (!empty($accountancy)) {
                             $total_fees = $total_paid = $total_penalty = $total_days = 0;
                             $outstanding = $total = 0;
-                            $fees = $total_turnover / $package['turnover'];
-                            $fees *= $package['rate'];
+                            if (isset($name) && $name === 'Accountancy Prime' && $total_turnover > 10000000) {
+                                $fees = 30000 + (floor(($total_turnover - 10000000) / 10000000) * 10000);
+                            } else {
+                                $fees = $total_turnover / $package['turnover'];
+                                $fees *= $package['rate'];
+                            }
                             $count = count($accountancy);
                             $last = end($accountancy);
                             if ($last['date'] == '') {
                                 $count--;
                             }
                             $acc_fees = $fees / $count;
+                            $premium_cumulative_gto = 0;
+                            $premium_previous_fee = 0;
                             foreach ($accountancy as $single) {
                                 $days = $paid = $penalty = 0;
                                 $paid = $single['paid'];
                                 $outstanding = $total;
-                                if ($single['date'] != '') {
-                                    $acc_fees = $fees / $count;
+                                if (isset($name) && $name === 'Accountancy Premium' && $single['date'] != '') {
+                                    $premium_cumulative_gto += $single['turnover'];
+                                    $gto = $premium_cumulative_gto;
+                                    if ($gto <= 0) $current_total_fee = 0;
+                                    elseif ($gto <= 2500000) $current_total_fee = 15000;
+                                    elseif ($gto <= 5000000) $current_total_fee = 24000;
+                                    elseif ($gto <= 7500000) $current_total_fee = 30000;
+                                    elseif ($gto <= 10000000) $current_total_fee = 36000;
+                                    else $current_total_fee = 36000 + (ceil(($gto - 10000000) / 10000000) * 15000);
+                                    $acc_fees = $current_total_fee - $premium_previous_fee;
+                                    $premium_previous_fee = $current_total_fee;
                                     $currentmonth = $single['date'];
                                 } else {
-                                    $acc_fees = 0;
+                                    if ($single['date'] != '') {
+                                        $acc_fees = $fees / $count;
+                                        $currentmonth = $single['date'];
+                                    } else {
+                                        $acc_fees = 0;
+                                    }
                                 }
                                 $balance = $outstanding + $acc_fees;
                                 if ($single['due_date'] < $date && $paid < $balance) {
