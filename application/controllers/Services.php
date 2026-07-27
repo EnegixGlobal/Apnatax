@@ -562,6 +562,12 @@ class Services extends CI_Controller
                 if (!empty($package)) {
                     if (isset($name) && $name === 'Accountancy Prime' && $total_turnover > 10000000) {
                         $fees = 30000 + (floor(($total_turnover - 10000000) / 10000000) * 10000);
+                    } elseif (isset($name) && $name === 'Accountancy Premium') {
+                        if ($total_turnover <= 2500000) $fees = 15000;
+                        elseif ($total_turnover <= 5000000) $fees = 24000;
+                        elseif ($total_turnover <= 7500000) $fees = 30000;
+                        elseif ($total_turnover <= 10000000) $fees = 36000;
+                        else $fees = 36000 + (ceil(($total_turnover - 10000000) / 10000000) * 15000);
                     } else {
                         $fees = $total_turnover / $package['turnover'];
                         $fees *= $package['rate'];
