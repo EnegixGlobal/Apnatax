@@ -79,8 +79,23 @@ class Reports extends CI_Controller
                 $total_fees = $total_other = $total_paid = $total_penalty = $total_days = 0;
                 $outstanding = $total = $balance = 0;
                 $total_sum = 0;
-                if (isset($name) && $name === 'Accountancy Prime' && $total_turnover > 10000000) {
-                    $fees = 30000 + (floor(($total_turnover - 10000000) / 10000000) * 10000);
+                // Slab-based Prime plan fee, per updated remuneration table
+                if (isset($name) && $name === 'Accountancy Prime') {
+                    $gto = $total_turnover / 100000;
+                    if ($gto <= 0) {
+                        $fees = 0;
+                    } else if ($gto <= 25) {
+                        $fees = (12000 / 25) * $gto;
+                    } else if ($gto <= 50) {
+                        $fees = (20000 / 50) * $gto;
+                    } else if ($gto <= 75) {
+                        $fees = (25000 / 75) * $gto;
+                    } else if ($gto <= 100) {
+                        $fees = (30000 / 100) * $gto;
+                    } else {
+                        $fees = 30000 + (($gto - 100) * (10000 / 100));
+                    }
+                    $fees = round($fees, 2);
                 } else {
                     $fees = $total_turnover / $package['turnover'];
                     $fees *= $package['rate'];
@@ -1379,8 +1394,23 @@ class Reports extends CI_Controller
         $total_paid = 0;
         $outstanding = $total = 0;
 
-        if (isset($name) && $name === 'Accountancy Prime' && $total_turnover > 10000000) {
-            $fees = 30000 + (floor(($total_turnover - 10000000) / 10000000) * 10000);
+        // Slab-based Prime plan fee, per updated remuneration table
+        if (isset($name) && $name === 'Accountancy Prime') {
+            $gto = $total_turnover / 100000;
+            if ($gto <= 0) {
+                $fees = 0;
+            } else if ($gto <= 25) {
+                $fees = (12000 / 25) * $gto;
+            } else if ($gto <= 50) {
+                $fees = (20000 / 50) * $gto;
+            } else if ($gto <= 75) {
+                $fees = (25000 / 75) * $gto;
+            } else if ($gto <= 100) {
+                $fees = (30000 / 100) * $gto;
+            } else {
+                $fees = 30000 + (($gto - 100) * (10000 / 100));
+            }
+            $fees = round($fees, 2);
         } else {
             $fees = $total_turnover / $package['turnover'];
             $fees *= $package['rate'];
@@ -1620,8 +1650,23 @@ class Reports extends CI_Controller
             $total_penalty = 0;
             $outstanding = $total = 0;
 
-            if (isset($name) && $name === 'Accountancy Prime' && $total_turnover > 10000000) {
-                $fees = 30000 + (floor(($total_turnover - 10000000) / 10000000) * 10000);
+            // Slab-based Prime plan fee, per updated remuneration table
+            if (isset($name) && $name === 'Accountancy Prime') {
+                $gto = $total_turnover / 100000;
+                if ($gto <= 0) {
+                    $fees = 0;
+                } else if ($gto <= 25) {
+                    $fees = (12000 / 25) * $gto;
+                } else if ($gto <= 50) {
+                    $fees = (20000 / 50) * $gto;
+                } else if ($gto <= 75) {
+                    $fees = (25000 / 75) * $gto;
+                } else if ($gto <= 100) {
+                    $fees = (30000 / 100) * $gto;
+                } else {
+                    $fees = 30000 + (($gto - 100) * (10000 / 100));
+                }
+                $fees = round($fees, 2);
             } else {
                 $fees = $total_turnover / $package['turnover'];
                 $fees *= $package['rate'];
