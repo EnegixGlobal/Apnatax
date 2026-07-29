@@ -236,10 +236,93 @@ class Reports extends CI_Controller
                     $total_sum += $total;
                     $total_fees += $acc_fees;
                     $total_paid += $paid;
+
+                    $isPastMonth = false;
+
+                    $renewalMethod = 'AUTO_WALLET';
+
+                    $auto_debit_status_label = isset($auto_debit_status) ? $auto_debit_status : 'Pending';
+
+
+                    if ($single['date'] != '') {
+
+                        $todayDate = new DateTime(date('Y-m-d'));
+
+                        $todayDate->setTime(0, 0, 0);
+
+                        
+
+                        $rowDate = new DateTime($single['date']);
+
+                        $rowDate->setTime(0, 0, 0);
+
+                        
+
+                        $isPastMonth = (date('Y-m', $rowDate->getTimestamp()) < date('Y-m', $todayDate->getTimestamp()));
+
+                        $renewalMethod = $isPastMonth ? 'ADMIN' : 'AUTO_WALLET';
+
+                        
+
+                        if ($auto_debit_status_label !== 'Confirmed') {
+
+                            if ($isPastMonth) {
+
+                                if ($total > 0) {
+
+                                    $auto_debit_status_label = 'Admin Renew';
+
+                                } else {
+
+                                    $auto_debit_status_label = 'Renewed';
+
+                                }
+
+                            } else {
+
+                                if (!empty($single['due_date'])) {
+
+                                    $dueDateObj = new DateTime($single['due_date']);
+
+                                    $dueDateObj->setTime(0, 0, 0);
+
+                                    
+
+                                    $interval = $todayDate->diff($dueDateObj);
+
+                                    $daysLeft = (int)$interval->format('%R%a');
+
+                                    
+
+                                    if ($daysLeft > 0) {
+
+                                        $auto_debit_status_label = $daysLeft . ' day' . ($daysLeft === 1 ? '' : 's') . ' left auto debit';
+
+                                    } else if ($daysLeft === 0) {
+
+                                        $auto_debit_status_label = 'Auto debit today';
+
+                                    } else {
+
+                                        $auto_debit_status_label = 'Auto debit processing';
+
+                                    }
+
+                                } else {
+
+                                    $auto_debit_status_label = 'Pending';
+
+                                }
+
+                            }
+
+                        }
+
+                    }
+
                     $month = $single['date'] != '' ? date('F-y', strtotime($single['date'])) : '--';
                     $due_date = $single['due_date'] != '' ? date('d-m-Y F', strtotime($single['due_date'])) : '--';
-                    $row = array(
-                        'month' => $month,
+                    $row = array('month' => $month,
                         'outstanding' => round($outstanding, 2),
                         'gto' => round($single['turnover'], 2),
                         'acc_fees' => round($acc_fees, 2),
@@ -249,7 +332,11 @@ class Reports extends CI_Controller
                         'balance' => round($balance, 2),
                         'due_date' => $due_date,
                         'due_days' => $days,
-                        'auto_debit_status' => $auto_debit_status
+
+                        'renewal_method' => $renewalMethod,
+
+                        'auto_debit_status_label' => $auto_debit_status_label
+
                     );
 
                     $report[] = $row;
