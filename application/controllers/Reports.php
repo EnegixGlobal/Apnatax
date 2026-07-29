@@ -118,35 +118,65 @@ class Reports extends CI_Controller
                     $fees *= $package['rate'];
                 }
                 $count = count($accountancy);
+
                 $last = end($accountancy);
+
                 if ($last['date'] == '') {
+
                     $count--;
+
                 }
-                $acc_fees = $fees / $count;
-                $premium_cumulative_gto = 0;
-                $premium_previous_fee = 0;
+
+                $activeMonthsCount = 0;
+
+                foreach ($accountancy as $acct) {
+
+                    if (isset($acct['turnover']) && $acct['turnover'] > 0) {
+
+                        $activeMonthsCount++;
+
+                    }
+
+                }
+
+                $monthlyAccountsFee = $activeMonthsCount > 0 ? ($fees / $activeMonthsCount) : 0;
+
+                $acc_fees = $count > 0 ? ($fees / $count) : 0;
+
+
                 foreach ($accountancy as &$single) {
+
                     $days = $paid = $penalty = 0;
+
                     $paid = !empty($single['paid']) ? $single['paid'] : 0;
+
                     // Outstanding should be the previous month's balance (unpaid amount)
                     $outstanding = $balance;
-                    if (isset($name) && $name === 'Accountancy Premium' && $single['date'] != '') {
-                        $premium_cumulative_gto += $single['turnover'];
-                        $gto = $premium_cumulative_gto;
-                        if ($gto <= 0) $current_total_fee = 0;
-                        elseif ($gto <= 2500000) $current_total_fee = 15000;
-                        elseif ($gto <= 5000000) $current_total_fee = 24000;
-                        elseif ($gto <= 7500000) $current_total_fee = 30000;
-                        elseif ($gto <= 10000000) $current_total_fee = 36000;
-                        else $current_total_fee = 36000 + (ceil(($gto - 10000000) / 10000000) * 15000);
-                        $acc_fees = $current_total_fee - $premium_previous_fee;
-                        $premium_previous_fee = $current_total_fee;
-                    } else {
-                        if ($single['date'] != '') {
-                            $acc_fees = $fees / $count;
+
+                    if (isset($name) && ($name === 'Accountancy Prime' || $name === 'Accountancy Premium')) {
+
+                        if (isset($single['turnover']) && $single['turnover'] > 0) {
+
+                            $acc_fees = $monthlyAccountsFee;
+
                         } else {
+
                             $acc_fees = 0;
+
                         }
+
+                    } else {
+
+                        if ($single['date'] != '') {
+
+                            $acc_fees = $count > 0 ? ($fees / $count) : 0;
+
+                        } else {
+
+                            $acc_fees = 0;
+
+                        }
+
                     }
                     $other_fee = $single['other_fee'] ?? 0;
                     $total_other += $other_fee;
@@ -1450,35 +1480,64 @@ class Reports extends CI_Controller
             $fees *= $package['rate'];
         }
         $count = count($accountancy);
+
         $last = end($accountancy);
+
         if ($last['date'] == '') {
+
             $count--;
+
         }
-        $acc_fees = $fees / $count;
-        $premium_cumulative_gto = 0;
-        $premium_previous_fee = 0;
+
+        $activeMonthsCount = 0;
+
+        foreach ($accountancy as $acct) {
+
+            if (isset($acct['turnover']) && $acct['turnover'] > 0) {
+
+                $activeMonthsCount++;
+
+            }
+
+        }
+
+        $monthlyAccountsFee = $activeMonthsCount > 0 ? ($fees / $activeMonthsCount) : 0;
+
+        $acc_fees = $count > 0 ? ($fees / $count) : 0;
+
 
         foreach ($accountancy as $single) {
+
             $days = $paid = $penalty = 0;
+
             $paid = !empty($single['paid']) ? $single['paid'] : 0;
+
             $outstanding = $total;
-            if (isset($name) && $name === 'Accountancy Premium' && $single['date'] != '') {
-                $premium_cumulative_gto += $single['turnover'];
-                $gto = $premium_cumulative_gto;
-                if ($gto <= 0) $current_total_fee = 0;
-                elseif ($gto <= 2500000) $current_total_fee = 15000;
-                elseif ($gto <= 5000000) $current_total_fee = 24000;
-                elseif ($gto <= 7500000) $current_total_fee = 30000;
-                elseif ($gto <= 10000000) $current_total_fee = 36000;
-                else $current_total_fee = 36000 + (ceil(($gto - 10000000) / 10000000) * 15000);
-                $acc_fees = $current_total_fee - $premium_previous_fee;
-                $premium_previous_fee = $current_total_fee;
-            } else {
-                if ($single['date'] != '') {
-                    $acc_fees = $fees / $count;
+
+            if (isset($name) && ($name === 'Accountancy Prime' || $name === 'Accountancy Premium')) {
+
+                if (isset($single['turnover']) && $single['turnover'] > 0) {
+
+                    $acc_fees = $monthlyAccountsFee;
+
                 } else {
+
                     $acc_fees = 0;
+
                 }
+
+            } else {
+
+                if ($single['date'] != '') {
+
+                    $acc_fees = $count > 0 ? ($fees / $count) : 0;
+
+                } else {
+
+                    $acc_fees = 0;
+
+                }
+
             }
             $other_fee = $single['other_fee'] ?? 0;
             $balance = $outstanding + $acc_fees + $other_fee;
@@ -1723,35 +1782,64 @@ class Reports extends CI_Controller
                 $fees *= $package['rate'];
             }
             $count = count($accountancy);
+
             $last = end($accountancy);
+
             if ($last['date'] == '') {
+
                 $count--;
+
             }
-            $acc_fees = $fees / $count;
-            $premium_cumulative_gto = 0;
-            $premium_previous_fee = 0;
+
+            $activeMonthsCount = 0;
+
+            foreach ($accountancy as $acct) {
+
+                if (isset($acct['turnover']) && $acct['turnover'] > 0) {
+
+                    $activeMonthsCount++;
+
+                }
+
+            }
+
+            $monthlyAccountsFee = $activeMonthsCount > 0 ? ($fees / $activeMonthsCount) : 0;
+
+            $acc_fees = $count > 0 ? ($fees / $count) : 0;
+
 
             foreach ($accountancy as $single) {
+
                 $days = $paid = $penalty = 0;
+
                 $paid = !empty($single['paid']) ? $single['paid'] : 0;
+
                 $outstanding = $total;
-                if (isset($name) && $name === 'Accountancy Premium' && $single['date'] != '') {
-                    $premium_cumulative_gto += $single['turnover'];
-                    $gto = $premium_cumulative_gto;
-                    if ($gto <= 0) $current_total_fee = 0;
-                    elseif ($gto <= 2500000) $current_total_fee = 15000;
-                    elseif ($gto <= 5000000) $current_total_fee = 24000;
-                    elseif ($gto <= 7500000) $current_total_fee = 30000;
-                    elseif ($gto <= 10000000) $current_total_fee = 36000;
-                    else $current_total_fee = 36000 + (ceil(($gto - 10000000) / 10000000) * 15000);
-                    $acc_fees = $current_total_fee - $premium_previous_fee;
-                    $premium_previous_fee = $current_total_fee;
-                } else {
-                    if ($single['date'] != '') {
-                        $acc_fees = $fees / $count;
+
+                if (isset($name) && ($name === 'Accountancy Prime' || $name === 'Accountancy Premium')) {
+
+                    if (isset($single['turnover']) && $single['turnover'] > 0) {
+
+                        $acc_fees = $monthlyAccountsFee;
+
                     } else {
+
                         $acc_fees = 0;
+
                     }
+
+                } else {
+
+                    if ($single['date'] != '') {
+
+                        $acc_fees = $count > 0 ? ($fees / $count) : 0;
+
+                    } else {
+
+                        $acc_fees = 0;
+
+                    }
+
                 }
                 $other_fee = $single['other_fee'] ?? 0;
                 $balance = $outstanding + $acc_fees + $other_fee;
