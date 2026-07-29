@@ -215,7 +215,14 @@ if ($this->session->flashdata('year') !== NULL) {
                                         ?>
                                     <?php } else { ?>
                                         <td class="text-center">
-                                            <span class="text-muted">Auto Debit</span>
+                                            <?php if ($paid > 0) { ?>
+                                                <span class="text-success font-weight-bold">
+                                                    Auto Debit<br>
+                                                    <small><?= !empty($single['payment_date']) ? date('d-m-Y', strtotime($single['payment_date'])) : '' ?></small>
+                                                </span>
+                                            <?php } else { ?>
+                                                <span class="text-muted">Auto Debit</span>
+                                            <?php } ?>
                                         </td>
                                     <?php } ?>
                                 </tr>

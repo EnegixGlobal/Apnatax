@@ -173,6 +173,8 @@
                                     data-userid="<?= $single['user_id']; ?>" 
                                     data-firmid="<?= $single['firm_id']; ?>" 
                                     data-date="<?= $single['date']; ?>" 
+                                    data-accfee="<?= $acc_fees; ?>" 
+                                    data-latefee="<?= $penalty; ?>" 
                                     title="Renew this month">
                                     <i class="fa fa-refresh"></i> Renew
                                 </button>

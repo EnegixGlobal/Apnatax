@@ -118,7 +118,9 @@ if($this->session->flashdata('year')!==NULL){
                         amount: amount,
                         user_id: btn.data('userid'),
                         firm_id: btn.data('firmid'),
-                        date: btn.data('date') || ''
+                        date: btn.data('date') || '',
+                        acc_fee: btn.data('accfee') || 0,
+                        late_fee: btn.data('latefee') || 0
                     };
                     
                     pendingRenewAction = btn.hasClass('renew-btn') ? 'renewaccountancy' : 'renewmonthlypackage';
@@ -161,8 +163,8 @@ if($this->session->flashdata('year')!==NULL){
                     });
                 }
 
-                $('#btn-pay-wallet').click(function() { processRenewal('Wallet'); });
-                $('#btn-pay-credit').click(function() { processRenewal('Credit Limit'); });
+                $('body').on('click', '#btn-pay-wallet', function() { processRenewal('Wallet'); });
+                $('body').on('click', '#btn-pay-credit', function() { processRenewal('Credit Limit'); });
             </script>
 
             <!-- Modal for Payment Method -->

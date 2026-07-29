@@ -322,6 +322,26 @@ class Reports extends CI_Controller
 
                     $month = $single['date'] != '' ? date('F-y', strtotime($single['date'])) : '--';
                     $due_date = $single['due_date'] != '' ? date('d-m-Y F', strtotime($single['due_date'])) : '--';
+
+                    $auto_debit_status_html = '';
+                    if ($auto_debit_status_label === 'Confirmed') {
+                        $auto_debit_status_html = '<span class="badge bg-success">Confirmed</span>';
+                    } else {
+                        $auto_debit_status_html = '<span class="badge bg-warning text-dark">' . $auto_debit_status_label . '</span>';
+                    }
+                    
+                    $action_date_html = '';
+                    if ($auto_debit_status_label === 'Confirmed' || $paid > 0) {
+                        $p_date = !empty($single['payment_date']) ? date('d-m-Y', strtotime($single['payment_date'])) : '';
+                        $action_date_html = '<span class="text-success font-weight-bold"><i class="fa fa-check-circle"></i> Confirmed<br><small>' . $p_date . '</small></span>';
+                    } else {
+                        if ($renewalMethod === 'ADMIN') {
+                            $action_date_html = 'Admin Renew';
+                        } else {
+                            $action_date_html = '<span class="text-muted">Auto Debit</span>';
+                        }
+                    }
+
                     $row = array('month' => $month,
                         'outstanding' => round($outstanding, 2),
                         'gto' => round($single['turnover'], 2),
@@ -332,11 +352,8 @@ class Reports extends CI_Controller
                         'balance' => round($balance, 2),
                         'due_date' => $due_date,
                         'due_days' => $days,
-
-                        'renewal_method' => $renewalMethod,
-
-                        'auto_debit_status_label' => $auto_debit_status_label
-
+                        'auto_debit_status_label' => $auto_debit_status_html,
+                        'action_date' => $action_date_html
                     );
 
                     $report[] = $row;
@@ -352,7 +369,8 @@ class Reports extends CI_Controller
                     'balance' => 0,
                     'due_date' => '',
                     'due_days' => $total_days,
-                    'auto_debit_status' => ''
+                    'auto_debit_status' => '',
+                    'action_date' => ''
                 );
 
                 $report[] = $row;
