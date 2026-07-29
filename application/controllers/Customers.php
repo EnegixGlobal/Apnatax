@@ -969,6 +969,8 @@ class Customers extends CI_Controller
         $user_id = $this->input->post('user_id');
         $firm_id = $this->input->post('firm_id');
         $date = $this->input->post('date');
+        $acc_fee = $this->input->post('acc_fee') ?: 0;
+        $late_fee = $this->input->post('late_fee') ?: 0;
         $payment_method = $this->input->post('payment_method') ?: 'Wallet';
 
         if (empty($id) || empty($amount) || empty($user_id) || empty($firm_id)) {
@@ -1015,6 +1017,8 @@ class Customers extends CI_Controller
             'firm_id' => $firm_id,
             'acc_date' => $date,
             'amount' => $amount,
+            'acc_fee' => $acc_fee,
+            'late_fee' => $late_fee,
             'payment_mode' => $payment_method,
             'added_on' => date('Y-m-d H:i:s'),
             'updated_on' => date('Y-m-d H:i:s')

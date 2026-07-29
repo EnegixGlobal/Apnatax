@@ -121,6 +121,43 @@ if ($this->session->flashdata('year') !== NULL) {
                                     );
                                     $prev[] = $month;
                                 }
+                    // --- DYNAMIC RENEWAL LOGIC ---
+                    $isPastMonth = false;
+                    $renewalMethod = 'AUTO_WALLET';
+                    $auto_debit_status_label = $single['auto_debit_status'] ?? 'Pending';
+                    
+                    if ($single['date'] != '') {
+                        $todayDate = new DateTime(date('Y-m-d'));
+                        $todayDate->setTime(0, 0, 0);
+                        $rowDate = new DateTime($single['date']);
+                        $rowDate->setTime(0, 0, 0);
+                        
+                        $isPastMonth = (date('Y-m', $rowDate->getTimestamp()) < date('Y-m', $todayDate->getTimestamp()));
+                        $renewalMethod = $isPastMonth ? 'ADMIN' : 'AUTO_WALLET';
+                        
+                        if ($auto_debit_status_label !== 'Confirmed') {
+                            if ($isPastMonth) {
+                                $auto_debit_status_label = ($total > 0) ? 'Admin Renew' : 'Renewed';
+                            } else {
+                                if (!empty($single['due_date'])) {
+                                    $dueDateObj = new DateTime($single['due_date']);
+                                    $dueDateObj->setTime(0, 0, 0);
+                                    $interval = $todayDate->diff($dueDateObj);
+                                    $daysLeft = (int)$interval->format('%R%a');
+                                    if ($daysLeft > 0) {
+                                        $auto_debit_status_label = $daysLeft . ' day' . ($daysLeft === 1 ? '' : 's') . ' left auto debit';
+                                    } else if ($daysLeft === 0) {
+                                        $auto_debit_status_label = 'Auto debit today';
+                                    } else {
+                                        $auto_debit_status_label = 'Auto debit processing';
+                                    }
+                                } else {
+                                    $auto_debit_status_label = 'Pending';
+                                }
+                            }
+                        }
+                    }
+                    // -----------------------------
                         ?>
                                 <tr>
                                     <td>
@@ -156,25 +193,38 @@ if ($this->session->flashdata('year') !== NULL) {
                                     </td>
                                     <td><?= $days; ?></td>
                                     <td class="text-center">
-                                        <?php if (($single['auto_debit_status'] ?? 'Pending') == 'Confirmed') { ?>
+                                        <?php if ($auto_debit_status_label === 'Confirmed') { ?>
                                             <span class="badge bg-success">Confirmed</span>
                                         <?php } else { ?>
-                                            <span class="badge bg-warning text-dark">Pending</span>
+                                            <span class="badge bg-warning text-dark"><?= $auto_debit_status_label ?></span>
                                         <?php } ?>
                                     </td>
-                                    <?php if ($paid == 0) { ?>
-                                        <td>
-                                            <button type="button" class="btn btn-sm btn-info edit-btn" value="<?= $single['id']; ?>"><i class="fa fa-edit"></i></button>
-                                            <button type="button" class="btn btn-sm btn-danger delete-btn" value="<?= $single['id']; ?>"><i class="fa fa-trash"></i></button>
+                                    <?php if ($renewalMethod === 'ADMIN') { ?>
+                                        <?php if ($paid == 0) { ?>
+                                            <td>
+                                                <button type="button" class="btn btn-sm btn-info edit-btn" value="<?= $single['id']; ?>"><i class="fa fa-edit"></i></button>
+                                                <button type="button" class="btn btn-sm btn-danger delete-btn" value="<?= $single['id']; ?>"><i class="fa fa-trash"></i></button>
+                                            </td>
+                                        <?php } else {
+                                        ?>
+                                            <td class="text-center font-weight-bold text-success">
+                                                <?= !empty($single['payment_date']) ? date('d-m-Y', strtotime($single['payment_date'])) : '<i class="fa fa-check-circle" style="font-size: 1.5em;"></i>' ?>
+                                            </td>
+                                        <?php
+                                        }
+                                        ?>
+                                    <?php } else { ?>
+                                        <td class="text-center">
+                                            <?php if ($paid > 0) { ?>
+                                                <span class="text-success font-weight-bold">
+                                                    Auto Debit<br>
+                                                    <small><?= !empty($single['payment_date']) ? date('d-m-Y', strtotime($single['payment_date'])) : '' ?></small>
+                                                </span>
+                                            <?php } else { ?>
+                                                <span class="text-muted">Auto Debit</span>
+                                            <?php } ?>
                                         </td>
-                                    <?php } else {
-                                    ?>
-                                        <td class="text-center font-weight-bold text-success">
-                                            <?= !empty($single['payment_date']) ? date('d-m-Y', strtotime($single['payment_date'])) : '<i class="fa fa-check-circle" style="font-size: 1.5em;"></i>' ?>
-                                        </td>
-                                    <?php
-                                    }
-                                    ?>
+                                    <?php } ?>
                                 </tr>
                             <?php
                             }
