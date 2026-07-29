@@ -96,6 +96,23 @@ class Reports extends CI_Controller
                         $fees = 30000 + (($gto - 100) * (10000 / 100));
                     }
                     $fees = round($fees, 2);
+                } else if (isset($name) && $name === 'Accountancy Premium') {
+                    // Slab-based Premium plan fee, per updated remuneration table
+                    $gto = $total_turnover / 100000;
+                    if ($gto <= 0) {
+                        $fees = 0;
+                    } else if ($gto <= 25) {
+                        $fees = (15000 / 25) * $gto;
+                    } else if ($gto <= 50) {
+                        $fees = (24000 / 50) * $gto;
+                    } else if ($gto <= 75) {
+                        $fees = (30000 / 75) * $gto;
+                    } else if ($gto <= 100) {
+                        $fees = (36000 / 100) * $gto;
+                    } else {
+                        $fees = 36000 + (($gto - 100) * (15000 / 100));
+                    }
+                    $fees = round($fees, 2);
                 } else {
                     $fees = $total_turnover / $package['turnover'];
                     $fees *= $package['rate'];
@@ -1411,6 +1428,23 @@ class Reports extends CI_Controller
                 $fees = 30000 + (($gto - 100) * (10000 / 100));
             }
             $fees = round($fees, 2);
+        } else if (isset($name) && $name === 'Accountancy Premium') {
+            // Slab-based Premium plan fee, per updated remuneration table
+            $gto = $total_turnover / 100000;
+            if ($gto <= 0) {
+                $fees = 0;
+            } else if ($gto <= 25) {
+                $fees = (15000 / 25) * $gto;
+            } else if ($gto <= 50) {
+                $fees = (24000 / 50) * $gto;
+            } else if ($gto <= 75) {
+                $fees = (30000 / 75) * $gto;
+            } else if ($gto <= 100) {
+                $fees = (36000 / 100) * $gto;
+            } else {
+                $fees = 36000 + (($gto - 100) * (15000 / 100));
+            }
+            $fees = round($fees, 2);
         } else {
             $fees = $total_turnover / $package['turnover'];
             $fees *= $package['rate'];
@@ -1665,6 +1699,23 @@ class Reports extends CI_Controller
                     $fees = (30000 / 100) * $gto;
                 } else {
                     $fees = 30000 + (($gto - 100) * (10000 / 100));
+                }
+                $fees = round($fees, 2);
+            } else if (isset($name) && $name === 'Accountancy Premium') {
+                // Slab-based Premium plan fee, per updated remuneration table
+                $gto = $total_turnover / 100000;
+                if ($gto <= 0) {
+                    $fees = 0;
+                } else if ($gto <= 25) {
+                    $fees = (15000 / 25) * $gto;
+                } else if ($gto <= 50) {
+                    $fees = (24000 / 50) * $gto;
+                } else if ($gto <= 75) {
+                    $fees = (30000 / 75) * $gto;
+                } else if ($gto <= 100) {
+                    $fees = (36000 / 100) * $gto;
+                } else {
+                    $fees = 36000 + (($gto - 100) * (15000 / 100));
                 }
                 $fees = round($fees, 2);
             } else {
