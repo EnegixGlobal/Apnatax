@@ -1552,7 +1552,7 @@ class Reports extends CI_Controller
             if ($gto <= 0) {
                 $fees = 0;
             } else if ($gto <= 25) {
-                $fees = (12000 / 25) * $gto;
+                $fees = 12000;
             } else if ($gto <= 50) {
                 $fees = (20000 / 50) * $gto;
             } else if ($gto <= 75) {
@@ -1569,7 +1569,7 @@ class Reports extends CI_Controller
             if ($gto <= 0) {
                 $fees = 0;
             } else if ($gto <= 25) {
-                $fees = (15000 / 25) * $gto;
+                $fees = 15000;
             } else if ($gto <= 50) {
                 $fees = (24000 / 50) * $gto;
             } else if ($gto <= 75) {
@@ -1854,7 +1854,7 @@ class Reports extends CI_Controller
                 if ($gto <= 0) {
                     $fees = 0;
                 } else if ($gto <= 25) {
-                    $fees = (12000 / 25) * $gto;
+                    $fees = 12000;
                 } else if ($gto <= 50) {
                     $fees = (20000 / 50) * $gto;
                 } else if ($gto <= 75) {
@@ -1871,7 +1871,7 @@ class Reports extends CI_Controller
                 if ($gto <= 0) {
                     $fees = 0;
                 } else if ($gto <= 25) {
-                    $fees = (15000 / 25) * $gto;
+                    $fees = 15000;
                 } else if ($gto <= 50) {
                     $fees = (24000 / 50) * $gto;
                 } else if ($gto <= 75) {
