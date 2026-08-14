@@ -72,7 +72,7 @@ $(document).ready(function() {
         table.search(this.value).draw();
     });
     
-    $('.update-limit-btn').click(function() {
+    $('#creditlimit-table').on('click', '.update-limit-btn', function() {
         var btn = $(this);
         var id = btn.data('id');
         var limit = $('#limit_' + id).val();
